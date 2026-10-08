@@ -84,6 +84,41 @@ Each game has:
 
 ![Adding fractions: pieces go into fraction bars](../assets/screenshots/fraction-game.png)
 
+## Number Snake
+
+A snake game that eats numbers instead of apples (on More games). In **Answer it**, a question shows at the top (10 × 1 = ?): steer to the right answer and the snake grows; the other numbers are near misses. In **Multiples**, eat every multiple of a number to move on to the next table. In **Add it up**, every number is fair game: the one you eat is added to a running total, and the snake waits while you type the new total (or tap it on the keypad). Bigger numbers are harder sums and score more; reach the goal (30, 100 or 500) for a bonus, and the total starts again from 0. A wrong number costs one of three hearts and shows the right fact, and running into your own tail ends the game.
+
+Two choices on the menu make it calmer or harder:
+
+| Choice | Options |
+|---|---|
+| **Movement** | **Auto** (the default): the snake keeps going and the arrows steer it. **Manual**: it only moves when you press, one square per press, with no time pressure (Speed doesn't apply). |
+| **Speed** | 🐌 Slow (the default), 🐢 Normal, 🐇 Fast. It speeds up a little with every right answer, but never past a limit for each speed. |
+| **Walls** | **Stop** (the default): bump into the wall and wait for a turn, no harm done. **Wrap**: come back in on the other side. **Lose a heart**: stop, and lose a heart. **Game over**: the classic rule. |
+
+Unless the walls wrap, numbers never appear along the edges, so you're never lured into a wall.
+
+Steer with the arrow keys (or WASD), a swipe on the board, or the arrows beside it; Space pauses. Easy is ×2, ×5 and ×10; Medium ×1 to ×6; Hard ×1 to ×12, on bigger boards. In Add it up the numbers are 1–9, 5–25 or 11–99. Your best score is kept for each way to play.
+
+![Number Snake: eat the answer to the question](../assets/screenshots/number-snake.png)
+
+![Add it up: the snake waits while you give the new total](../assets/screenshots/number-snake-add.png)
+
+## Demos
+
+**Demos** on the main menu opens 26 quick demos: classic games turned into math games, to try out ideas. Each has Easy, Medium and Hard (the times tables), a score, and a message with the right fact after every mistake.
+
+| Group | Demos |
+|---|---|
+| Arcade | Times Tetris, Fact Invaders, Product Breakout, Multiple Muncher (Pac-Man), Answer Hopper (Frogger), Whack-a-Multiple, Flappy Facts, Factor Asteroids |
+| Puzzle | 2048 ×2, Product Match (Match-3), Fact Pairs (Memory), Multiple Sweeper (Minesweeper), Times Cages (KenKen), Picture Products (Nonogram), Area Puzzle (Tangram) |
+| Board & card | Four in a Row, Snakes & Ladders, Fact Battleship, Product War, Times Bingo, Fact Dominoes |
+| Other genres | Fact Towers (tower defense), Fact Racer, Skip-Count Beats (rhythm), Multiplier Bakery (idle clicker), Jump the Answer (platformer) |
+
+![The Demos hub](../assets/screenshots/demos-hub.png)
+
+![All 26 demos](../assets/screenshots/demos-all.png)
+
 ## Cheat codes
 
 Press ++grave++ (the key left of 1) for the cheat code box. Codes are secret; each one found earns a hidden achievement, and the box lists the active ones so they can be switched off. Cheats never work in class games.

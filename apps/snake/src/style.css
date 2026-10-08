@@ -1,0 +1,36 @@
+/* Number Snake: the shared Blockout look, plus the snake's panel and arrows. */
+@import '@blockout/ui/css/tokens.css';
+@import '@blockout/ui/css/base.css';
+@import '@blockout/ui/css/menu.css';
+@import '@blockout/ui/css/game.css';
+@import '@blockout/ui/css/play.css';
+@import '@blockout/ui/css/results.css';
+@import '@blockout/ui/css/rewards.css';
+@import '@blockout/ui/css/small-screens.css';
+@import '@blockout/game-kit/style.css';
+
+#board { cursor: default; border-radius: 10px; touch-action: none; }
+.snake-panel { text-align: center; }
+.snake-task { font-size: 1.6rem; font-weight: 900; line-height: 1.2; }
+.snake-fact { min-height: 2.6em; margin: 10px 0; font-weight: 800; color: var(--muted); }
+.snake-fact.good { color: var(--good-ink); }
+.snake-fact.bad { color: var(--bad); }
+.snake-stats { display: flex; justify-content: space-between; align-items: center; font-weight: 900; font-size: 1.2rem; }
+.snake-score small { font-size: 0.8rem; color: var(--muted); }
+.snake-keys { margin-top: 14px; }
+.dpad { display: grid; grid-template-columns: repeat(3, 64px); grid-template-rows: repeat(2, 56px); gap: 6px; justify-content: center; }
+.dpad [data-dir="up"] { grid-column: 2; grid-row: 1; }
+.dpad [data-dir="left"] { grid-column: 1; grid-row: 2; }
+.dpad [data-dir="down"] { grid-column: 2; grid-row: 2; }
+.dpad [data-dir="right"] { grid-column: 3; grid-row: 2; }
+.dpad .btn { font-size: 1.3rem; padding: 0; }
+#level small, #walls small, #movement small { display: block; }
+#walls { display: grid; grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 480px) { #walls { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) {
+  .game-header .logo.small { font-size: 1.25rem; }
+}
+
+.snake-ask { margin-top: 10px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.snake-ask .math-q { font-size: 1.6rem; font-weight: 900; display: flex; align-items: center; gap: 8px; }
+.snake-ask .answer-box { min-width: 3.2em; }

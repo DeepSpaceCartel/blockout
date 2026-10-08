@@ -1,0 +1,17 @@
+{
+  "name": "@blockout/demos",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "description": "Blockout demos: classic game mechanics (Tetris, Space Invaders, 2048, Bingo…) turned into quick math games to try.",
+  "dependencies": {
+    "@blockout/ui": "*",
+    "@blockout/game-kit": "*"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "node --test",
+    "lint": "eslint src test"
+  }
+}

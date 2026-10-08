@@ -1,0 +1,17 @@
+{
+  "name": "@blockout/snake",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "description": "Number Snake: a snake game that eats numbers instead of apples (a prototype under More games).",
+  "dependencies": {
+    "@blockout/ui": "*",
+    "@blockout/game-kit": "*"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "node --test",
+    "lint": "eslint src test"
+  }
+}

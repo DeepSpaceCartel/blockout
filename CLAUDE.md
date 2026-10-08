@@ -12,6 +12,8 @@ A multiplication-as-area game for 3rd graders, based on "Blockout" from Math for
 | `apps/multiplication/src/game/*.js` | The game UI, one module per area: `base` (constants, `el`), `wallet`, `settings`, `wardrobe`, `play` (game state and turns), `stats`, `shop`, `achievements`, `practice`, `invites`, `classroom`, `cheats`, `checkin`, `input`, `render`. See "How the game modules load" below. |
 | `apps/multiplication/src/accounts.js` | Account screens: sign in, student homework (Play › starts the game), teacher My classes, parent My kids, live tournament banner. Imports what it needs from `src/game/api.js`. |
 | `apps/multiplication/src/invite.js` | Invite links (`validate` whitelists every setting). |
+| `apps/demos` | Demos (`/demos/`): 26 classic mechanics as quick math games. `src/catalog.js` lists them; each is `src/games/<id>.js` exporting `mount(stage, ctx)`, where `ctx` (from `src/kit.js`) gives facts, the status bar, keypad, canvas, and timers and listeners that clean themselves up. `window.Demo.state()` for automated checks. |
+| `apps/snake` | Number Snake (`/snake/`): a snake game that eats numbers. Rules in `src/rules.js` (pure, tested), the page in `src/main.js`; `window.SnakeGame` for automated checks. |
 | `apps/<operation>` (7), `apps/more-games` | The other games (`/addition/`, …), each a tiny app running `@blockout/game-kit`, plus the More games hub (`/more-games/`). |
 | `apps/server/src/index.js` | Node server: the built apps (`apps/<name>/dist`; multiplication at `/`), JSON API, SSE plus `/poll` for classrooms, accounts routes. |
 | `apps/server/src/rooms.js`, `tournament.js` | Pure room logic: whole class, pairs, tournaments (knockout, double elimination, round robin, Swiss, king of the hill). |

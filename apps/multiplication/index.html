@@ -180,6 +180,7 @@
         <button type="button" class="btn btn-small" id="achievements-btn"><svg class="icon" aria-hidden="true"><use href="#i-trophy"></use></svg> Achievements</button>
         <button type="button" class="btn btn-small" id="invite-btn"><svg class="icon" aria-hidden="true"><use href="#i-link"></use></svg> Invite</button>
         <a class="btn btn-small" id="more-games-btn" href="/more-games/"><svg class="icon" aria-hidden="true"><use href="#i-gamepad"></use></svg> More games</a>
+        <a class="btn btn-small" id="demos-btn" href="/demos/"><svg class="icon" aria-hidden="true"><use href="#i-dices"></use></svg> Demos</a>
       </div>
     </div>
   </main>
@@ -268,6 +269,7 @@
             <button type="button" class="btn" id="host-end-btn"><svg class="icon" aria-hidden="true"><use href="#i-flag"></use></svg> End game</button>
           </div>
           <label class="host-auto" id="host-auto-label"><input type="checkbox" id="host-auto" checked /> Roll again by itself when everyone’s done</label>
+          <div class="host-boards" id="host-boards" hidden></div>
         </div>
         <div id="host-ended" class="host-panel" hidden>
           <p class="host-kicker">Class results</p>
@@ -367,6 +369,8 @@
         </div>
 
         <div class="scores" id="scores"></div>
+
+        <div class="classmates" id="classmates" hidden></div>
       </aside>
     </div>
   </main>

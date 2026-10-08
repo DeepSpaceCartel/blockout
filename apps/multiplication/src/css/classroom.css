@@ -143,3 +143,17 @@ button.pair-name.picked { border-style: solid; border-color: var(--accent); back
   .host-layout { grid-template-columns: 1fr; }
   .host-roster { max-height: none; }
 }
+
+/* ---------- Classmates' boards: the student's side panel and the teacher's screen ---------- */
+.mini-board { display: block; border: 2px solid var(--edge); border-radius: 6px; background: var(--surface); }
+.classmates { margin-top: 12px; }
+.classmates-title { margin: 0 0 8px; font-size: 0.95rem; color: var(--muted); }
+.classmates-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.classmate, .host-board { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px; border: 2px solid var(--line); border-radius: 10px; background: var(--paper); }
+.classmate.done, .host-board.done { border-color: var(--good); }
+.host-board.offline { opacity: 0.55; }
+.classmate-who { display: flex; flex-direction: column; align-items: center; text-align: center; line-height: 1.15; }
+.classmate-name { font-weight: 800; font-size: 0.85rem; }
+.classmate-score { font-size: 0.75rem; color: var(--muted); font-weight: 700; }
+.host-boards { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; width: 100%; margin-top: 14px; }
+.host-name .player-title, .match-name .player-title, .podium-name .player-title, .pair-name .player-title, .result-name .player-title { display: block; font-size: 0.7rem; white-space: normal; line-height: 1.15; }

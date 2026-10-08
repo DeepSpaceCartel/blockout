@@ -201,6 +201,8 @@ export function run() {
     stats: $('stats'),
     detailsBtn: $('details-btn'),
     scores: $('scores'),
+    classmates: $('classmates'),
+    hostBoards: $('host-boards'),
     gameOver: $('game-over'),
     resultTitle: $('result-title'),
     resultSub: $('result-sub'),

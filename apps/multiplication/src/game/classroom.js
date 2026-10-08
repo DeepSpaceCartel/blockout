@@ -13,10 +13,65 @@ import { currentPlayer, game, gameId, humanRoll, make, renderStats, resetTurn, r
 import { loadHistory, saveHistory } from './stats.js';
 import { refreshNudges, tap } from './shop.js';
 import { drawQr } from './invites.js';
-import { setDetailsOpen, toMenu } from './input.js';
+import { dragRect, humanPreview, setDetailsOpen, toMenu } from './input.js';
 import { render, renderDie, resizeBoard, setMsg } from './render.js';
 
 let HOST_SETTINGS;
+
+// Your Wardrobe look, sent when you join so classmates see your avatar and title
+const myLook = () => ({ avatar: settings.cosmetics.avatar, title: settings.cosmetics.title });
+
+// A player's name with their avatar and title (from the server)
+function lookName(p, cls, text = p.name) {
+  const span = make('span', cls, p.avatar ? `${p.avatar} ${text}` : text);
+  if (p.title) span.append(make('span', 'player-title', p.title));
+  return span;
+}
+
+// A small picture of a board: rects are [x, y, w, h]
+function miniBoard(rects, size, color, px = 84) {
+  const c = document.createElement('canvas');
+  const dpr = window.devicePixelRatio || 1;
+  c.width = c.height = px * dpr;
+  c.style.width = c.style.height = `${px}px`;
+  c.className = 'mini-board';
+  const g = c.getContext('2d');
+  g.scale(dpr, dpr);
+  const cell = px / size;
+  const css = getComputedStyle(document.documentElement);
+  g.fillStyle = css.getPropertyValue('--surface').trim() || '#fff';
+  g.fillRect(0, 0, px, px);
+  g.fillStyle = color;
+  g.strokeStyle = css.getPropertyValue('--paper').trim() || '#fff';
+  g.lineWidth = 1;
+  for (const [x, y, w, h] of rects) {
+    g.globalAlpha = 0.85;
+    g.fillRect(x * cell, y * cell, w * cell, h * cell);
+    g.globalAlpha = 1;
+    g.strokeRect(x * cell + 0.5, y * cell + 0.5, w * cell - 1, h * cell - 1);
+  }
+  return c;
+}
+
+// Whole class: classmates near you on the leaderboard, with their boards (live as they place)
+function renderClassmates(view) {
+  const box = el.classmates;
+  if (!box) return;
+  const list = view.classmates || [];
+  box.hidden = !list.length;
+  if (!list.length) return;
+  box.replaceChildren(make('h3', 'classmates-title', 'Classmates'));
+  const grid = make('div', 'classmates-grid');
+  for (const c of list) {
+    const card = make('div', 'classmate' + (c.done ? ' done' : ''));
+    card.append(miniBoard(c.rects, view.settings.size, '#2e86de', 64));
+    const who = make('div', 'classmate-who');
+    who.append(lookName(c, 'classmate-name'), make('span', 'classmate-score', `${ordinal(c.rank)} · ${c.score}`));
+    card.append(who);
+    grid.append(card);
+  }
+  box.append(grid);
+}
 
 
 function ordinal(n) {
@@ -198,6 +253,7 @@ function startClassGame(view) {
 function syncClassGame(view) {
   const c = game.classroom;
   c.view = view;
+  renderClassmates(view);
   if (view.round > c.round) {
     if (!['wait', 'over'].includes(game.phase)) {
       setGameId(gameId + 1); // stop whatever the last roll was still doing
@@ -282,6 +338,8 @@ function startPairGame(view) {
   const defs = m.players.map((p, i) => ({
     name: p.name,
     cpu: p.isCpu,
+    avatar: p.avatar, // your partner's look (yours comes from your Wardrobe)
+    title: p.title,
     ...(i === me ? { statsName: el.singleName.value.trim() || 'You' } : {}),
   }));
   const { size, difficulty } = view.settings;
@@ -332,11 +390,23 @@ function syncPairGame(view) {
   const newTurn = m.turn !== c.round;
   if (newTurn) c.round = m.turn;
   if (newTurn && myTurn && ['wait', 'roll'].includes(game.phase)) startPairTurn(note);
-  else if (!myTurn && game.phase === 'wait') {
+  // your partner's move as they make it: dragging, then answering
+  game.partnerLive = !myTurn && m.live && m.live.by !== game.classroom.view.you.id ? m.live : null;
+  if (!myTurn && game.phase === 'wait') {
     if (m.roll) {
-      renderDie(el.dieA, m.roll[0]);
-      renderDie(el.dieB, m.roll[1]);
-      setMsg(`${opponent().name} rolled ${m.roll[0]} and ${m.roll[1]}…`);
+      if (c.rollShown !== m.turn) {
+        c.rollShown = m.turn;
+        animatePartnerRoll(m.roll);
+      }
+      const [a, b] = m.roll;
+      const live = game.partnerLive;
+      setMsg(
+        live && live.phase === 'answer'
+          ? `${opponent().name} is working out ${a} × ${b}…`
+          : live && live.rect
+            ? `${opponent().name} is placing a ${a} × ${b} rectangle…`
+            : `${opponent().name} rolled ${a} and ${b}…`
+      );
     } else if (newTurn || note) {
       renderDie(el.dieA, null);
       renderDie(el.dieB, null);
@@ -345,6 +415,45 @@ function syncPairGame(view) {
   }
   render();
   updateMyGameButton();
+}
+
+// Your partner rolled: tumble the dice for a moment, like your own roll
+async function animatePartnerRoll([a, b]) {
+  const my = gameId;
+  const sides = game.sides;
+  for (let i = 0; i < 7; i++) {
+    renderDie(el.dieA, 1 + Math.floor(Math.random() * sides));
+    renderDie(el.dieB, 1 + Math.floor(Math.random() * sides));
+    await waitInGame(55);
+    if (my !== gameId || !game) return;
+  }
+  renderDie(el.dieA, a);
+  renderDie(el.dieB, b);
+}
+
+// Your turn in pairs: tell your partner what you're doing (the rectangle you're
+// dragging or aiming, then the one you're answering), when it changes, a few
+// times a second at most. Called from render().
+const LIVE_EVERY_MS = 120;
+let liveSent = '';
+let liveTimer = null;
+function pairLiveTick() {
+  if (!game || game.mode !== 'pair' || game.phase === 'over') return;
+  const c = game.classroom;
+  if (game.current !== c.me || !['place', 'answer'].includes(game.phase)) return;
+  const rect = game.phase === 'answer' ? game.pending && game.pending.rect : game.drag ? dragRect() : humanPreview();
+  const payload = { phase: game.phase === 'answer' ? 'answer' : 'place', rect: rect ? { x: rect.x, y: rect.y, w: rect.w, h: rect.h } : null };
+  const key = JSON.stringify(payload);
+  if (key === liveSent) return;
+  liveSent = key;
+  if (liveTimer) return; // the latest goes out when the timer fires
+  const send = () => {
+    liveTimer = null;
+    if (!game || game.mode !== 'pair' || game.classroom !== c) return;
+    Classroom.live(c.session, JSON.parse(liveSent)).catch(() => {}); // only a preview: never mind if it misses
+  };
+  send();
+  liveTimer = setTimeout(send, LIVE_EVERY_MS);
 }
 
 function startPairTurn(note = '') {
@@ -430,7 +539,7 @@ function finishPairGame(view) {
     const fill = make('span');
     fill.style.width = `${(p.score / top) * 100}%`;
     bar.append(fill);
-    li.append(make('span', 'result-name', p.name), make('span', 'result-pts', `${p.score} pts`), bar);
+    li.append(lookName(p, 'result-name'), make('span', 'result-pts', `${p.score} pts`), bar);
     el.resultList.append(li);
   }
   el.rewards.innerHTML = '';
@@ -613,7 +722,7 @@ function finishClassGame(view) {
     const fill = make('span');
     fill.style.width = `${(r.score / top) * 100}%`;
     bar.append(fill);
-    li.append(make('span', 'result-name', `${ordinal(r.rank)} ${r.name}`), make('span', 'result-pts', `${r.score} pts`), bar);
+    li.append(lookName(r, 'result-name', `${ordinal(r.rank)} ${r.name}`), make('span', 'result-pts', `${r.score} pts`), bar);
     el.resultList.append(li);
   }
   renderClassRewards(view);
@@ -852,6 +961,7 @@ function renderHost(view) {
     el.hostDoneText.textContent = `${view.done} of ${view.here} done`;
     el.hostNextBtn.replaceChildren(icon(view.round >= s.rounds ? 'flag' : 'dices'), view.round >= s.rounds ? ' Finish game' : ' Next roll');
     el.hostAuto.checked = view.autoNext;
+    renderHostBoards(view);
   } else {
     renderHostResults(view);
   }
@@ -862,6 +972,7 @@ function renderHost(view) {
   el.hostNextBtn.hidden = el.hostAutoLabel.hidden = view.type === 'pairs' || (tourney && view.tournament && view.tournament.format === 'koth');
   el.hostAutoLabel.lastChild.textContent = tourney ? ' Start the next round by itself' : ' Roll again by itself when everyone’s done';
   el.hostMatches.hidden = !pairsPlaying;
+  el.hostBoards.hidden = view.type !== 'class' || view.state !== 'playing';
   el.hostTournament.hidden = !tourney || view.state !== 'playing';
   el.hostPodium.hidden = view.type === 'pairs';
   el.hostMatchResults.hidden = view.type !== 'pairs';
@@ -958,7 +1069,7 @@ function renderTournamentPodium(t) {
   const medals = ['🥇', '🥈', '🥉'];
   for (const x of t.standings.filter((s) => s.place <= 3).slice(0, 4)) {
     const li = make('li', `podium-${x.place}`);
-    li.append(make('span', 'podium-medal', medals[x.place - 1]), make('span', 'podium-name', x.name), make('span', 'podium-score', `${x.wins}–${x.losses}`));
+    li.append(make('span', 'podium-medal', medals[x.place - 1]), lookName(x, 'podium-name'), make('span', 'podium-score', `${x.wins}–${x.losses}`));
     el.hostPodium.append(li);
   }
 }
@@ -973,13 +1084,13 @@ function renderTournamentRoster(view) {
   for (const x of t.standings) {
     const p = byId.get(x.id);
     const li = make('li', (p && !p.connected ? 'offline ' : '') + (x.out ? 'knocked-out' : ''));
-    li.append(make('span', 'host-rank', ordinal(x.place)), make('span', 'host-name', x.name), make('span', 'host-score', `${x.wins}–${x.losses}`));
+    li.append(make('span', 'host-rank', ordinal(x.place)), lookName(x, 'host-name'), make('span', 'host-score', `${x.wins}–${x.losses}`));
     li.append(make('span', 'host-status', !p ? '👋' : t.over ? (x.place === 1 ? '🏆' : '') : !p.connected ? '📴' : playingNow.has(x.id) ? '🎲' : x.out ? '' : '⏳'));
     el.hostRoster.append(li);
   }
   for (const p of view.waiting || []) {
     const li = make('li', 'waiting');
-    li.append(make('span', 'host-name', p.name), make('span', 'host-waiting', '⏳ next tournament'));
+    li.append(lookName(p, 'host-name'), make('span', 'host-waiting', '⏳ next tournament'));
     el.hostRoster.append(li);
   }
 }
@@ -1016,7 +1127,7 @@ function renderHostPairsLobby(view) {
   const arrange = view.pairOptions.matching === 'arrange';
   if (swapPick && !view.players.some((p) => p.id === swapPick)) swapPick = null;
   const nameChip = (p) => {
-    if (!arrange) return make('span', 'pair-name', p.name);
+    if (!arrange) return lookName(p, 'pair-name');
     const b = make('button', 'pair-name' + (swapPick === p.id ? ' picked' : ''), p.name);
     b.type = 'button';
     b.addEventListener('click', () => {
@@ -1067,7 +1178,7 @@ function renderHostMatches(view, list) {
     m.players.forEach((p, i) => {
       const row = make('div', 'match-row' + (m.over && m.winner === p.id ? ' winner' : ''));
       const turn = !m.over && m.current === i;
-      row.append(make('span', 'match-turn', turn ? '🎲' : m.over && m.winner === p.id ? '🏆' : ''), make('span', 'match-name', p.name), make('span', 'match-score', String(p.score)));
+      row.append(make('span', 'match-turn', turn ? '🎲' : m.over && m.winner === p.id ? '🏆' : ''), lookName(p, 'match-name'), make('span', 'match-score', String(p.score)));
       li.append(row);
     });
     const left = m.left && m.players.find((p) => p.id === m.left);
@@ -1124,7 +1235,7 @@ function renderHostRoster(view) {
   for (const p of view.players) {
     const li = make('li', p.connected ? '' : 'offline');
     if (view.state !== 'lobby') li.append(make('span', 'host-rank', ordinal(p.rank)));
-    li.append(make('span', 'host-name', p.name));
+    li.append(lookName(p, 'host-name'));
     if (view.state === 'lobby') {
       const remove = make('button', 'host-remove', '×');
       remove.type = 'button';
@@ -1145,9 +1256,23 @@ function renderHostRoster(view) {
   // Joined after the game started: they play the next one
   for (const p of view.waiting || []) {
     const li = make('li', 'waiting' + (p.connected ? '' : ' offline'));
-    li.append(make('span', 'host-name', p.name), make('span', 'host-waiting', '⏳ next game'));
+    li.append(lookName(p, 'host-name'), make('span', 'host-waiting', '⏳ next game'));
     li.title = 'Joined after this game started';
     el.hostRoster.append(li);
+  }
+}
+
+// Whole class: every student's board, updating as they place their rectangles
+function renderHostBoards(view) {
+  const box = el.hostBoards;
+  box.replaceChildren();
+  for (const p of view.players) {
+    const card = make('div', 'host-board' + (p.done ? ' done' : '') + (p.connected ? '' : ' offline'));
+    card.append(miniBoard((view.boards && view.boards[p.id]) || [], view.settings.size, '#2e86de', 96));
+    const who = make('div', 'classmate-who');
+    who.append(lookName(p, 'classmate-name'), make('span', 'classmate-score', `${p.done ? '✓ ' : ''}${p.score}`));
+    card.append(who);
+    box.append(card);
   }
 }
 
@@ -1163,7 +1288,7 @@ function renderHostResults(view) {
   const medals = ['🥇', '🥈', '🥉'];
   for (const p of view.players.filter((x) => x.rank <= 3).slice(0, 5)) {
     const li = make('li', `podium-${p.rank}`);
-    li.append(make('span', 'podium-medal', medals[p.rank - 1]), make('span', 'podium-name', p.name), make('span', 'podium-score', `${p.score} pts`));
+    li.append(make('span', 'podium-medal', medals[p.rank - 1]), lookName(p, 'podium-name'), make('span', 'podium-score', `${p.score} pts`));
     el.hostPodium.append(li);
   }
   renderHostReport(view);
@@ -1222,7 +1347,7 @@ export function run() {
     if (!name) return fail('Type your first name.', el.classNameInput);
     el.classJoinBtn.disabled = true;
     try {
-      const joined = await Classroom.join(code, name);
+      const joined = await Classroom.join(code, name, myLook());
       try {
         localStorage.setItem(CLASS_NAME_KEY, joined.name);
       } catch (e) {}
@@ -1337,7 +1462,7 @@ export function run() {
     if (v && v.type === 'pairs' && v.odd.needed && v.odd.how === 'screen' && !(classSession && classSession.host)) {
       // The odd one out plays the teacher, here: join as a player first
       try {
-        const me = await Classroom.joinAsTeacher(host);
+        const me = await Classroom.joinAsTeacher(host, myLook());
         connectClass({ code: host.code, id: me.id, key: me.key, name: me.name, teacher: true, host: true });
       } catch (err) {
         return toast('⚠️ ' + err.message);
@@ -1380,7 +1505,7 @@ export function run() {
       if (savedSession && savedSession.code === link.code) connectClass(savedSession);
       else if (link.play) {
         // the teacher's other device, for playing an odd one out
-        Classroom.joinWithPlayKey(link.code, link.play)
+        Classroom.joinWithPlayKey(link.code, link.play, myLook())
           .then((me) => {
             connectClass({ code: link.code, id: me.id, key: me.key, name: me.name, teacher: true });
             showClassWaiting(null);
@@ -1405,4 +1530,4 @@ export function run() {
   }
 }
 
-export { TOURNAMENT_NAMES, checkClassroom, classSession, connectHost, leaveClass, openClassJoin, openHostSetup, ordinal, pairRoll, pairTurnOrWait, reportClass, showHostView };
+export { pairLiveTick, TOURNAMENT_NAMES, checkClassroom, classSession, connectHost, leaveClass, openClassJoin, openHostSetup, ordinal, pairRoll, pairTurnOrWait, reportClass, showHostView };

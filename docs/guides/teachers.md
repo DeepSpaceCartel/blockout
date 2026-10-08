@@ -20,11 +20,15 @@ Students join with the 4-letter code, the link, or the QR code. Every setting is
 
 ![The lobby: join code, address, QR code and the students who've joined](../assets/screenshots/classroom-lobby.png)
 
-During the game your screen shows the roll, who's done and the leaderboard; each student plays on their own device.
+During the game your screen shows the roll, who's done, the leaderboard and a small copy of every student's board, filling in as they play. Each student plays on their own device and sees the boards of the classmates nearest them on the leaderboard. Everyone's avatar and title from the Wardrobe shows next to their name.
 
 ![Your screen during a game](../assets/screenshots/classroom-teacher.png)
 
 ![A student's screen during a class game](../assets/screenshots/classroom-student.png)
+
+In Pairs, you watch your partner's turn as it happens: their roll, the rectangle they're placing, then a **?** on it while they work out the answer.
+
+![Pairs: Ann is working out 4 × 3 on her partner's screen](../assets/screenshots/classroom-pairs-live.png)
 
 !!! tip "Students' devices can't reach your computer?"
     Share it through a tunnel: see [Share through a tunnel](share-through-a-tunnel.md).

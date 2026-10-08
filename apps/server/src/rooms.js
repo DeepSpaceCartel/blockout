@@ -12,6 +12,7 @@
 import crypto from 'crypto';
 import * as Core from '@blockout/engine';
 import * as Progress from '@blockout/progress';
+import * as Cosmetics from '@blockout/progress/cosmetics';
 import * as Tournament from './tournament.js';
 
 const SIZES = [6, 8, 10, 12, 16, 20, 24];
@@ -113,6 +114,20 @@ function cleanName(name) {
 }
 
 // The students (not the teacher or the CPU when they play in pairs)
+// A player's Wardrobe look, from ids the page sends: an avatar emoji and a title
+// name, or nothing. Only real Wardrobe ids count (never free text), so nothing
+// odd can show up on a classmate's screen.
+function cleanLook(look = {}) {
+  const avatar = Cosmetics.category('avatar').options.find((o) => o.id === look.avatar && o.id !== 'none');
+  const title = Cosmetics.TITLES.find((t) => t.id === look.title && t.id !== 'none');
+  return { avatar: avatar ? avatar.preview : '', title: title ? title.name : '' };
+}
+const lookOf = (p) => {
+  if (p.isCpu) return { avatar: '🤖', title: '' };
+  if (p.isTeacher) return { avatar: (p.look && p.look.avatar) || '🍎', title: (p.look && p.look.title) || '' };
+  return p.look || { avatar: '', title: '' };
+};
+
 const students = (room) => room.players.filter((p) => !p.isTeacher && !p.isCpu);
 // Students in the game that's running (not those who joined after it started)
 const playing = (room) => students(room).filter((p) => !p.benched);
@@ -138,14 +153,14 @@ function freshScore(player, size) {
   return player;
 }
 
-function join(room, name) {
+function join(room, name, look) {
   const clean = cleanName(name);
   if (RESERVED_NAMES.includes(clean.toLowerCase())) throw new RoomError('name', 'Please use your own first name.');
   if (students(room).length >= MAX_PLAYERS) throw new RoomError('full', 'This class is full.');
   if (room.players.some((p) => p.name.toLowerCase() === clean.toLowerCase())) {
     throw new RoomError('taken', `Someone called ${clean} is already in. Add your last initial, like “${clean} B”.`);
   }
-  const player = freshScore({ id: token().slice(0, 8), key: token(), name: clean, connections: 0 }, room.settings.size);
+  const player = freshScore({ id: token().slice(0, 8), key: token(), name: clean, look: cleanLook(look), connections: 0 }, room.settings.size);
   // Joining after the game started: you're in the class, and play the next game
   if (room.state === 'playing') player.benched = true;
   room.players.push(player);
@@ -348,10 +363,13 @@ function teacherPlayer(room) {
 }
 
 // The teacher joins as a player (to play the odd one out).
-function joinTeacher(room) {
+function joinTeacher(room, look) {
   const existing = teacherPlayer(room);
-  if (existing) return existing;
-  const t = freshScore({ id: token().slice(0, 8), key: token(), name: 'Teacher', isTeacher: true, connections: 0 }, room.settings.size);
+  if (existing) {
+    if (look) existing.look = cleanLook(look);
+    return existing;
+  }
+  const t = freshScore({ id: token().slice(0, 8), key: token(), name: 'Teacher', isTeacher: true, look: cleanLook(look), connections: 0 }, room.settings.size);
   room.players.push(t);
   return t;
 }
@@ -540,6 +558,24 @@ function submitPair(room, player, r) {
   return player;
 }
 
+// Pairs: what the player on turn is doing, for their partner to watch live:
+// dragging a rectangle ('place', rect or null) or answering ('answer', rect).
+// Checked loosely (it's only shown, never scored); the real move comes with submit.
+function setLive(room, player, live = {}) {
+  const m = myTurn(room, player);
+  if (!m.roll) throw new RoomError('stale', 'Roll first.');
+  const phase = live.phase === 'answer' ? 'answer' : 'place';
+  let rect = null;
+  if (live.rect) {
+    const { x, y, w, h } = live.rect;
+    const n = m.board.size;
+    const ok = [x, y, w, h].every(Number.isInteger) && x >= 0 && y >= 0 && w > 0 && h > 0 && x + w <= n && y + h <= n && w * h <= n * n;
+    if (ok) rect = { x, y, w, h };
+  }
+  m.live = { by: player.id, turn: m.turn, phase, rect };
+  return m;
+}
+
 // The CPU's turn, in two steps so everyone can watch: roll, then place.
 function cpuRoll(room, m, rng = Math.random) {
   return pairRoll(room, room.players.find((p) => p.id === m.ids[m.current]), rng);
@@ -559,6 +595,7 @@ const cpuToMove = (room, m) => !m.over && room.state === 'playing' && m.ids[m.cu
 
 function nextTurn(room, m) {
   m.roll = null;
+  m.live = null;
   m.turn++;
   m.current = 1 - m.current;
   const cap = room.settings.matchTurns;
@@ -632,6 +669,7 @@ function leaderboard(room) {
     return {
       id: p.id,
       name: p.name,
+      ...lookOf(p),
       rank,
       score: p.score,
       squares: p.squares,
@@ -672,6 +710,7 @@ function report(room) {
 const PUBLIC = (p) => ({
   id: p.id,
   name: p.name,
+  ...lookOf(p),
   score: p.score,
   squares: p.squares,
   bonus: p.bonus,
@@ -693,6 +732,8 @@ function matchView(room, m) {
     winner: m.winner,
     left: m.left,
     lastPass: m.lastPass,
+    // what the player whose turn it is is doing right now (see setLive)
+    live: m.live && m.live.turn === m.turn ? { by: m.live.by, phase: m.live.phase, rect: m.live.rect } : null,
     filled: 1 - Core.emptyCount(m.board) / (m.board.size * m.board.size),
     players: players.map(PUBLIC),
     rects: m.board.rects.map(({ x, y, w, h, a, b, player }) => ({ x, y, w, h, a, b, owner: player })),
@@ -701,13 +742,16 @@ function matchView(room, m) {
 
 function pairsTeacherView(room) {
   const order = syncOrder(room);
-  const name = (id) => (room.players.find((p) => p.id === id) || {}).name;
+  const who = (id) => {
+    const p = room.players.find((x) => x.id === id);
+    return { id, name: p ? p.name : undefined, ...(p ? lookOf(p) : {}) };
+  };
   const t = teacherPlayer(room);
   return {
     pairOptions: room.pairOptions,
     playKey: room.playKey,
     // lobby preview (shuffle mode shuffles when the game starts)
-    pairs: pairsFrom(order).map(([a, b]) => [{ id: a, name: name(a) }, b ? { id: b, name: name(b) } : null]),
+    pairs: pairsFrom(order).map(([a, b]) => [who(a), b ? who(b) : null]),
     odd: oddOpponent(room),
     teacher: t ? { id: t.id, connected: connected(t), match: t.match } : null,
     matches: room.matches.map((m) => {
@@ -724,7 +768,11 @@ function tournamentView(room) {
   const t = room.tournament;
   if (!t) return null;
   const name = (id) => (room.players.find((p) => p.id === id) || {}).name || room.lastNames?.[id] || '?';
-  const table = Tournament.standings(t).map((x) => ({ ...x, name: name(x.id) }));
+  const lookFor = (id) => {
+    const p = room.players.find((x) => x.id === id);
+    return p ? lookOf(p) : { avatar: '', title: '' };
+  };
+  const table = Tournament.standings(t).map((x) => ({ ...x, name: name(x.id), ...lookFor(x.id) }));
   const current = t.rounds[t.rounds.length - 1];
   return {
     format: t.format,
@@ -771,12 +819,32 @@ function tournamentYou(room, player) {
   return { status, place: row.place, of: t.seeds.length, wins: st.wins, losses: st.losses, bestStreak: st.bestStreak, upsets: st.upsets, line, champion: t.championId ? (room.players.find((p) => p.id === t.championId) || {}).name : null };
 }
 
+// Whole class: everyone's board, as compact [x, y, w, h] rectangles.
+const boardOf = (p) => p.board.rects.map(({ x, y, w, h }) => [x, y, w, h]);
+
+// Up to `max` classmates for a student's side panel: the ones closest to them
+// on the leaderboard (rank neighbours), best first.
+function classmatesFor(room, player, board, max = 8) {
+  const others = board.filter((r) => r.id !== player.id);
+  const mine = board.findIndex((r) => r.id === player.id);
+  const near = others
+    .map((r) => ({ r, d: Math.abs(board.indexOf(r) - (mine < 0 ? 0 : mine)) }))
+    .sort((a, b) => a.d - b.d)
+    .slice(0, max)
+    .map(({ r }) => r)
+    .sort((a, b) => board.indexOf(a) - board.indexOf(b));
+  return near.map((r) => {
+    const p = room.players.find((x) => x.id === r.id);
+    return { id: r.id, name: r.name, avatar: r.avatar, title: r.title, rank: r.rank, score: r.score, done: r.done, rects: boardOf(p) };
+  });
+}
+
 function teacherView(room) {
   const board = leaderboard(room);
   const here = playing(room).filter(connected);
   return {
     // joined after the game started: they play the next one
-    waiting: students(room).filter((p) => p.benched).map((p) => ({ id: p.id, name: p.name, connected: connected(p) })),
+    waiting: students(room).filter((p) => p.benched).map((p) => ({ id: p.id, name: p.name, ...lookOf(p), connected: connected(p) })),
     code: room.code,
     type: room.type,
     ...(room.type !== 'class' ? pairsTeacherView(room) : {}),
@@ -788,6 +856,8 @@ function teacherView(room) {
     round: room.round,
     roll: room.roll,
     players: board,
+    // whole class: every student's board, for the mini-boards on the projector
+    boards: room.type === 'class' ? Object.fromEntries(playing(room).map((p) => [p.id, boardOf(p)])) : null,
     done: here.filter((p) => p.done).length,
     here: here.length,
     report: room.state === 'ended' ? report(room) : null,
@@ -828,14 +898,18 @@ function studentView(room, player) {
       rects: player.board.rects.map(({ x, y, w, h, a, b }) => ({ x, y, w, h, a, b })),
     },
     of: board.length,
+    // whole class: classmates near you on the leaderboard, with their boards
+    classmates: room.type === 'class' && room.state !== 'lobby' ? classmatesFor(room, player, board) : null,
     // at the end everyone sees the top five
-    top: room.state === 'ended' ? board.slice(0, 5).map(({ name, rank, score }) => ({ name, rank, score })) : null,
+    top: room.state === 'ended' ? board.slice(0, 5).map(({ name, avatar, title, rank, score }) => ({ name, avatar, title, rank, score })) : null,
   };
 }
 
 const isHere = (p) => connected(p);
 
 export {
+  cleanLook,
+  setLive,
   SIZES,
   DIFFICULTIES,
   ROUNDS,

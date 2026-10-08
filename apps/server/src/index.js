@@ -160,6 +160,25 @@ function broadcast(room) {
   );
 }
 
+// Pairs: a partner's live move (dragging, answering) goes only to the two players
+// in that match, a few times a second at most, without bumping the room's version
+// (so nobody else's long poll wakes up for it).
+const LIVE_MS = 80;
+const livePending = new Map(); // `${code}:${match}` -> timeout
+function broadcastMatch(room, m) {
+  const key = `${room.code}:${m.id}`;
+  if (livePending.has(key)) return;
+  livePending.set(
+    key,
+    setTimeout(() => {
+      livePending.delete(key);
+      if (!rooms.has(room.code)) return;
+      for (const s of streams.get(room.code) || []) if (s.role !== 'teacher' && m.ids.includes(s.id)) pushView(room, s);
+      for (const w of pollers.get(room.code) || []) if (w.role !== 'teacher' && m.ids.includes(w.id)) answerPoll(room, w);
+    }, LIVE_MS)
+  );
+}
+
 // Tournaments: when a round is done (or a king-of-the-hill match), start the next
 // one after a pause, by itself if the teacher left "auto" on (king of the hill always).
 const roundTimers = new Map(); // code -> timeout
@@ -420,16 +439,16 @@ const routes = {
     let p;
     if (body.teacher || body.play) {
       if (body.teacher !== room.teacherKey && body.play !== room.playKey) throw new Rooms.RoomError('teacher', 'That teacher link isn’t right.');
-      p = Rooms.joinTeacher(room);
+      p = Rooms.joinTeacher(room, body.look);
     } else {
       // Signed-in students play under their account's name (their school
       // already knows it): no name check, nothing sent to OpenAI.
       const user = await signedIn(req);
-      if (user && user.role === 'student') p = Rooms.join(room, user.firstName);
+      if (user && user.role === 'student') p = Rooms.join(room, user.firstName, body.look);
       else {
         const check = await Moderation.checkName(body.name, { apiKey: OPENAI_API_KEY });
         if (!check.ok) throw new Rooms.RoomError('name', 'Please use your real first name.');
-        p = Rooms.join(room, body.name);
+        p = Rooms.join(room, body.name, body.look);
       }
     }
     broadcast(room);
@@ -450,6 +469,16 @@ const routes = {
     const result = Rooms.pairRoll(room, p);
     broadcast(room);
     return result;
+  },
+
+  // Pairs: what the player on turn is doing (dragging, answering), for their partner
+  'POST /api/rooms/:code/live': async (req, code) => {
+    const room = getRoom(code);
+    const body = await readJson(req);
+    const p = Rooms.findPlayer(room, body.id, body.key);
+    const m = Rooms.setLive(room, p, body.live);
+    broadcastMatch(room, m);
+    return { ok: true };
   },
 
   'POST /api/rooms/:code/leave': async (req, code) => {

@@ -382,3 +382,61 @@ test('tournaments: knocked-out students, byes and walkovers', () => {
   const winnerView = Rooms.studentView(room, room.players.find((p) => p.id === final.winner)).tournament;
   assert.equal(winnerView.status, 'champion');
 });
+
+// ---------------------------------------------------------------- looks and live play
+
+test('looks: a Wardrobe avatar and title travel with a player; anything else is dropped', () => {
+  const room = Rooms.createRoom({ type: 'class' });
+  const ann = Rooms.join(room, 'Ann', { avatar: 'fox', title: 'none' });
+  const bo = Rooms.join(room, 'Bo', { avatar: '<img src=x>', title: 'hacker' });
+  assert.deepEqual(ann.look, { avatar: '🦊', title: '' });
+  assert.deepEqual(bo.look, { avatar: '', title: '' }, 'only real Wardrobe ids');
+  Rooms.start(room);
+  const row = Rooms.teacherView(room).players.find((p) => p.id === ann.id);
+  assert.equal(row.avatar, '🦊');
+  const t = Rooms.joinTeacher(room, { avatar: 'owl' });
+  assert.equal(Rooms.cleanLook({ avatar: 'owl' }).avatar, t.look.avatar);
+});
+
+test('pairs: your partner sees your live move (dragging, answering) until the turn moves on', () => {
+  const { room, players } = pairsOf(['Ann', 'Bo'], { matching: 'keep' });
+  Rooms.start(room);
+  const m = Rooms.matchOf(room, players[0]);
+  const onTurn = room.players.find((p) => p.id === m.ids[m.current]);
+  const partner = room.players.find((p) => p.id === m.ids[1 - m.current]);
+  assert.throws(() => Rooms.setLive(room, partner, { phase: 'place', rect: { x: 0, y: 0, w: 2, h: 2 } }), /turn/i, 'only the player on turn');
+  assert.throws(() => Rooms.setLive(room, onTurn, { phase: 'place' }), /Roll first/);
+  Rooms.pairRoll(room, onTurn, () => 0.5);
+  Rooms.setLive(room, onTurn, { phase: 'place', rect: { x: 1, y: 2, w: 3, h: 2 } });
+  let seen = Rooms.studentView(room, partner).match.live;
+  assert.deepEqual(seen, { by: onTurn.id, phase: 'place', rect: { x: 1, y: 2, w: 3, h: 2 } });
+  Rooms.setLive(room, onTurn, { phase: 'place', rect: { x: -1, y: 0, w: 99, h: 1 } });
+  assert.equal(Rooms.studentView(room, partner).match.live.rect, null, 'off the board: not shown');
+  Rooms.setLive(room, onTurn, { phase: 'answer', rect: { x: 0, y: 0, w: 1, h: 1 } });
+  assert.equal(Rooms.studentView(room, partner).match.live.phase, 'answer');
+  // the match view carries both players' looks
+  assert.ok('avatar' in Rooms.studentView(room, partner).match.players[0]);
+  // once the turn is over, nothing is live
+  const [a, b] = m.roll;
+  let spot = null;
+  for (let y = 0; y < m.board.size && !spot; y++) for (let x = 0; x < m.board.size && !spot; x++) if (Core.isValidPlacement(m.board, x, y, a, b)) spot = { x, y, w: a, h: b };
+  Rooms.submit(room, onTurn, { round: m.turn, kind: 'placed', rect: spot, firstTry: true, ms: 1000 });
+  seen = Rooms.studentView(room, partner).match.live;
+  assert.equal(seen, null);
+});
+
+test('whole class: students see up to 8 classmates near them, with their boards; the teacher sees every board', () => {
+  const room = Rooms.createRoom({ type: 'class' });
+  const kids = Array.from({ length: 12 }, (_, i) => Object.assign(Rooms.join(room, `Kid${String.fromCharCode(65 + i)}`), { connections: 1 }));
+  Rooms.start(room);
+  const [a, b] = room.roll;
+  Rooms.submit(room, kids[0], { round: room.round, kind: 'placed', rect: { x: 0, y: 0, w: a, h: b }, firstTry: true, ms: 900 });
+  const view = Rooms.studentView(room, kids[5]);
+  assert.equal(view.classmates.length, 8);
+  assert.ok(!view.classmates.some((c) => c.id === kids[5].id), 'not yourself');
+  const t = Rooms.teacherView(room);
+  assert.equal(Object.keys(t.boards).length, 12);
+  assert.deepEqual(t.boards[kids[0].id], [[0, 0, a, b]]);
+  const lead = Rooms.studentView(room, kids[1]).classmates.find((c) => c.id === kids[0].id);
+  assert.deepEqual(lead && lead.rects, [[0, 0, a, b]], 'the leader is near the top');
+});

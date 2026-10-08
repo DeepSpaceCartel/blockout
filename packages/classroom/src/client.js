@@ -56,11 +56,14 @@ async function check() {
 const health = () => request('GET', '/api/health');
 const roomInfo = (code) => request('GET', `/api/rooms/${encodeURIComponent(code)}/info`);
 const createRoom = (settings) => request('POST', '/api/rooms', { settings });
-const join = (code, name) => request('POST', `/api/rooms/${encodeURIComponent(code)}/join`, { name });
+// look: { avatar, title } Wardrobe ids, so classmates see your avatar and title
+const join = (code, name, look) => request('POST', `/api/rooms/${encodeURIComponent(code)}/join`, { name, look });
 // The teacher as a player (pairs: playing the odd one out), from the projector
 // screen (with the teacher key) or another device (with the play key from its link).
-const joinAsTeacher = (h) => request('POST', `/api/rooms/${h.code}/join`, { teacher: h.teacherKey });
-const joinWithPlayKey = (code, play) => request('POST', `/api/rooms/${encodeURIComponent(code)}/join`, { play });
+const joinAsTeacher = (h, look) => request('POST', `/api/rooms/${h.code}/join`, { teacher: h.teacherKey, look });
+const joinWithPlayKey = (code, play, look) => request('POST', `/api/rooms/${encodeURIComponent(code)}/join`, { play, look });
+// Pairs: what you're doing on your turn, for your partner to watch ({ phase, rect })
+const live = (s, payload) => request('POST', `/api/rooms/${s.code}/live`, { id: s.id, key: s.key, live: payload });
 const roll = (s) => request('POST', `/api/rooms/${s.code}/roll`, { id: s.id, key: s.key });
 const leave = (s) => request('POST', `/api/rooms/${s.code}/leave`, { id: s.id, key: s.key });
 const sendResult = (s, result) => request('POST', `/api/rooms/${s.code}/result`, { id: s.id, key: s.key, ...result });
@@ -177,6 +180,7 @@ export {
   join,
   joinAsTeacher,
   joinWithPlayKey,
+  live,
   roll,
   leave,
   sendResult,

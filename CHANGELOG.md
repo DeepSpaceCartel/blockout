@@ -16,6 +16,10 @@ Work towards 0.3.0 on the `v0.3.0` branch. Details and decisions: [the v0.3.0 wo
 - Homework only offers what the child can already play, and "Play ›" starts it straight away.
 - A signed-in student's progress follows them to any device; the first time on a device, that device's guest progress is added to the account.
 - Tricky, Master and Legend difficulties after Hard, and the IDDQD and FIVEMOREMINUTESMOM cheat codes, each with a secret achievement.
+- Demos (on the main menu): 26 classic games turned into quick math games to try, from Times Tetris and Fact Invaders to Times Bingo, Fact Racer and Multiplier Bakery.
+- Number Snake (on More games): a snake game that eats numbers instead of apples: the answer to a times-table question, every multiple of a number, or (Add it up) any number you like, added to a running total that you then have to give. Movement (Auto, or Manual: one square per press), speed (Slow, Normal, Fast) and walls (Stop, Wrap, Lose a heart, Game over) are chosen on its menu.
+- Classroom: in Pairs (and tournament matches), you see your partner's roll, the rectangle they're placing and the one they're answering as it happens. In Whole class, students see the boards of the classmates nearest them on the leaderboard, and the teacher's screen shows every student's board.
+- Classroom: everyone's Wardrobe avatar and title show next to their name, on the lobby, leaderboards, match cards and results.
 - More games: addition, subtraction, division and four fraction games, reachable from the main menu. Each has Single player, Home (two players on one screen) and Practice, its own points, a shop (Medium, then Hard; 20-question rounds, then Expert practice; Home multiplayer), achievements and stats.
 
 ### Changed

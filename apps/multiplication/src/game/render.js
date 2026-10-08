@@ -5,7 +5,7 @@ import { PIPS, ctx, el } from './base.js';
 import { settings } from './settings.js';
 import { look } from './wardrobe.js';
 import { currentDims, currentPlayer, game, make } from './play.js';
-import { ordinal } from './classroom.js';
+import { ordinal, pairLiveTick } from './classroom.js';
 import { dragRect, humanPreview, judgeDrawn } from './input.js';
 
 function setMsg(text) {
@@ -78,6 +78,7 @@ function render() {
   el.canvas.style.cursor = game.phase === 'place' ? 'crosshair' : 'default';
   renderScores();
   drawBoard();
+  pairLiveTick(); // pairs: your partner watches your move
 }
 
 // "Board: 24 of 400 filled", with a bar split into each player's colour.
@@ -336,6 +337,11 @@ function drawBoard() {
     drawRect(rect, game.players[rect.player].color, cell, rect === game.lastRect);
   }
 
+  // pairs: your partner's move as they make it
+  if (game.mode === 'pair' && game.partnerLive && game.partnerLive.rect) {
+    drawPartnerLive(game.partnerLive, game.players[1 - game.classroom.me].color, cell);
+  }
+
   const preview = game.cpuPreview ? { ...game.cpuPreview, valid: true } : humanPreview();
   if (preview) drawPreview(preview, currentPlayer().color, cell);
   if (game.phase === 'place' && game.placeMode === 'draw') {
@@ -346,6 +352,34 @@ function drawBoard() {
   ctx.strokeStyle = pal.edge;
   ctx.lineWidth = 2;
   ctx.strokeRect(1, 1, cssSize - 2, cssSize - 2);
+}
+
+// Your partner's rectangle: dashed while they're still moving it, then solid
+// with a "?" while they work out the answer.
+function drawPartnerLive(live, color, cell) {
+  const { x, y, w, h } = live.rect;
+  ctx.save();
+  if (live.phase === 'answer') {
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.55;
+    ctx.fillRect(x * cell, y * cell, w * cell, h * cell);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#fff';
+    ctx.font = `900 ${Math.max(14, Math.min(w, h) * cell * 0.5)}px system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('?', (x + w / 2) * cell, (y + h / 2) * cell);
+  } else {
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.18;
+    ctx.fillRect(x * cell, y * cell, w * cell, h * cell);
+    ctx.globalAlpha = 1;
+  }
+  ctx.setLineDash(live.phase === 'answer' ? [] : [6, 4]);
+  ctx.strokeStyle = shade(color, -0.3);
+  ctx.lineWidth = 2.5;
+  ctx.strokeRect(x * cell + 1.5, y * cell + 1.5, w * cell - 3, h * cell - 3);
+  ctx.restore();
 }
 
 function drawRect(rect, color, cell, highlight) {
