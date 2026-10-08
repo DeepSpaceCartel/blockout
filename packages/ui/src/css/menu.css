@@ -148,3 +148,57 @@ kbd {
   padding: 0 4px;
   background: var(--surface);
 }
+
+/* Landscape tablets and laptops (Chromebooks, iPads held sideways): the card goes
+   wide, with the title, modes and menu on the left and the settings on the right,
+   so Start is on screen without scrolling. Phones and portrait screens keep the
+   one column above. By shape, not device: user agents don't tell an iPad apart. */
+@media (orientation: landscape) and (min-width: 900px) and (min-height: 560px) {
+  #start-screen { padding-top: clamp(12px, 3vh, 32px); }
+  .start-card {
+    max-width: 1080px;
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    grid-template-areas:
+      "top     form"
+      "logo    form"
+      "tagline form"
+      "live    form"
+      "modes   form"
+      "actions form";
+    /* the last row takes the slack, so the menu sits level with Start */
+    grid-template-rows: auto auto auto auto auto 1fr;
+    column-gap: clamp(24px, 3vw, 40px);
+    align-items: start;
+    padding: clamp(20px, 3vh, 32px) clamp(24px, 3vw, 36px);
+  }
+  .start-card > .top-row { grid-area: top; }
+  .start-card > .logo { grid-area: logo; }
+  .start-card > .tagline { grid-area: tagline; margin-bottom: 1rem; }
+  .start-card > .live-banner { grid-area: live; }
+  .start-card > .mode-picker { grid-area: modes; }
+  .start-card > #setup-form { grid-area: form; }
+  .start-card > .menu-actions { grid-area: actions; align-self: end; }
+
+  /* Modes stack as rows: the icon on the left, title and subtitle beside it */
+  .mode-picker { grid-template-columns: 1fr; gap: 8px; margin-bottom: 1rem; }
+  .mode-card {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto auto;
+    column-gap: 12px;
+    justify-items: start;
+    text-align: left;
+    padding: 8px 16px;
+  }
+  .mode-card .mode-icon { grid-row: 1 / -1; align-self: center; font-size: 1.6rem; }
+  .mode-card .lock-badge { grid-column: 2; }
+
+  /* Three buttons a row (two on narrower screens, so the labels fit); the last
+     row stretches, so no button is left on its own */
+  .start-card .menu-actions { display: flex; flex-wrap: wrap; margin-top: 0; }
+  .start-card .menu-actions .btn { flex: 1 1 calc((100% - 16px) / 3); min-width: 0; font-size: 0.9rem; }
+}
+@media (orientation: landscape) and (min-width: 900px) and (max-width: 1099px) and (min-height: 560px) {
+  .start-card .menu-actions .btn { flex-basis: calc((100% - 8px) / 2); }
+}

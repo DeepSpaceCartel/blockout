@@ -45,6 +45,9 @@ jobs:
             gh --version
             cloudflared --version
             coder version
+            kubectl version --client
+            helm version
+            op --version
             test -n "$(ls ~/.claude/skills)"
             node -e "require('playwright').chromium.launch().then(b => b.close())"
             npm run lint

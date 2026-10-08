@@ -270,6 +270,24 @@ async function openAccount() {
   account.open();
 }
 
+// Back from signing out of an account that came from Google. Blockout and
+// Keycloak are signed out; Google isn't, and only Google can do that, for all of
+// Google in this browser at once. So it's offered, not done.
+function signedOutOfGoogle() {
+  account.clear('Signed out');
+  account.body.append(
+    make('p', null, 'You’re signed out of Blockout.'),
+    make('p', 'setting-help', 'On a shared computer? This browser is still signed in to Google. Signing out of Google signs you out of all of it here: Gmail, Classroom, YouTube and the rest.'),
+  );
+  const google = make('a', 'btn', 'Also sign out of Google');
+  google.href = 'https://accounts.google.com/Logout';
+  google.target = '_blank';
+  google.rel = 'noopener';
+  account.actions.append(google);
+  account.done();
+  account.open();
+}
+
 // A student's classes, joining one with a code, and the code for a grown-up
 async function studentAccount() {
   const classes = make('div', 'acct-section');
@@ -888,6 +906,7 @@ async function start() {
   } catch (err) {
     toast('Sign-in', err.message);
   }
+  if (Auth.takeSignedOut() === 'google') signedOutOfGoogle();
   if (Auth.signedIn()) {
     try {
       const next = await Auth.syncProgress(Game.progress());

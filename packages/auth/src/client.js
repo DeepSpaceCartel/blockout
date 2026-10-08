@@ -14,11 +14,12 @@
 // local one is just a cache.
 
 import * as Progress from '@blockout/progress';
-const AUTH_KEY = 'blockout.auth'; // { token, user, refresh?, expires? }
+const AUTH_KEY = 'blockout.auth'; // { token, user, refresh?, idToken?, expires? }
 const GUEST_KEY = 'blockout.progress';
 const MERGED_KEY = 'blockout.mergedInto'; // user ids this device's guest save went into
 const PUSH_DELAY_MS = 1500;
 const PKCE_KEY = 'blockout.pkce';
+const SIGNED_OUT_KEY = 'blockout.signedOut'; // sessionStorage: the provider a Keycloak sign-out came from
 
 const read = (key, fallback = null) => {
   try {
@@ -94,6 +95,14 @@ async function signInDev(person) {
 }
 
 // ---- keycloak provider (OIDC authorization code + PKCE)
+// A JWT's claims, unchecked: only for what the page shows (the server checks tokens)
+const claims = (jwt) => {
+  try {
+    return JSON.parse(atob(jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+  } catch (_) {
+    return {};
+  }
+};
 const b64url = (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
 async function signInKeycloak() {
   const c = await config();
@@ -130,16 +139,48 @@ async function finishKeycloak() {
   });
   if (!res.ok) throw new AuthError('auth', 'Signing in didn’t work. Please try again.');
   const t = await res.json();
-  saveSession({ token: t.access_token, refresh: t.refresh_token, user: null });
+  // the ID token is only kept to end the Keycloak session on sign out
+  saveSession({ token: t.access_token, refresh: t.refresh_token, idToken: t.id_token, user: null });
   const { user } = await api('GET', '/api/me');
   saveSession({ ...session, user });
   return true;
 }
 
+// Signing out of a Keycloak account also ends the Keycloak session; otherwise
+// the next "Sign in" on a shared Chromebook would quietly be the same child.
+// reload = false (an expired token) only forgets the token here.
 function signOut(reload = true) {
-  flushProgress();
+  flushProgress(); // keepalive: it survives leaving the page
+  const idToken = session && session.idToken;
   saveSession(null);
-  if (reload) location.reload();
+  if (!reload) return;
+  if (!idToken) {
+    location.reload();
+    return;
+  }
+  try {
+    // Keycloak names the identity provider ("google") when the account came from one
+    sessionStorage.setItem(SIGNED_OUT_KEY, claims(idToken).identity_provider || 'keycloak');
+  } catch (_) {
+    // private window: no "signed out" message
+  }
+  config().then((c) => {
+    const url = new URL(`${c.issuer}/protocol/openid-connect/logout`);
+    url.search = new URLSearchParams({ id_token_hint: idToken, post_logout_redirect_uri: location.origin + location.pathname, client_id: c.clientId });
+    location.assign(url.toString());
+  }, () => location.reload());
+}
+
+// Once, after coming back from a Keycloak sign-out: which provider the account
+// came from ('google', or 'keycloak' for a Keycloak password), else null.
+function takeSignedOut() {
+  try {
+    const from = sessionStorage.getItem(SIGNED_OUT_KEY);
+    sessionStorage.removeItem(SIGNED_OUT_KEY);
+    return from;
+  } catch (_) {
+    return null;
+  }
 }
 
 // ---- progress
@@ -203,6 +244,7 @@ export {
   signInKeycloak,
   finishKeycloak,
   signOut,
+  takeSignedOut,
   progressKey,
   queueProgress,
   flushProgress,

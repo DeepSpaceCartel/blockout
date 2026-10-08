@@ -12,6 +12,8 @@
 	// tools; .devcontainer/check.mjs keeps Playwright in step with package-lock.json.
 	"features": {
 		"ghcr.io/devcontainers/features/github-cli:1": {},
+		// kubectl and helm, for the services the workspace's cluster runs (like Keycloak)
+		"ghcr.io/devcontainers/features/kubectl-helm-minikube:1": { "minikube": "none" },
 		"./features/cloudflared": { "version": "2026.10.0" },
 		"./features/playwright-chromium": { "version": "1.63.0" },
 		"./features/python-venv": {},
@@ -19,16 +21,19 @@
 			"source": "DeepSpaceCartel/skills",
 			"ref": "5642bd7c6c82a1fdc5f36ddadadf02723951f296"
 		},
-		"./features/coder-cli": { "url": "https://coder.deepspacecartel.com" }
+		"./features/coder-cli": { "url": "https://coder.deepspacecartel.com" },
+		// op, for reading deploy secrets (deploy/keycloak) from 1Password
+		"./features/1password-cli": { "version": "2.40.0" }
 	},
 
-	// The Blockout server (npm start), the Vite dev server (npm run dev) and the
-	// docs site (mkdocs serve)
-	"forwardPorts": [8080, 5173, 8000],
+	// The Blockout server (npm start), the Vite dev server (npm run dev), the
+	// docs site (mkdocs serve) and Keycloak (npm run keycloak, see deploy/keycloak)
+	"forwardPorts": [8080, 5173, 8000, 8180],
 	"portsAttributes": {
 		"8080": { "label": "Blockout server" },
 		"5173": { "label": "Vite (multiplication)" },
 		"8000": { "label": "Docs (mkdocs serve)" },
+		"8180": { "label": "Keycloak (npm run keycloak)" },
 		// Throwaway servers that Playwright test scripts start
 		"8134-8199": { "onAutoForward": "ignore" }
 	},

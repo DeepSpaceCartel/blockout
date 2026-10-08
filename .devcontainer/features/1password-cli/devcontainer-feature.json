@@ -1,0 +1,13 @@
+{
+	"id": "1password-cli",
+	"version": "1.0.0",
+	"name": "1Password CLI",
+	"description": "The 1Password CLI (op) from 1Password's signed apt repository, for reading deploy secrets (like the Google OAuth client secret) instead of typing them.",
+	"options": {
+		"version": {
+			"type": "string",
+			"default": "2.40.0",
+			"description": "An op version in 1Password's apt repository (like 2.40.0), or latest."
+		}
+	}
+}

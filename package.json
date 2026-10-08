@@ -17,7 +17,8 @@
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint",
-    "start": "npm run build && node apps/server/src/index.js 8080"
+    "start": "npm run build && node apps/server/src/index.js 8080",
+    "keycloak": "kubectl -n keycloak port-forward svc/keycloak-keycloakx-http 8180:80"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

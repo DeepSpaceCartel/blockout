@@ -28,6 +28,7 @@ Work towards 0.3.0 on the `v0.3.0` branch. Details and decisions: [the v0.3.0 wo
 - Legend deals teens (like 14 × 7) for half of its rolls and Tricky facts for the rest; Tricky, Master and Legend games now last about as long as Hard ones.
 - The project is now a Turborepo of Vite apps and shared packages. `npm start` builds and serves everything; the other games moved from `prototypes/*.html` to `/<name>/`.
 - Running the server now needs Node 26 or newer (it was 22.12).
+- On Chromebooks, laptops and iPads held sideways, the main menu is laid out in two columns (modes and menu on the left, settings on the right), so Start is on screen without scrolling. Phones and portrait screens keep the one column.
 
 ### Security
 - API errors no longer carry internal details, and every response has basic browser security headers.

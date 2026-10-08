@@ -1,0 +1,54 @@
+# Postgres for Keycloak (apply with -n <namespace>). The password comes from the
+# keycloak-db Secret that install.sh creates, never from this repo.
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak-db
+spec:
+  selector: { app: keycloak-db }
+  ports: [{ name: postgres, port: 5432 }]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: keycloak-db
+spec:
+  serviceName: keycloak-db
+  replicas: 1
+  selector: { matchLabels: { app: keycloak-db } }
+  template:
+    metadata: { labels: { app: keycloak-db } }
+    spec:
+      # The alpine image's postgres user; fsGroup lets it own the volume
+      securityContext:
+        runAsUser: 70
+        runAsGroup: 70
+        fsGroup: 70
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: postgres
+          image: postgres:17.11-alpine
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          env:
+            - { name: POSTGRES_DB, value: keycloak }
+            - { name: POSTGRES_USER, value: keycloak }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: keycloak-db, key: password } }
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+          ports: [{ name: postgres, containerPort: 5432 }]
+          readinessProbe:
+            exec: { command: [pg_isready, -U, keycloak, -d, keycloak] }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 512Mi }
+          volumeMounts: [{ name: data, mountPath: /var/lib/postgresql/data }]
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec:
+        accessModes: [ReadWriteOnce]
+        # Hetzner volumes start at 10 GB
+        resources: { requests: { storage: 10Gi } }

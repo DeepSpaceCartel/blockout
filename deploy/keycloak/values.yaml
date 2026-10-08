@@ -1,0 +1,59 @@
+# Keycloak for Blockout sign-in (Helm chart codecentric/keycloakx), reached on
+# http://localhost:8180 through `npm run keycloak` (a kubectl port-forward), so
+# for development only: other devices can't reach it. Install or update it with
+# deploy/keycloak/install.sh; see docs/guides/set-up-keycloak.md.
+image:
+  tag: "26.7.4"
+
+# Production mode on plain HTTP; the blockout realm is imported on first start
+# (an existing realm is left alone)
+args: ["start", "--import-realm"]
+
+http:
+  relativePath: "/"
+  managementRelativePath: "/"
+
+database:
+  vendor: postgres
+  hostname: keycloak-db
+  port: 5432
+  database: keycloak
+  username: keycloak
+  existingSecret: keycloak-db
+  existingSecretKey: password
+
+extraEnv: |
+  # Every URL Keycloak hands out (and the tokens' iss) uses the port-forward address
+  - name: KC_HOSTNAME
+    value: http://localhost:8180
+  - name: KC_BOOTSTRAP_ADMIN_USERNAME
+    valueFrom: { secretKeyRef: { name: keycloak-admin, key: username } }
+  - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+    valueFrom: { secretKeyRef: { name: keycloak-admin, key: password } }
+  # Secrets the realm refers to as ${vault.<key>} are files in this folder, named
+  # <realm>_<key>: the Google client secret is blockout_google-secret
+  - name: KC_VAULT
+    value: file
+  - name: KC_VAULT_DIR
+    value: /opt/keycloak/vault
+  - name: JAVA_OPTS_APPEND
+    value: -XX:MaxRAMPercentage=70
+
+extraVolumes: |
+  - name: realm
+    configMap: { name: keycloak-realm }
+  - name: vault
+    secret:
+      secretName: google-oauth
+      items: [{ key: secret, path: blockout_google-secret }]
+extraVolumeMounts: |
+  - name: realm
+    mountPath: /opt/keycloak/data/import
+    readOnly: true
+  - name: vault
+    mountPath: /opt/keycloak/vault
+    readOnly: true
+
+resources:
+  requests: { cpu: 250m, memory: 768Mi }
+  limits: { memory: 1Gi }

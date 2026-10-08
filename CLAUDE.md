@@ -24,6 +24,7 @@ A multiplication-as-area game for 3rd graders, based on "Blockout" from Math for
 | `packages/ui` | `@blockout/ui`: CSS in `src/css/*` (tokens, base, menu, game, dice skins, results, panels, rewards, wardrobe, players), the Lucide icon sprite (`icons.svg`), DOM helpers, `@blockout/ui/rewards` (toasts, achievement banners, confetti), and `@blockout/ui/vite` (`blockoutPage()`: adds the theme script and the sprite to every page). |
 | `packages/game-kit` | `@blockout/game-kit`: `startGame(variantId)`, the shared page engine of the other games, and their `style.css`. `@blockout/game-kit/meta`: each game's save (`blockout.game.<id>`): points, shop chains, achievements, question stats. Pure, tested. |
 | `packages/classroom`, `packages/auth` | Browser clients: classroom server (SSE with long-poll fallback, session in sessionStorage); sign-in (dev or Keycloak PKCE), bearer token, per-account progress key and sync. |
+| `deploy/keycloak` | Keycloak for sign-in in the workspace's cluster (namespace `keycloak`): `install.sh` (idempotent; also after a cluster rebuild), the `codecentric/keycloakx` chart's `values.yaml`, `postgres.yaml`, and the `blockout` realm (`realm-blockout.json`, imported only when the realm doesn't exist; the Google secret is `${vault.google-secret}` from the `google-oauth` Secret). Reached on `http://localhost:8180` via `npm run keycloak`. Guide: `docs/guides/set-up-keycloak.md`. |
 | `docs/` | The MkDocs Material site (`mkdocs.yml`): `home/`, `guides/`, `concepts/`, `reference/`, `project/`, `decisions/` (ADRs), `privacy.md`, screenshots in `assets/screenshots/`. The v0.3.0 plan and log are kept out of the nav. |
 | `.github/` | CI (`workflows/ci.yml`: lint, test and build on Node 26, strict docs build; `workflows/devcontainer.yml`: builds the dev container; actions pinned to commit SHAs) and Dependabot (npm, actions, dev container features). |
 
@@ -45,12 +46,15 @@ npm start           # build, then serve everything on http://localhost:8080
 npm start -- --public-url https://<name>.trycloudflare.com   # behind a Cloudflare tunnel
 npm run dev         # Vite dev servers (multiplication on :5173, proxying /api) + the server with --watch
 cloudflared tunnel --url http://localhost:8080
+deploy/keycloak/install.sh   # install or update Keycloak in the cluster
+npm run keycloak    # forward it to http://localhost:8180; then start Blockout with
+BLOCKOUT_AUTH=keycloak KEYCLOAK_ISSUER=http://localhost:8180/realms/blockout KEYCLOAK_CLIENT_ID=blockout npm start
 ```
 
 - **The dev server:** the user usually keeps one running on 8080 behind a Cloudflare quick tunnel. The tunnel URL changes, so ask for it or reuse the last one given.
 - **After client changes:** rebuild (`npm run build`). Built assets are hashed and `index.html` is served `no-cache`, so a page reload picks them up.
 - **After server changes:** restart the server.
-- **Setup:** Dev Container Features install the GitHub CLI (the official feature), and, from `.devcontainer/features/`, cloudflared, Playwright's Chromium with its libraries (in `/ms-playwright`), python3-venv, the DeepSpaceCartel Agent Skills (user-level, `~/.claude/skills`), and the `coder` CLI from coder.deepspacecartel.com; `.devcontainer/postCreateCommand.sh` installs the npm packages and the docs venv (`.venv`). Feature versions are pinned in `devcontainer.json`: when Playwright moves on in `package-lock.json`, bump `playwright-chromium` to match (`node .devcontainer/check.mjs` checks, and CI runs it). `.github/workflows/devcontainer.yml` builds the container and smoke-tests it.
+- **Setup:** Dev Container Features install the GitHub CLI, kubectl and helm (the official features), and, from `.devcontainer/features/`, cloudflared, Playwright's Chromium with its libraries (in `/ms-playwright`), python3-venv, the DeepSpaceCartel Agent Skills (user-level, `~/.claude/skills`), the `coder` CLI from coder.deepspacecartel.com, and the 1Password CLI (`op`, from 1Password's signed apt repository); `.devcontainer/postCreateCommand.sh` installs the npm packages and the docs venv (`.venv`). Feature versions are pinned in `devcontainer.json`: when Playwright moves on in `package-lock.json`, bump `playwright-chromium` to match (`node .devcontainer/check.mjs` checks, and CI runs it). `.github/workflows/devcontainer.yml` builds the container and smoke-tests it.
 
 ## Browser testing (Playwright)
 
