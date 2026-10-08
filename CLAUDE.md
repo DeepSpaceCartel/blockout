@@ -25,7 +25,7 @@ A multiplication-as-area game for 3rd graders, based on "Blockout" from Math for
 | `packages/game-kit` | `@blockout/game-kit`: `startGame(variantId)`, the shared page engine of the other games, and their `style.css`. `@blockout/game-kit/meta`: each game's save (`blockout.game.<id>`): points, shop chains, achievements, question stats. Pure, tested. |
 | `packages/classroom`, `packages/auth` | Browser clients: classroom server (SSE with long-poll fallback, session in sessionStorage); sign-in (dev or Keycloak PKCE), bearer token, per-account progress key and sync. |
 | `docs/` | The MkDocs Material site (`mkdocs.yml`): `home/`, `guides/`, `concepts/`, `reference/`, `project/`, `decisions/` (ADRs), `privacy.md`, screenshots in `assets/screenshots/`. The v0.3.0 plan and log are kept out of the nav. |
-| `.github/` | CI (`workflows/ci.yml`: lint, test, build, strict docs build; actions pinned to commit SHAs) and Dependabot. |
+| `.github/` | CI (`workflows/ci.yml`: lint, test and build on Node 26, strict docs build; `workflows/devcontainer.yml`: builds the dev container; actions pinned to commit SHAs) and Dependabot (npm, actions, dev container features). |
 
 Tests live next to their code (`packages/*/test`, `apps/*/test`, `node:test`).
 
@@ -50,7 +50,7 @@ cloudflared tunnel --url http://localhost:8080
 - **The dev server:** the user usually keeps one running on 8080 behind a Cloudflare quick tunnel. The tunnel URL changes, so ask for it or reuse the last one given.
 - **After client changes:** rebuild (`npm run build`). Built assets are hashed and `index.html` is served `no-cache`, so a page reload picks them up.
 - **After server changes:** restart the server.
-- **Setup:** `.devcontainer/postCreateCommand.sh` installs the npm packages, Playwright Chromium with its libraries, and cloudflared.
+- **Setup:** Dev Container Features install the GitHub CLI (the official feature), and, from `.devcontainer/features/`, cloudflared, Playwright's Chromium with its libraries (in `/ms-playwright`), python3-venv, the DeepSpaceCartel Agent Skills (user-level, `~/.claude/skills`), and the `coder` CLI from coder.deepspacecartel.com; `.devcontainer/postCreateCommand.sh` installs the npm packages and the docs venv (`.venv`). Feature versions are pinned in `devcontainer.json`: when Playwright moves on in `package-lock.json`, bump `playwright-chromium` to match (`node .devcontainer/check.mjs` checks, and CI runs it). `.github/workflows/devcontainer.yml` builds the container and smoke-tests it.
 
 ## Browser testing (Playwright)
 

@@ -1,24 +1,56 @@
-// For format details, see https://aka.ms/devcontainer.json. For config options, see the
-// README at: https://github.com/devcontainers/templates/tree/main/src/typescript-node
+// Format: https://containers.dev/implementors/json_reference/
 {
-	"name": "Node.js & TypeScript",
-	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-	"image": "mcr.microsoft.com/devcontainers/typescript-node:5-24-trixie",
+	"name": "Blockout",
+	"image": "mcr.microsoft.com/devcontainers/typescript-node:5-26-trixie",
+	"hostRequirements": { "cpus": 1, "memory": "4gb", "storage": "10gb" },
 
-	// Features to add to the dev container. More info: https://containers.dev/features.
-	// "features": {},
+	// Features: https://containers.dev/features. Local ones live in ./features:
+	// cloudflared for tunnels, Chromium for the Playwright browser tests,
+	// python3-venv for the docs site, Agent Skills for Claude Code (user-level, in
+	// ~/.claude/skills), and the coder CLI from the Coder deployment (always that
+	// server's version). The other versions are pinned so a rebuild gets the same
+	// tools; .devcontainer/check.mjs keeps Playwright in step with package-lock.json.
+	"features": {
+		"ghcr.io/devcontainers/features/github-cli:1": {},
+		"./features/cloudflared": { "version": "2026.10.0" },
+		"./features/playwright-chromium": { "version": "1.63.0" },
+		"./features/python-venv": {},
+		"./features/agent-skills": {
+			"source": "DeepSpaceCartel/skills",
+			"ref": "5642bd7c6c82a1fdc5f36ddadadf02723951f296"
+		},
+		"./features/coder-cli": { "url": "https://coder.deepspacecartel.com" }
+	},
 
-	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	// The Blockout server (npm start) and the Vite dev server (npm run dev)
-	"forwardPorts": [8080, 5173],
+	// The Blockout server (npm start), the Vite dev server (npm run dev) and the
+	// docs site (mkdocs serve)
+	"forwardPorts": [8080, 5173, 8000],
+	"portsAttributes": {
+		"8080": { "label": "Blockout server" },
+		"5173": { "label": "Vite (multiplication)" },
+		"8000": { "label": "Docs (mkdocs serve)" },
+		// Throwaway servers that Playwright test scripts start
+		"8134-8199": { "onAutoForward": "ignore" }
+	},
 
-	// Use 'postCreateCommand' to run commands after the container is created.
-	// Playwright + Chromium for the browser tests, and cloudflared for tunnels
-	"postCreateCommand": "bash .devcontainer/postCreateCommand.sh"
+	// npm packages and the docs venv, which need the workspace (features can't see it)
+	"postCreateCommand": "bash .devcontainer/postCreateCommand.sh",
 
-	// Configure tool-specific properties.
-	// "customizations": {},
-
-	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
-	// "remoteUser": "root"
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"anthropic.claude-code",
+				"dbaeumer.vscode-eslint",
+				"redhat.vscode-yaml"
+			],
+			"settings": {
+				// mkdocs.yml uses Material's !!python/name tags
+				"yaml.customTags": [
+					"!!python/name:material.extensions.emoji.twemoji",
+					"!!python/name:material.extensions.emoji.to_svg",
+					"!!python/name:pymdownx.superfences.fence_code_format"
+				]
+			}
+		}
+	}
 }

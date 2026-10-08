@@ -18,7 +18,7 @@ npm test           # unit tests for every app and package
 npm run lint       # ESLint
 ```
 
-- **Node:** needs Node 22.12 or newer. The server uses the built-in `node:sqlite`.
+- **Node:** needs Node 26 or newer. The server uses the built-in `node:sqlite`.
 - **Sharing through a tunnel:** run `cloudflared tunnel --url http://localhost:8080`, then `npm start -- --public-url https://<name>.trycloudflare.com` so the class join links and QR codes use the tunnel's address.
 
 ## Layout

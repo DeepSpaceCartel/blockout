@@ -1,0 +1,16 @@
+{
+	"id": "playwright-chromium",
+	"version": "1.0.0",
+	"name": "Playwright Chromium",
+	"description": "Chromium for Playwright and the Linux libraries it needs, in a shared folder any user can update.",
+	"options": {
+		"version": {
+			"type": "string",
+			"default": "1.63.0",
+			"description": "The Playwright version whose Chromium to install. Keep it in step with package-lock.json; postCreateCommand.sh fetches a matching one if it drifts."
+		}
+	},
+	"containerEnv": {
+		"PLAYWRIGHT_BROWSERS_PATH": "/ms-playwright"
+	}
+}

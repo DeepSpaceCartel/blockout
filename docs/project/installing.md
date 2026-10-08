@@ -4,10 +4,10 @@
 
 ## What you need
 
-- **Node 22.12 or newer** (the server uses the built-in `node:sqlite`); Node 24 is what CI uses.
+- **Node 26 or newer** (the server uses the built-in `node:sqlite`); CI and the dev container use Node 26.
 - **npm** (it comes with Node).
 
-The dev container (`.devcontainer/`) has all of this, plus Playwright's Chromium and `cloudflared`; `postCreateCommand.sh` sets it up.
+The dev container (`.devcontainer/`, Node 26) has all of this, plus Playwright's Chromium, `cloudflared`, the GitHub CLI, the `coder` CLI, the docs site's Python venv (`.venv`) and the DeepSpaceCartel Agent Skills for Claude Code. Dev Container Features install the system tools (the local ones are in `.devcontainer/features/`); `postCreateCommand.sh` installs the npm packages and the docs venv. A CI workflow builds the container whenever `.devcontainer/` changes.
 
 ## Build and run
 

@@ -1,4 +1,5 @@
-# Keeps the pinned action SHAs (with their version comments) and npm packages current.
+# Keeps the pinned action SHAs (with their version comments), npm packages and the
+# dev container current.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -12,3 +13,10 @@ updates:
     groups:
       tooling:
         patterns: ['*']
+  # The ghcr.io features in .devcontainer/devcontainer.json. Not the image (its
+  # 5-26-trixie tag already floats within image version 5) or the local features in
+  # .devcontainer/features, whose versions are bumped by hand.
+  - package-ecosystem: devcontainers
+    directory: /
+    schedule:
+      interval: weekly

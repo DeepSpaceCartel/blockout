@@ -1,0 +1,13 @@
+{
+	"id": "cloudflared",
+	"version": "1.1.0",
+	"name": "cloudflared",
+	"description": "Cloudflare's tunnel client, for sharing the classroom server through a quick tunnel.",
+	"options": {
+		"version": {
+			"type": "string",
+			"default": "2026.10.0",
+			"description": "A cloudflared release tag (like 2026.10.0), or latest."
+		}
+	}
+}
