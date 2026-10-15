@@ -71,17 +71,17 @@ test('classes: teacher creates, any @iusd.org student joins with the code, other
   const { accounts, signIn } = setup();
   const teacher = await signIn({ firstName: 'Ms', lastInitial: 'R', role: 'teacher', schoolId: 'cadence-park' });
   assert.equal(teacher.schoolId, 'cadence-park');
-  const c = accounts.createClass(teacher, { name: 'Room 12' });
+  const c = await accounts.createClass(teacher, { name: 'Room 12' });
   assert.match(c.code, /^[A-Z2-9]{6}$/);
   const kid = await signIn({ firstName: 'Maya', lastInitial: 'K', role: 'student', email: 'maya@iusd.org' });
   const outsider = await signIn({ firstName: 'Bo', role: 'student', email: 'bo@gmail.com' });
-  assert.equal(accounts.joinClass(kid, { code: c.code.toLowerCase() }).class.name, 'Room 12');
-  assert.throws(() => accounts.joinClass(outsider, { code: c.code }), /@iusd\.org/);
-  assert.throws(() => accounts.joinClass(kid, { code: 'NOPE22' }), /No class/);
-  assert.throws(() => accounts.createClass(kid, { name: 'x' }), /Only teachers/);
+  assert.equal((await accounts.joinClass(kid, { code: c.code.toLowerCase() })).class.name, 'Room 12');
+  await assert.rejects(accounts.joinClass(outsider, { code: c.code }), /@iusd\.org/);
+  await assert.rejects(accounts.joinClass(kid, { code: 'NOPE22' }), /No class/);
+  await assert.rejects(accounts.createClass(kid, { name: 'x' }), /Only teachers/);
   const other = await signIn({ firstName: 'Mr', lastInitial: 'T', role: 'teacher', schoolId: 'cadence-park' });
-  assert.throws(() => accounts.classDetail(other, c.id), /isn’t one of yours/);
-  const detail = accounts.classDetail(teacher, c.id);
+  await assert.rejects(accounts.classDetail(other, c.id), /isn’t one of yours/);
+  const detail = await accounts.classDetail(teacher, c.id);
   assert.equal(detail.students.length, 1);
   assert.equal(detail.students[0].name, 'Maya K.');
   assert.match(detail.students[0].parentCode, /^[A-Z2-9]{8}$/);
@@ -90,19 +90,19 @@ test('classes: teacher creates, any @iusd.org student joins with the code, other
 test('progress sync: saves round-trip, cheats stay on the device, stats come from the save', async () => {
   const { accounts, signIn } = setup();
   const kid = await signIn({ firstName: 'Maya', role: 'student', email: 'maya@iusd.org' });
-  assert.equal(accounts.getProgress(kid).progress, null);
+  assert.equal((await accounts.getProgress(kid)).progress, null);
   const s = P.createProgress();
   s.wallet = 50;
   P.cheatOn(s, 'fivemoreminutesmom');
   s.facts.you = { name: 'You', facts: { '6 × 7': { asked: 4, firstTry: 1, wrong: 3, timeouts: 0, said: [], times: [] } } };
-  accounts.putProgress(kid, s);
-  const back = accounts.getProgress(kid).progress;
+  await accounts.putProgress(kid, s);
+  const back = (await accounts.getProgress(kid)).progress;
   assert.equal(back.wallet, 50);
   assert.deepEqual(back.cheats, {});
   // IDDQD's free unlocks never reach the account
   P.cheatOn(s, 'iddqd');
-  accounts.putProgress(kid, s);
-  assert.deepEqual(accounts.getProgress(kid).progress.unlocks, []);
+  await accounts.putProgress(kid, s);
+  assert.deepEqual((await accounts.getProgress(kid)).progress.unlocks, []);
   assert.deepEqual(P.factSummary(back).needsPractice, ['6 × 7']);
 });
 
@@ -130,37 +130,37 @@ test('merging a device into an account keeps the most of everything', () => {
 test('homework: teacher sets class homework, parent sets extra; progress detected from the save', async () => {
   const { accounts, signIn, tick, now } = setup();
   const teacher = await signIn({ firstName: 'Ms', lastInitial: 'R', role: 'teacher', schoolId: 'cadence-park' });
-  const c = accounts.createClass(teacher, { name: 'Room 12' });
+  const c = await accounts.createClass(teacher, { name: 'Room 12' });
   const kid = await signIn({ firstName: 'Maya', role: 'student', email: 'maya@iusd.org' });
-  accounts.joinClass(kid, { code: c.code });
+  await accounts.joinClass(kid, { code: c.code });
   const parent = await signIn({ firstName: 'Ana', role: 'parent', email: 'ana@gmail.com' });
-  assert.throws(() => accounts.createAssignment(parent, { studentId: kid.id, goal: { type: 'games', games: 1 } }), /Link your child/);
-  const code = accounts.parentCode(kid).code;
-  assert.equal(accounts.linkChild(parent, { code: code.toLowerCase() }).child.name, 'Maya');
-  accounts.createAssignment(teacher, { classId: c.id, goal: { type: 'practice', rounds: 2, difficulty: 'easy' }, due: '2026-09-25' });
-  accounts.createAssignment(parent, { studentId: kid.id, goal: { type: 'master', table: 7 } });
-  assert.throws(() => accounts.createAssignment(teacher, { classId: c.id, goal: { type: 'fly' } }), /Pick what/);
+  await assert.rejects(accounts.createAssignment(parent, { studentId: kid.id, goal: { type: 'games', games: 1 } }), /Link your child/);
+  const code = (await accounts.parentCode(kid)).code;
+  assert.equal((await accounts.linkChild(parent, { code: code.toLowerCase() })).child.name, 'Maya');
+  await accounts.createAssignment(teacher, { classId: c.id, goal: { type: 'practice', rounds: 2, difficulty: 'easy' }, due: '2026-09-25' });
+  await accounts.createAssignment(parent, { studentId: kid.id, goal: { type: 'master', table: 7 } });
+  await assert.rejects(accounts.createAssignment(teacher, { classId: c.id, goal: { type: 'fly' } }), /Pick what/);
   tick(1000);
   const s = P.createProgress();
   P.noteActivity(s, { kind: 'practice', finished: true, difficulty: 'easy' }, now());
-  accounts.putProgress(kid, s);
-  let hw = accounts.myHomework(kid).homework;
+  await accounts.putProgress(kid, s);
+  let hw = (await accounts.myHomework(kid)).homework;
   assert.equal(hw.length, 2);
   const practice = hw.find((h) => h.goal.type === 'practice');
   assert.deepEqual([practice.have, practice.need, practice.status, practice.from], [1, 2, 'open', 'teacher']);
   assert.equal(hw.find((h) => h.goal.type === 'master').from, 'parent');
   // the parent sees everything, the teacher sees class progress
-  const seen = accounts.childDetail(parent, kid.id);
+  const seen = await accounts.childDetail(parent, kid.id);
   assert.equal(seen.assignments.length, 2);
   const stranger = await signIn({ firstName: 'Zed', role: 'parent' });
-  assert.throws(() => accounts.childDetail(stranger, kid.id), /can’t see/);
-  const detail = accounts.classDetail(teacher, c.id);
+  await assert.rejects(accounts.childDetail(stranger, kid.id), /can’t see/);
+  const detail = await accounts.classDetail(teacher, c.id);
   assert.deepEqual([detail.assignments.length, detail.assignments[0].done, detail.assignments[0].of], [1, 0, 1]);
   // only the setter can remove homework
   const extra = hw.find((h) => h.from === 'parent');
-  assert.throws(() => accounts.deleteAssignment(teacher, extra.id), /Only whoever/);
-  accounts.deleteAssignment(parent, extra.id);
-  hw = accounts.myHomework(kid).homework;
+  await assert.rejects(accounts.deleteAssignment(teacher, extra.id), /Only whoever/);
+  await accounts.deleteAssignment(parent, extra.id);
+  hw = (await accounts.myHomework(kid)).homework;
   assert.equal(hw.length, 1);
 });
 
@@ -191,30 +191,30 @@ test('homework goals: master, practice by difficulty, win by board, games; late 
 test('scheduled tournaments open on time; students of the class (or school) see them', async () => {
   const { accounts, signIn, tick, now } = setup();
   const teacher = await signIn({ firstName: 'Ms', lastInitial: 'R', role: 'teacher', schoolId: 'cadence-park' });
-  const c = accounts.createClass(teacher, { name: 'Room 12' });
+  const c = await accounts.createClass(teacher, { name: 'Room 12' });
   const kid = await signIn({ firstName: 'Maya', role: 'student', email: 'maya@iusd.org' });
   const other = await signIn({ firstName: 'Leo', role: 'student', email: 'leo@iusd.org' });
-  accounts.joinClass(kid, { code: c.code });
-  assert.throws(() => accounts.createSchedule(teacher, { classId: c.id, startsAt: now() - 3600e3 }), /hasn’t passed/);
-  const { schedule } = accounts.createSchedule(teacher, { classId: c.id, startsAt: now() + 60e3, settings: { format: 'swiss', size: 8 } });
-  accounts.createSchedule(teacher, { scope: 'school', title: 'Cadence Park Cup', startsAt: now() + 120e3 });
+  await accounts.joinClass(kid, { code: c.code });
+  await assert.rejects(accounts.createSchedule(teacher, { classId: c.id, startsAt: now() - 3600e3 }), /hasn’t passed/);
+  const { schedule } = await accounts.createSchedule(teacher, { classId: c.id, startsAt: now() + 60e3, settings: { format: 'swiss', size: 8 } });
+  await accounts.createSchedule(teacher, { scope: 'school', title: 'Cadence Park Cup', startsAt: now() + 120e3 });
   let made = 0;
   const createRoom = (settings) => {
     assert.equal(settings.type, 'tournament');
     made++;
     return { code: `ROOM${made}`, teacherKey: `key${made}` };
   };
-  assert.deepEqual(accounts.openDue(createRoom), []);
-  assert.throws(() => accounts.hostSchedule(teacher, schedule.id), /hasn’t started/);
+  assert.deepEqual((await accounts.openDue(createRoom)), []);
+  await assert.rejects(accounts.hostSchedule(teacher, schedule.id), /hasn’t started/);
   tick(61e3);
-  assert.equal(accounts.openDue(createRoom).length, 1);
-  assert.deepEqual(accounts.hostSchedule(teacher, schedule.id), { code: 'ROOM1', teacherKey: 'key1' });
-  assert.deepEqual(accounts.live(kid).live.map((l) => l.code), ['ROOM1']);
-  assert.deepEqual(accounts.live(other).live, []); // not in the class
+  assert.equal((await accounts.openDue(createRoom)).length, 1);
+  assert.deepEqual((await accounts.hostSchedule(teacher, schedule.id)), { code: 'ROOM1', teacherKey: 'key1' });
+  assert.deepEqual((await accounts.live(kid)).live.map((l) => l.code), ['ROOM1']);
+  assert.deepEqual((await accounts.live(other)).live, []); // not in the class
   tick(60e3);
-  accounts.openDue(createRoom);
-  assert.deepEqual(accounts.live(other).live.map((l) => l.title), ['Cadence Park Cup']); // the whole school
-  assert.equal(accounts.openDue(createRoom).length, 0); // each opens once
+  await accounts.openDue(createRoom);
+  assert.deepEqual((await accounts.live(other)).live.map((l) => l.title), ['Cadence Park Cup']); // the whole school
+  assert.equal((await accounts.openDue(createRoom)).length, 0); // each opens once
 });
 
 test('audit log: account changes are logged by id, never by name or code', async () => {
@@ -225,9 +225,9 @@ test('audit log: account changes are logged by id, never by name or code', async
   const signIn = async (person) => accounts.authenticate((await accounts.devSignIn(person)).token);
   const teacher = await signIn({ role: 'teacher', firstName: 'Ms', lastInitial: 'R', schoolId: 'cadence-park' });
   const kid = await signIn({ role: 'student', firstName: 'Maya', lastInitial: 'K', email: 'maya@iusd.org' });
-  const c = accounts.createClass(teacher, { name: 'Room 12' });
-  accounts.joinClass(kid, { code: c.code });
-  accounts.removeStudent(teacher, c.id, kid.id);
+  const c = await accounts.createClass(teacher, { name: 'Room 12' });
+  await accounts.joinClass(kid, { code: c.code });
+  await accounts.removeStudent(teacher, c.id, kid.id);
   assert.deepEqual(
     lines.map((l) => [l['event.name'], l['user.role']]),
     [['class.created', 'teacher'], ['class.joined', 'student'], ['class.student_removed', 'teacher']]

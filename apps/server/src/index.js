@@ -491,11 +491,7 @@ function matchAccountRoute(method, pathname) {
 
 // Scheduled tournaments: open each one's lobby when it's due
 const scheduleTimer = setInterval(() => {
-  try {
-    accounts.openDue(openRoom);
-  } catch (e) {
-    log.error('schedule.error', exception(e));
-  }
+  accounts.openDue(openRoom).catch((e) => log.error('schedule.error', exception(e)));
 }, SCHEDULE_TICK_MS).unref();
 
 const routes = {
