@@ -228,12 +228,19 @@ function diceProfile(boardSize, sides = 6) {
 // Chance per die of trying rare faces: about 1 in 6 overall, split between them.
 const RARE_TOTAL_CHANCE = 1 / 6;
 
-// Returns a per-game dice bag: bag.roll() gives one die.
-function createDice(boardSize, rng = Math.random, sides = 6) {
+// A per-game dice bag's state, as plain data (it can be saved as JSON, so a
+// live class can be stored and picked up by another server).
+function diceState(boardSize, sides = 6) {
   const profile = diceProfile(boardSize, sides);
   const remaining = { ...profile.rare };
-  const perFace = RARE_TOTAL_CHANCE / Math.max(1, Object.keys(remaining).length);
-  const [lo, hi] = profile.common;
+  return { sides, common: profile.common, remaining, perFace: RARE_TOTAL_CHANCE / Math.max(1, Object.keys(remaining).length) };
+}
+
+// A bag that rolls from a saved state: bag.roll() gives one die, and uses up
+// rare faces in state.remaining (the state itself, so it can be saved again).
+function diceFromState(state, rng = Math.random) {
+  const { sides, remaining, perFace } = state;
+  const [lo, hi] = state.common;
   return {
     sides,
     remaining,
@@ -248,6 +255,9 @@ function createDice(boardSize, rng = Math.random, sides = 6) {
     },
   };
 }
+
+// Returns a per-game dice bag: bag.roll() gives one die.
+const createDice = (boardSize, rng = Math.random, sides = 6) => diceFromState(diceState(boardSize, sides), rng);
 
 // "No room": when a roll doesn't fit anywhere the player has to pass. To keep
 // that from happening while there's still space, rolls can be limited to ones
@@ -339,6 +349,8 @@ export {
   fitsDifficulty,
   diceProfile,
   createDice,
+  diceState,
+  diceFromState,
   FIT_MODES,
   fitThreshold,
   fitOnlyNow,

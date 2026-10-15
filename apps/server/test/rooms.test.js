@@ -440,3 +440,35 @@ test('whole class: students see up to 8 classmates near them, with their boards;
   const lead = Rooms.studentView(room, kids[1]).classmates.find((c) => c.id === kids[0].id);
   assert.deepEqual(lead && lead.rects, [[0, 0, a, b]], 'the leader is near the top');
 });
+
+// ---------------------------------------------------------------- saving
+
+// A live room is saved as JSON (to be picked up by another server): it must be
+// plain data, and a copy read back must play on as if nothing happened.
+const roundTrip = (room) => JSON.parse(JSON.stringify(room));
+
+test('saving: a whole-class game survives a JSON round trip mid-game and plays to the end', () => {
+  let { room } = classOf(['Ann', 'Bo']);
+  Rooms.start(room);
+  for (const p of room.players) Rooms.submit(room, p, placeFor(room, p));
+  room = roundTrip(room);
+  assert.deepEqual(roundTrip(room), room, 'nothing is lost in JSON');
+  for (let i = 0; i < 40 && room.state === 'playing'; i++) {
+    Rooms.nextRound(room);
+    if (room.state !== 'playing') break;
+    for (const p of room.players) if (!p.done) Rooms.submit(room, p, Core.validPlacements(p.board, ...room.roll).length ? placeFor(room, p) : { round: room.round, kind: 'timeout' });
+    room = roundTrip(room);
+  }
+  assert.equal(room.state, 'ended');
+});
+
+test('saving: pairs survive a JSON round trip every turn', () => {
+  let { room } = pairsOf(['Ann', 'Bo']);
+  Rooms.start(room);
+  for (let i = 0; i < 400 && room.state === 'playing'; i++) {
+    room = roundTrip(room);
+    playTurn(room, room.matches[0]);
+  }
+  assert.equal(room.state, 'ended');
+  assert.equal(room.matches[0].over, true);
+});

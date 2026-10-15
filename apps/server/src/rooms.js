@@ -206,13 +206,13 @@ function start(room, rng = Math.random) {
     p.benched = false;
   }
   const sides = Core.DIFFICULTY_SIDES[room.settings.difficulty];
-  room.bag = Core.createDice(room.settings.size, rng, sides);
-  nextRound(room);
+  room.bag = Core.diceState(room.settings.size, sides); // (plain data: rolled with diceFromState)
+  nextRound(room, rng);
 }
 
 // Roll for everyone. Anyone who didn't answer the last roll has missed it; anyone
 // whose board has no room for this one passes straight away.
-function nextRound(room) {
+function nextRound(room, rng = Math.random) {
   if (room.state !== 'playing') throw new RoomError('state', 'The game isn’t running.');
   for (const p of playing(room)) {
     if (room.round > 0 && !p.done) {
@@ -222,7 +222,8 @@ function nextRound(room) {
   }
   if (room.round >= room.settings.rounds) return end(room);
   room.round++;
-  room.roll = [room.bag.roll(), room.bag.roll()];
+  const bag = Core.diceFromState(room.bag, rng);
+  room.roll = [bag.roll(), bag.roll()];
   for (const p of playing(room)) {
     p.result = null;
     p.done = false;
@@ -439,7 +440,7 @@ function newMatch(room, pair, rng, extra = {}) {
     ids: pair,
     names: Object.fromEntries(pair.map((pid) => [pid, room.players.find((p) => p.id === pid).name])), // kept if someone leaves
     board: Core.createBoard(room.settings.size),
-    bag: Core.createDice(room.settings.size, rng, Core.DIFFICULTY_SIDES[room.settings.difficulty]),
+    bag: Core.diceState(room.settings.size, Core.DIFFICULTY_SIDES[room.settings.difficulty]),
     current: 0, // index into ids: whose turn it is
     turn: 1, // bumps after every turn
     roll: null, // the current player's roll, once they've rolled
@@ -532,7 +533,7 @@ function myTurn(room, player) {
 function pairRoll(room, player, rng = Math.random) {
   const m = myTurn(room, player);
   if (m.roll) return { roll: m.roll, passed: false };
-  const roll = Core.rollForBoard(m.board, m.bag, rng, room.settings.fitRolls);
+  const roll = Core.rollForBoard(m.board, Core.diceFromState(m.bag, rng), rng, room.settings.fitRolls);
   if (!canFit(m.board, roll)) {
     player.passes++;
     m.passes++;
