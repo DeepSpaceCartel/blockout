@@ -30,6 +30,9 @@ Work towards 0.3.0 on the `v0.3.0` branch. Details and decisions: [the v0.3.0 wo
 - Running the server now needs Node 26 or newer (it was 22.12).
 - On Chromebooks, laptops and iPads held sideways, the main menu is laid out in two columns (modes and menu on the left, settings on the right), so Start is on screen without scrolling. Phones and portrait screens keep the one column.
 
+### Fixed
+- A web address with a broken `%` escape (like `/%E0`) no longer stops the server for everyone; it gets a `400` answer. Request bodies that are cut off or arrive too slowly are answered too, instead of waiting forever.
+
 ### Security
 - API errors no longer carry internal details, and every response has basic browser security headers.
 - Only a student's first name, last initial, role and email domain are stored; see [Privacy](https://github.com/alexanderilyin/blockout/blob/v0.3.0/docs/privacy.md).

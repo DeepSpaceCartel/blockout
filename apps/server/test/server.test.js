@@ -66,3 +66,21 @@ test('HTTP: errors are RFC 9457 problem details (and keep error/message for the 
   const missing = await fetch(`${base}/api/nope`);
   assert.equal((await missing.json()).status, 404);
 });
+
+test('HTTP: malformed addresses and cut-off bodies get an answer, and the server keeps going', async () => {
+  for (const path of ['/%E0', '/addition/%E0%A4%A', '/api/classes/%E0']) {
+    const res = await fetch(base + path);
+    assert.equal(res.status, 400, path);
+    assert.equal((await res.json()).error, 'bad-request');
+  }
+
+  // A body that stops halfway: the client goes away before sending it all
+  const net = await import('node:net');
+  await new Promise((resolve) => {
+    const sock = net.connect(server.address().port, 'localhost', () => {
+      sock.write('POST /api/rooms HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{"ty');
+      setTimeout(() => (sock.destroy(), resolve()), 50);
+    });
+  });
+  assert.equal((await call('GET', '/api/health')).status, 200);
+});

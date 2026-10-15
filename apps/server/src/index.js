@@ -46,6 +46,7 @@ const POLL_HOLD_MS = 25000; // a long poll waits this long for a change before a
 const CLOSED_MEMORY_MS = 30 * 60 * 1000; // pollers of a closed class are told so for this long
 const MAX_BODY = 16 * 1024;
 const MAX_PROGRESS_BODY = 600 * 1024; // a signed-in student's whole save
+const BODY_TIMEOUT_MS = 10 * 1000;
 const SCHEDULE_TICK_MS = 10 * 1000; // how often due tournaments are opened
 
 const rooms = new Map(); // code -> room
@@ -80,7 +81,12 @@ function staticFile(pathname) {
 }
 
 function serveStatic(req, res) {
-  const pathname = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  let pathname;
+  try {
+    pathname = decodePath(new URL(req.url, 'http://x').pathname);
+  } catch (e) {
+    return sendProblem(res, e.status, e.code, e.message);
+  }
   // "/addition" without the slash: go to "/addition/" so relative paths work
   if (/^\/[a-z-]+$/.test(pathname) && fs.existsSync(path.join(APPS, pathname.slice(1), 'dist', 'index.html'))) {
     res.writeHead(301, { Location: `${pathname}/` });
@@ -108,7 +114,25 @@ const SECURITY_HEADERS = {
 // An error as RFC 9457 problem details. `type` stays about:blank (the status
 // says what kind of problem it is); `error` (a short code) and `message` (for
 // the player) are extension members the games read.
-const STATUS_TITLES = { 400: 'Bad Request', 401: 'Unauthorized', 403: 'Forbidden', 404: 'Not Found', 409: 'Conflict', 500: 'Internal Server Error' };
+const STATUS_TITLES = { 400: 'Bad Request', 401: 'Unauthorized', 403: 'Forbidden', 404: 'Not Found', 408: 'Request Timeout', 409: 'Conflict', 500: 'Internal Server Error' };
+
+// A problem with the request itself (bad URL, slow body), answered with its own status
+class HttpError extends Error {
+  constructor(status, code, message) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
+}
+
+// A malformed escape like %E0 makes decodeURIComponent throw; that's the client's mistake, not ours
+function decodePath(s) {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    throw new HttpError(400, 'bad-request', 'Bad address.');
+  }
+}
 function sendProblem(res, status, code, message) {
   const body = { type: 'about:blank', title: STATUS_TITLES[status] || 'Error', status, detail: message, error: code, message };
   send(res, status, body, 'application/problem+json; charset=utf-8');
@@ -123,6 +147,17 @@ function readJson(req, max = MAX_BODY) {
   return new Promise((resolve, reject) => {
     let size = 0;
     const chunks = [];
+    // A body that never finishes (or a client that goes away) must not hold the request forever
+    const timer = setTimeout(() => {
+      reject(new HttpError(408, 'timeout', 'The request took too long.'));
+      req.destroy();
+    }, BODY_TIMEOUT_MS);
+    const fail = () => {
+      clearTimeout(timer);
+      reject(new HttpError(400, 'aborted', 'The request was cut off.'));
+    };
+    req.on('error', fail);
+    req.on('close', () => (req.complete ? clearTimeout(timer) : fail()));
     req.on('data', (c) => {
       size += c.length;
       if (size > max) {
@@ -131,6 +166,7 @@ function readJson(req, max = MAX_BODY) {
       } else chunks.push(c);
     });
     req.on('end', () => {
+      clearTimeout(timer);
       try {
         resolve(chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : {});
       } catch (e) {
@@ -404,7 +440,7 @@ function matchAccountRoute(method, pathname) {
     const want = pattern.split('/').filter(Boolean);
     if (want.length !== parts.length) continue;
     const params = {};
-    if (want.every((w, i) => (w.startsWith(':') ? (params[w.slice(1)] = decodeURIComponent(parts[i])) : w === parts[i]))) return { handler, params };
+    if (want.every((w, i) => (w.startsWith(':') ? (params[w.slice(1)] = decodePath(parts[i])) : w === parts[i]))) return { handler, params };
   }
   return null;
 }
@@ -586,9 +622,10 @@ function route(req) {
 }
 
 const server = http.createServer(async (req, res) => {
-  const r = route(req);
-  if (!r) return serveStatic(req, res);
+  let r;
   try {
+    r = route(req);
+    if (!r) return serveStatic(req, res);
     // Live updates: /api/rooms/CODE/events?teacher=KEY or ?id=ID&key=KEY
     // or, where streams don't get through, /poll with the same keys plus ?v=VERSION
     const live = req.method === 'GET' && r.code && /\/(events|poll)$/.test(r.url.pathname);
@@ -611,6 +648,7 @@ const server = http.createServer(async (req, res) => {
     if (!r.handler) return sendProblem(res, 404, 'not-found', 'Not found.');
     send(res, 200, await r.handler(req, r.code));
   } catch (e) {
+    if (e instanceof HttpError) return sendProblem(res, e.status, e.code, e.message);
     if (e instanceof AccountError) return sendProblem(res, e.status, e.code, e.message);
     if (e instanceof Auth.AuthError) return sendProblem(res, 401, 'auth', e.message);
     if (e instanceof Rooms.RoomError) {
@@ -636,6 +674,14 @@ setInterval(() => {
 }, 10 * 60 * 1000).unref();
 
 if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
+  // Anything that slips past the request handlers: log it and exit, so the
+  // process manager (Kubernetes, systemd) restarts a clean server
+  const fatal = (kind) => (e) => {
+    console.error(kind, e);
+    process.exit(1);
+  };
+  process.on('unhandledRejection', fatal('Unhandled rejection:'));
+  process.on('uncaughtException', fatal('Uncaught exception:'));
   server.listen(PORT, () => {
     console.log(`Blockout server on http://localhost:${PORT}/`);
     for (const url of lanUrls()) console.log(url === PUBLIC_URL ? `  Students join at: ${url}` : `  Chromebooks on this network: ${url}`);

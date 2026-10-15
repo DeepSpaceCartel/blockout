@@ -21,6 +21,7 @@ Everything under `/api` on the server. Requests and responses are JSON. The game
     ```
 
     `error` is a short machine-readable code, and `message` (the same as `detail`) is written for the player; the games show it as is.
+- **Bad requests:** an address with a broken `%` escape gets `400` (`bad-request`). A request body that's cut off gets `400` (`aborted`), and one that takes longer than 10 seconds to arrive gets `408` (`timeout`).
 
 ## Sign-in
 
