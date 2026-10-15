@@ -13,3 +13,4 @@ Architecture Decision Records: one hard-to-reverse decision per file, numbered, 
 | [0005](0005-game-modules-run-phase.md) | Game modules declare at import and do their load-time work in `run()` | accepted |
 | [0006](0006-mongodb-and-redis.md) | Accounts in MongoDB and live classes in Redis (Valkey), so several servers can run | accepted |
 | [0007](0007-live-classes-in-redis.md) | Live classes in Redis for up to 4 hours, one server running each class's timers | accepted |
+| [0008](0008-roles-in-blockout.md) | Blockout keeps each account's role; one-time invites change it, only `admin` comes from Keycloak | accepted |

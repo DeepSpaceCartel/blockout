@@ -19,13 +19,15 @@ When a student, teacher or parent signs in, the server (`apps/server/src/store/`
 | An opaque ID from the sign-in provider | To recognise the same account next time |
 | The game save: points, unlocks, which multiplication facts are mastered, recent games | Progress, class stats and homework |
 | Class memberships, homework, parent links, scheduled tournaments | The features themselves |
+| One-time codes (only a scrambled copy), who made them and who used them; for teachers and grown-ups, who invited them | Making teachers and linking grown-ups, and being able to trace who let whom in |
 
 We don't collect: full names, email addresses, birthdays, photos, location, contacts, device IDs or anything for advertising.
 
 ## Who sees a student's data
 - **The student.**
 - **Teachers of a class the student joined**, through the roster and student pages.
-- **Parents the student linked,** by giving them the code on the student's account page, or a code from the teacher.
+- **Grown-ups linked with a one-time code** the student made on their account page, or their teacher made for them. A teacher can see who is linked and take off a grown-up who shouldn't be.
+- **Blockout's admins** (named people with the admin role), who look after accounts and delete them on request. They see names, roles, email domains and dates, not progress.
 
 Nobody else sees it: not other students, other parents or other teachers.
 
@@ -36,7 +38,9 @@ Nobody else sees it: not other students, other parents or other teachers.
 - Sign-in will go through the school's own identity provider: Keycloak, brokering Google sign-in for `@iusd.org`. Only that provider sees email addresses.
 
 ## Deleting data
-- A student's data is deleted on request from the school or a parent. For now that's a manual database task; a teacher-facing delete button is on the to-do list.
+- **A grown-up can delete their child's account,** with everything in it, from the child's page under **👪 My kids**. Teachers and grown-ups can delete their own accounts from their account page.
+- **On request from a school or a family,** an admin deletes any account the same way ([Admins](guides/admins.md)).
+- Deleting removes the account's progress, class memberships, links, homework, codes, and the classes it teaches (with their rosters, homework and tournaments). It can't be undone.
 - Guests can clear their data from Stats → Reset stats, or by clearing the browser's site data.
 
 ## Security

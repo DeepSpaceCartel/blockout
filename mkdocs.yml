@@ -19,6 +19,7 @@ nav:
       - Playing: guides/playing.md
       - Teachers: guides/teachers.md
       - Parents: guides/parents.md
+      - Admins: guides/admins.md
       - Share through a tunnel: guides/share-through-a-tunnel.md
       - Switch sign-in to Keycloak: guides/set-up-keycloak.md
       - Set up MongoDB and Valkey: guides/set-up-the-databases.md
@@ -43,6 +44,7 @@ nav:
       - 0005. Game modules declare at import, work in run(): decisions/0005-game-modules-run-phase.md
       - 0006. MongoDB and Redis, for several servers: decisions/0006-mongodb-and-redis.md
       - 0007. Live classes in Redis: decisions/0007-live-classes-in-redis.md
+      - 0008. Roles kept by Blockout, changed by invites: decisions/0008-roles-in-blockout.md
 
 theme:
   name: material

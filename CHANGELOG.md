@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Work towards 0.3.0 on the `v0.3.0` branch. Details and decisions: [the v0.3.0 work log](https://github.com/alexanderilyin/blockout/blob/v0.3.0/docs/v0.3.0-log.md).
 
 ### Added
+- Anyone can sign in as a student; one-time codes do the rest. A **teacher code** (from an admin, or a teacher inviting a colleague under **🏫 My classes**) makes a teacher; a **grown-up's code** (made by the child on their account page, or by their teacher next to the student in the roster) makes a child's grown-up and links them. Codes work once, for 7 or 14 days, with a QR code and a link.
+- An admin page at `/admin/` for accounts with the Keycloak `admin` role: find accounts, change roles, delete accounts, make teacher codes and add schools.
+- Deleting accounts: a grown-up can delete their child's account, and teachers and grown-ups their own; admins any account. Everything in the account goes with it.
+- Teachers see each student's grown-ups and can take off one who shouldn't be there.
 - Structured logs: JSON lines in production (one per request, plus an audit record for each account change, by id only), short text lines at a terminal. `LOG_LEVEL` and `LOG_FORMAT` set them.
 - Health endpoints for Kubernetes probes: `/health/startup`, `/health/live` and `/health/ready`. On `SIGTERM` the server finishes cleanly: it stops taking connections, ends live-update streams so browsers reconnect, answers waiting polls and exits.
 - Accounts for students, teachers and parents, signed in with a practice "dev sign-in" for now and ready for Keycloak (and school Google accounts) later. Guests can still play everything except hosting a class.
@@ -25,6 +29,7 @@ Work towards 0.3.0 on the `v0.3.0` branch. Details and decisions: [the v0.3.0 wo
 - More games: addition, subtraction, division and four fraction games, reachable from the main menu. Each has Single player, Home (two players on one screen) and Practice, its own points, a shop (Medium, then Hard; 20-question rounds, then Expert practice; Home multiplayer), achievements and stats.
 
 ### Changed
+- Roles are kept by Blockout, not taken from the sign-in provider: Keycloak's `student`, `teacher` and `parent` roles are ignored, and only `admin` counts.
 - Live classes can be kept in Redis (Valkey, `BLOCKOUT_REDIS_URL`), so several servers can run them together: a class carries on when a server restarts, crashes or is updated, and its rate limits are shared. A production server requires it.
 - Accounts can be kept in MongoDB (`BLOCKOUT_MONGO_URL`), which several servers can share; a production server requires it. Without it, accounts are kept in memory only (`data/blockout.db` is copied into MongoDB with `apps/server/scripts/sqlite-to-mongo.js`). `deploy/data/install.sh` installs MongoDB and Valkey in the cluster, and `npm run services` forwards them for development.
 - In the other games, Medium, Hard, 20-question practice, Expert practice and Home multiplayer are now unlocked with points.
@@ -33,6 +38,9 @@ Work towards 0.3.0 on the `v0.3.0` branch. Details and decisions: [the v0.3.0 wo
 - The project is now a Turborepo of Vite apps and shared packages. `npm start` builds and serves everything; the other games moved from `prototypes/*.html` to `/<name>/`.
 - Running the server now needs Node 26 or newer (it was 22.12).
 - On Chromebooks, laptops and iPads held sideways, the main menu is laid out in two columns (modes and menu on the left, settings on the right), so Start is on screen without scrolling. Phones and portrait screens keep the one column.
+
+### Removed
+- Permanent parent codes: grown-ups link a child with a one-time code instead.
 
 ### Fixed
 - A class no longer shows "lost" when the server is restarting or busy for a moment: the page switches to polling and keeps trying until the class answers, and only gives up when the class is really gone.

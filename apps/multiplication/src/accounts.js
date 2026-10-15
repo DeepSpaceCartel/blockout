@@ -1,6 +1,7 @@
-// Account screens: signing in (dev sign-in for now), a student's homework and
-// classes, a teacher's classes (roster, stats, homework, scheduled tournaments)
-// and a parent's view of their children. Talks to apps/server through
+// Account screens: signing in (dev sign-in or Keycloak), a student's homework and
+// classes, a teacher's classes (roster, stats, homework, scheduled tournaments,
+// inviting teachers and grown-ups), a parent's view of their children, and
+// one-time codes (#code=…) that make someone a teacher or a child's grown-up. Talks to apps/server through
 // @blockout/auth and borrows a few helpers from the game (./game/api.js).
 // Guests never see any of it except "Sign in".
 
@@ -45,6 +46,67 @@ function input(attrs = {}) {
   const i = document.createElement('input');
   for (const [k, v] of Object.entries(attrs)) i.setAttribute(k, v);
   return i;
+}
+
+// "Tue, Oct 29"
+const shortDay = (t) => new Date(t).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+const codeLink = (code) => `${location.origin}${location.pathname}#code=${code}`;
+
+// A one-time code to hand over: big, with when it stops working, a QR code of
+// its link (for a phone) and a button to copy the link
+function codeCard(invite, who) {
+  const card = make('div', 'acct-invite');
+  const qr = document.createElement('canvas');
+  qr.className = 'acct-qr';
+  Game.drawQr(qr, codeLink(invite.code));
+  const text = make('div', 'acct-invite-text');
+  const copy = button('Copy link', 'btn btn-small', async () => {
+    try {
+      await navigator.clipboard.writeText(codeLink(invite.code));
+      copy.textContent = 'Copied!';
+    } catch (_) {
+      prompt('Copy this link:', codeLink(invite.code));
+    }
+  });
+  text.append(make('div', 'acct-code', invite.code.replace(/(.{4})/, '$1 ')), make('p', 'setting-help', `${who} Works once, until ${shortDay(invite.expiresAt)}.`), copy);
+  card.append(qr, text);
+  return card;
+}
+
+// "I have a code": a teacher's or a grown-up's one-time code. The account
+// changes (a new role, a linked child), so the page starts again.
+function redeemForm(placeholder = 'Code') {
+  const form = make('form', 'acct-inline');
+  const code = input({ type: 'text', maxlength: '9', autocomplete: 'off', placeholder, class: 'acct-code-input' });
+  const go = button('Use code', 'btn btn-small btn-primary');
+  go.type = 'submit';
+  form.append(code, go);
+  const error = errorLine();
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    error.hidden = true;
+    try {
+      await redeem(code.value);
+    } catch (err) {
+      showError(error, err);
+    }
+  });
+  const wrap = make('div');
+  wrap.append(form, error);
+  return wrap;
+}
+
+async function redeem(code) {
+  const r = await Auth.api('POST', '/api/invites/redeem', { code });
+  await Auth.refreshUser();
+  toast(r.child ? '👪 Linked' : `${ROLE[r.user.role].emoji} Welcome`, r.child ? r.child.name : `You’re a ${ROLE[r.user.role].label.toLowerCase()} now.`);
+  setTimeout(() => location.reload(), 1200); // (the menu changes with the role)
+}
+
+// Deleting an account: typed, because it can't be undone
+async function confirmDelete(what, typed) {
+  const answer = prompt(`${what} This can’t be undone. Type ${typed} to go ahead.`);
+  return answer !== null && answer.trim().toLowerCase() === typed.toLowerCase();
 }
 
 function select(options, value) {
@@ -211,13 +273,16 @@ async function openSignIn({ role = 'student', note = '' } = {}) {
   const initial = input({ type: 'text', maxlength: '1', autocomplete: 'off', placeholder: 'K', class: 'acct-initial' });
   const email = input({ type: 'email', autocomplete: 'off', placeholder: 'maya@iusd.org' });
   const school = select([...config.schools.map((s) => [s.id, `${s.name} (@${s.domain})`]), ['', 'No school']]);
+  const admin = input({ type: 'checkbox' });
+  const adminField = make('label', 'acct-check');
+  adminField.append(admin, make('span', null, 'Admin (manage accounts at /admin/)'));
   const emailField = field('School email', email);
   const schoolField = field('School', school);
   const names = make('div', 'acct-names');
   names.append(field('First name', first), field('Last initial', initial));
   const error = errorLine();
   const form = make('form', 'acct-form');
-  form.append(who.el, names, emailField, schoolField, make('p', 'setting-help acct-privacy', 'We only keep your first name and last initial.'), error);
+  form.append(who.el, names, emailField, schoolField, adminField, make('p', 'setting-help acct-privacy', 'We only keep your first name and last initial.'), error);
   let emailTouched = false;
   email.addEventListener('input', () => (emailTouched = true));
   first.addEventListener('input', () => {
@@ -240,6 +305,7 @@ async function openSignIn({ role = 'student', note = '' } = {}) {
         lastInitial: initial.value,
         email: r === 'student' ? email.value : r === 'parent' ? '' : undefined,
         schoolId: r === 'teacher' ? school.value : undefined,
+        admin: admin.checked,
       });
       location.reload(); // the page picks up the account's save
     } catch (err) {
@@ -260,11 +326,31 @@ async function openAccount() {
   if (!u) return openSignIn();
   account.clear('Your account');
   const card = make('div', 'acct-card');
-  card.append(make('div', 'acct-big', `${ROLE[u.role].emoji} ${u.name}`), make('div', 'acct-sub', `${ROLE[u.role].label}${u.school ? ` · ${u.school.name}` : ''}`));
+  card.append(make('div', 'acct-big', `${ROLE[u.role].emoji} ${u.name}`), make('div', 'acct-sub', `${ROLE[u.role].label}${u.isAdmin ? ' · Admin' : ''}${u.school ? ` · ${u.school.name}` : ''}`));
   account.body.append(card);
   if (u.role === 'student') await studentAccount();
-  if (u.role === 'teacher') account.body.append(make('p', 'setting-help', 'Your classes, homework and tournaments are under 🏫 My classes on the main menu.'));
+  if (u.role === 'teacher') account.body.append(make('p', 'setting-help', 'Your classes, homework, tournaments and codes for other teachers are under 🏫 My classes on the main menu.'));
   if (u.role === 'parent') account.body.append(make('p', 'setting-help', 'Follow your children under 👪 My kids on the main menu.'));
+  if (u.role === 'student') {
+    // Everyone starts as a student: a teacher's or a grown-up's code changes that
+    const grownUps = make('div', 'acct-section');
+    grownUps.append(make('h3', 'stats-heading', 'Teachers and grown-ups'), make('p', 'setting-help', 'Got a code to become a teacher, or to follow a child? Type it here.'), redeemForm());
+    account.body.append(grownUps);
+  }
+  if (u.isAdmin) account.actions.append(button('Admin', 'btn', () => location.assign('/admin/')));
+  if (u.role === 'teacher' || u.role === 'parent') {
+    account.actions.append(
+      button('Delete my account', 'btn btn-danger', async () => {
+        if (!(await confirmDelete('Delete your Blockout account and everything in it?', 'delete'))) return;
+        try {
+          await Auth.api('DELETE', '/api/me');
+          Auth.signOut();
+        } catch (err) {
+          alert(err.message);
+        }
+      })
+    );
+  }
   account.actions.append(button('Sign out', 'btn', () => Auth.signOut()));
   account.done();
   account.open();
@@ -326,12 +412,21 @@ async function studentAccount() {
     }
   }
   await fill();
-  try {
-    const { code: pc } = await Auth.api('GET', '/api/me/parent-code');
-    parent.append(make('h3', 'stats-heading', 'For a grown-up'), make('p', 'setting-help', 'Give this code to your mom, dad or another grown-up so they can see how you’re doing and add homework.'), make('div', 'acct-code', pc.replace(/(.{4})/, '$1 ')));
-  } catch (_) {
-    // not fatal
-  }
+  parent.append(make('h3', 'stats-heading', 'For a grown-up'), make('p', 'setting-help', 'Make a code for your mom, dad or another grown-up, so they can see how you’re doing and add homework.'));
+  const slot = make('div');
+  const codeError = errorLine();
+  parent.append(
+    button('Make a grown-up code', 'btn btn-small', async () => {
+      codeError.hidden = true;
+      try {
+        slot.replaceChildren(codeCard(await Auth.api('POST', '/api/me/parent-invites'), 'Give it to one grown-up.'));
+      } catch (err) {
+        showError(codeError, err);
+      }
+    }),
+    slot,
+    codeError
+  );
 }
 
 function askTeacherSignIn() {
@@ -615,6 +710,100 @@ async function renderClasses() {
   const slot = make('div', 'acct-class');
   classes.body.append(slot);
   await renderClass(slot);
+  classes.body.append(await teacherInvites());
+}
+
+// A student's grown-ups, for their teacher: who's linked (take off a wrong
+// one), and a code for a new one
+async function openGrownUps(student, d, back) {
+  d.clear(`${student.name}’s grown-ups`);
+  d.actions.append(button('← Back', 'btn', back));
+  d.done();
+  const list = make('div', 'acct-list');
+  const error = errorLine();
+  async function fill() {
+    list.replaceChildren();
+    try {
+      const { parents } = await Auth.api('GET', `/api/students/${student.id}/parents`);
+      if (!parents.length) list.append(make('p', 'setting-help', 'No grown-up is following yet.'));
+      for (const p of parents) {
+        const row = make('div', 'acct-item');
+        row.append(
+          make('span', null, `👪 ${p.name}`),
+          button('Remove', 'btn btn-small', async () => {
+            if (!confirm(`Stop ${p.name} following ${student.name}?`)) return;
+            await Auth.api('DELETE', `/api/students/${student.id}/parents/${p.id}`);
+            fill();
+          })
+        );
+        list.append(row);
+      }
+    } catch (err) {
+      showError(error, err);
+    }
+  }
+  const slot = make('div');
+  d.body.append(
+    list,
+    make('p', 'setting-help', `A code lets one grown-up follow ${student.name}: their Times Table, homework, and setting homework of their own.`),
+    button('Make a grown-up code', 'btn btn-small', async () => {
+      try {
+        slot.replaceChildren(codeCard(await Auth.api('POST', `/api/students/${student.id}/parent-invites`), `For ${student.name}’s grown-up.`));
+      } catch (err) {
+        showError(error, err);
+      }
+    }),
+    slot,
+    error
+  );
+  await fill();
+}
+
+// Bringing in another teacher: a one-time code, and the codes still out there
+async function teacherInvites() {
+  const section = make('div', 'acct-section');
+  section.append(make('h3', 'stats-heading', 'Invite a teacher'), make('p', 'setting-help', 'A colleague signs in, then types the code (or opens its link) to get their own classes.'));
+  const slot = make('div');
+  const list = make('div', 'acct-list');
+  const error = errorLine();
+  async function fill() {
+    list.replaceChildren();
+    try {
+      const { invites } = await Auth.api('GET', '/api/me/teacher-invites');
+      for (const i of invites) {
+        const row = make('div', 'acct-item');
+        const state = i.usedAt ? `used by ${i.usedBy}` : i.expired ? 'expired' : `waiting, until ${shortDay(i.expiresAt)}`;
+        row.append(make('span', null, `🍎 Code from ${shortDay(i.createdAt)}`), make('span', 'acct-small', state));
+        if (!i.usedAt) {
+          row.append(
+            button('Remove', 'btn btn-small', async () => {
+              await Auth.api('DELETE', `/api/me/invites/${i.id}`);
+              fill();
+            })
+          );
+        }
+        list.append(row);
+      }
+    } catch (err) {
+      showError(error, err);
+    }
+  }
+  section.append(
+    button('Make a teacher code', 'btn btn-small', async () => {
+      error.hidden = true;
+      try {
+        slot.replaceChildren(codeCard(await Auth.api('POST', '/api/me/teacher-invites', {}), 'For one teacher.'));
+        fill();
+      } catch (err) {
+        showError(error, err);
+      }
+    }),
+    slot,
+    list,
+    error
+  );
+  await fill();
+  return section;
 }
 
 async function renderClass(slot) {
@@ -648,7 +837,7 @@ async function renderClass(slot) {
   else {
     const table = make('table', 'stats-table acct-roster');
     const head = make('tr');
-    for (const h of ['Name', 'Times Table', 'Needs practice', 'Last played', 'Homework', 'Parent code']) head.append(make('th', null, h));
+    for (const h of ['Name', 'Times Table', 'Needs practice', 'Last played', 'Homework', 'Grown-ups']) head.append(make('th', null, h));
     const thead = make('thead');
     thead.append(head);
     const tbody = make('tbody');
@@ -659,7 +848,8 @@ async function renderClass(slot) {
       const tt = make('td');
       tt.append(masteryBar(s.summary), make('span', 'acct-small', `${s.summary.mastered} of ${s.summary.total} mastered`));
       const hw = s.homework.total ? `${s.homework.done} of ${s.homework.total}${s.homework.late ? ` · ${s.homework.late} late` : ''}` : '—';
-      tr.append(nameCell, tt, make('td', null, s.summary.needsPractice.length ? s.summary.needsPractice.slice(0, 4).join(', ') + (s.summary.needsPractice.length > 4 ? '…' : '') : '—'), make('td', null, ago(s.lastPlayed)), make('td', null, hw), make('td', 'acct-mono', s.parentCode || ''));
+      tr.append(nameCell, tt, make('td', null, s.summary.needsPractice.length ? s.summary.needsPractice.slice(0, 4).join(', ') + (s.summary.needsPractice.length > 4 ? '…' : '') : '—'), make('td', null, ago(s.lastPlayed)), make('td', null, hw), make('td'));
+      tr.lastChild.append(button('Grown-ups', 'btn btn-small', () => openGrownUps(s, classes, renderClasses)));
       const remove = button('×', 'acct-remove', async () => {
         if (!confirm(`Take ${s.name} out of ${c.name}?`)) return;
         await Auth.api('DELETE', `/api/classes/${c.id}/students/${s.id}`);
@@ -819,6 +1009,19 @@ async function openStudent(id, d, back) {
       },
     })
   );
+  if (me.role === 'parent') {
+    d.actions.prepend(
+      button(`Delete ${s.name}’s account`, 'btn btn-danger', async () => {
+        if (!(await confirmDelete(`Delete ${s.name}’s Blockout account, with their progress, classes and homework?`, s.name.split(' ')[0]))) return;
+        try {
+          await Auth.api('DELETE', `/api/students/${s.id}`);
+          back();
+        } catch (err) {
+          alert(err.message);
+        }
+      })
+    );
+  }
 }
 
 async function openKids() {
@@ -836,7 +1039,7 @@ async function renderKids() {
     kids.body.append(make('p', 'setting-help', err.message));
     return;
   }
-  if (!list.length) kids.body.append(make('p', 'setting-help', 'Link your child’s account with the code on their Blockout account page (tap their name at the top of the menu), or ask their teacher for it.'));
+  if (!list.length) kids.body.append(make('p', 'setting-help', 'Link your child’s account with a code: your child makes one on their Blockout account page (tap their name at the top of the menu), or their teacher can.'));
   const cards = make('div', 'acct-kids');
   for (const c of list) {
     const card = button('', 'acct-kid', () => openStudent(c.id, kids, renderKids));
@@ -898,6 +1101,20 @@ async function rosterLink() {
   }
 }
 
+// #code=CODE: a one-time code's link (a teacher's or a grown-up's)
+async function codeFromLink() {
+  const m = /^#code=([A-Za-z0-9]+)$/.exec(location.hash);
+  if (!m) return;
+  const code = m[1].toUpperCase();
+  if (!Auth.signedIn()) return openSignIn({ note: '🔑 Sign in first, then the code is used for your account.' });
+  history.replaceState(null, '', location.pathname);
+  try {
+    await redeem(code);
+  } catch (err) {
+    toast('🔑 That code didn’t work', err.message);
+  }
+}
+
 async function start() {
   renderMenu();
   if (!Auth.served()) return;
@@ -917,6 +1134,7 @@ async function start() {
     renderMenu(); // (a stale sign-in may have been dropped)
   }
   await rosterLink();
+  await codeFromLink();
   refreshHomeworkBadge();
   pollLive();
   setInterval(pollLive, LIVE_POLL_MS);

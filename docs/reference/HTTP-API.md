@@ -23,7 +23,7 @@ Everything under `/api` on the server. Requests and responses are JSON. The game
     `error` is a short machine-readable code, and `message` (the same as `detail`) is written for the player; the games show it as is.
 - **Rate limits** answer `429` (`rate`) with a `Retry-After` header in seconds:
     - every request, per address: 6000 a minute (a whole school often shares one address)
-    - wrong class, room or parent codes, per address: 30, then 30 a minute. While they're used up, code lookups (joining, room info and actions, `POST /api/me/classes`, `POST /api/children`) get `429` too
+    - wrong class, room or invite codes, per address: 30, then 30 a minute. While they're used up, code lookups (joining, room info and actions, `POST /api/me/classes`, `POST /api/children`, `POST /api/invites/redeem`) get `429` too
     - joining a class or linking a child, per account: 10 a minute
     - dev sign-in, per address: 60 a minute
 
@@ -49,8 +49,9 @@ On `SIGTERM` or `SIGINT` the server stops taking connections, reports `draining`
 | Method and path | Who | Body | Answer |
 |---|---|---|---|
 | `GET /api/auth/config` | anyone | | `{ provider, issuer?, clientId?, schools: [{ id, name, domain }] }` |
-| `POST /api/auth/dev` | anyone, dev sign-in only | `{ role, firstName, lastInitial, email?, schoolId? }` | `{ token, user }` |
-| `GET /api/me` | signed in | | `{ user: { id, role, name, firstName, lastInitial, school } }` |
+| `POST /api/auth/dev` | anyone, dev sign-in only | `{ role, firstName, lastInitial, email?, schoolId?, admin? }` | `{ token, user }`. `role` is the account's role when it's new. |
+| `GET /api/me` | signed in | | `{ user: { id, role, isAdmin, name, firstName, lastInitial, school } }` |
+| `DELETE /api/me` | teacher (without classes or tournaments), parent | | `{ ok }`: the account and everything in it are deleted |
 
 ## A student's own data
 
@@ -61,8 +62,19 @@ On `SIGTERM` or `SIGINT` the server stops taking connections, reports `draining`
 | `GET /api/me/homework` | student | | `{ homework: [{ id, goal, label, due, status: open\|late\|done, have, need, from, fromName }] }` |
 | `GET /api/me/classes` | student | | `{ classes: [{ id, name }] }` |
 | `POST /api/me/classes` | student | `{ code }` | `{ class }`. School classes only take that school's email domain. |
-| `GET /api/me/parent-code` | student | | `{ code }` for a parent to link |
+| `POST /api/me/parent-invites` | student | | `{ kind, code, expiresAt }`: a one-time code for a grown-up (14 days). A new one replaces the last unused one. |
 | `GET /api/me/live` | anyone | | `{ live: [{ id, title, code }] }` tournaments open now for this student |
+
+## Invites
+
+One-time codes that change an account: 8 characters, kept only as a hash, shown once. Anyone who signs in starts as a student.
+
+| Method and path | Who | Body | Answer |
+|---|---|---|---|
+| `POST /api/invites/redeem` | signed in | `{ code }` | `{ user, child? }`. A teacher code makes a student account (not in a class, not linked) a teacher; a grown-up's code makes it a parent, or links another child to a parent. `404` for unknown, used or expired codes; `409` when this account can't take it |
+| `GET /api/me/teacher-invites` | teacher, admin | | `{ invites: [{ id, kind, createdAt, expiresAt, by, usedBy, usedAt, expired }] }` (no codes) |
+| `POST /api/me/teacher-invites` | teacher, admin | | `{ kind, code, expiresAt }` (7 days). Teachers: at most 10 unused, and 20 a day |
+| `DELETE /api/me/invites/:id` | whoever made it, admin | | `{ ok }` |
 
 ## Teachers
 
@@ -76,14 +88,18 @@ On `SIGTERM` or `SIGINT` the server stops taking connections, reports `draining`
 | `POST /api/schedules` | `{ classId, scope: class\|school, title, startsAt, settings: { format, size, difficulty } }` | `{ schedule }` |
 | `DELETE /api/schedules/:id` | | `{ ok }` |
 | `GET /api/schedules/:id/host` | | `{ code, teacherKey }` of the opened lobby |
+| `POST /api/students/:id/parent-invites` | | `{ kind, code, expiresAt }`: a grown-up's code for a student in your class (admins: any student) |
+| `GET /api/students/:id/parents` | | `{ parents: [{ id, name }] }` (admins too) |
+| `DELETE /api/students/:id/parents/:parent` | | `{ ok }`: takes a wrong grown-up off (admins too) |
 
 ## Parents
 
 | Method and path | Body | Answer |
 |---|---|---|
 | `GET /api/children` | | `{ children: [stats] }` |
-| `POST /api/children` | `{ code }` | `{ child }` |
+| `POST /api/children` | `{ code }` | `{ user, child }`: `POST /api/invites/redeem` for grown-ups' codes only |
 | `DELETE /api/children/:id` | | `{ ok }` |
+| `DELETE /api/students/:id` | | `{ ok }`: deletes a linked child's account and everything in it (admins: any student) |
 
 ## Teachers and parents
 
@@ -94,6 +110,20 @@ On `SIGTERM` or `SIGINT` the server stops taking connections, reports `draining`
 | `DELETE /api/homework/:id` | | `{ ok }` (only whoever set it) |
 
 A `goal` is one of `{ type: 'master', table }`, `{ type: 'practice', rounds, difficulty }`, `{ type: 'win', size, difficulty }` or `{ type: 'games', games }`; `difficulty` may be `any`.
+
+## Admins
+
+Accounts with the Keycloak realm role `admin` (dev sign-in: `admin: true`).
+
+| Method and path | Body | Answer |
+|---|---|---|
+| `GET /api/admin/users?q=&role=&page=&limit=` | | `{ users: [{ id, name, role, domain, schoolId, invitedBy, createdAt, lastSeen }], total, page, limit }`, newest sign-ins first; `q` matches the start of the first name |
+| `PUT /api/admin/users/:id/role` | `{ role }` | `{ user }`. `409` for a teacher who still has classes or tournaments |
+| `DELETE /api/admin/users/:id` | | `{ ok }`: the account and everything in it (the classes they teach, with rosters, homework and tournaments) |
+| `GET /api/admin/invites?kind=teacher\|parent` | | `{ invites }` |
+| `POST /api/admin/invites` | `{ schoolId? }` | a teacher code |
+| `GET /api/admin/schools` | | `{ schools }` |
+| `POST /api/admin/schools` | `{ name, domain }` | `{ school }` |
 
 ## Live classes
 

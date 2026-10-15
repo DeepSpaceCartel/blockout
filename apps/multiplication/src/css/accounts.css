@@ -94,3 +94,10 @@
   .acct-dialog { --pad-x: 14px; --pad-y: 18px; }
   .acct-names { grid-template-columns: 1fr 80px; }
 }
+
+/* A one-time code to hand over: QR code beside the code itself */
+.acct-invite { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin: 10px 0; padding: 12px; border: 2px dashed var(--line); border-radius: var(--radius); background: var(--surface); }
+.acct-qr { width: 120px; height: 120px; image-rendering: pixelated; border-radius: 6px; }
+.acct-invite-text { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; }
+.acct-invite-text .setting-help { margin: 0; }
+.acct-check { display: flex; gap: 8px; align-items: center; font-size: 0.95rem; color: var(--muted); }

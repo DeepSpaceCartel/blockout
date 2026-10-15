@@ -33,17 +33,23 @@ In Pairs, you watch your partner's turn as it happens: their roll, the rectangle
 !!! tip "Students' devices can't reach your computer?"
     Share it through a tunnel: see [Share through a tunnel](share-through-a-tunnel.md).
 
+## Becoming a teacher
+
+Everyone who signs in starts as a student. To teach, you need a **teacher code**, from an admin or from a teacher who's already here: sign in, tap your name at the top of the menu, and type it under **Teachers and grown-ups** (or open the code's link). Use an account that isn't in a class yet.
+
+To bring in a colleague, open **🏫 My classes** › **Invite a teacher** › **Make a teacher code**. Each code works once, for 7 days; the list shows which were used, and **Remove** cancels one.
+
 ## Your classes
 
 Open **🏫 My classes** on the main menu and make a class ("Room 12"). It gets a 6-character code and a join link; students sign in with their school account and type the code (or open the link) to join the class list. Any `@iusd.org` student with the code can join.
 
-![My classes: the join code, the class list with each student's Times Table, homework and parent code](../assets/screenshots/teacher-my-classes.png)
+![My classes: the join code, and the class list with each student's Times Table and homework](../assets/screenshots/teacher-my-classes.png)
 
 For each student you see:
 
 - how much of the Times Table is mastered, and which facts need practice
 - when they last played, and how their homework is going
-- the code for a parent to link their account
+- **Grown-ups**: who follows them, and a one-time code for a new grown-up (it works once, for 14 days; take off a grown-up who shouldn't be there)
 
 Tap a name for their page: the full Times Table, their homework (and a form to set homework just for them) and what they've played recently.
 

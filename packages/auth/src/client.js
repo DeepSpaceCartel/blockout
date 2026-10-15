@@ -196,6 +196,14 @@ async function finishKeycloak() {
   return true;
 }
 
+// After something changed the account (a new role from an invite): ask again who we are
+async function refreshUser() {
+  if (!session) return null;
+  const { user } = await api('GET', '/api/me');
+  saveSession({ ...session, user });
+  return user;
+}
+
 // Signing out of a Keycloak account also ends the Keycloak session; otherwise
 // the next "Sign in" on a shared Chromebook would quietly be the same child.
 // reload = false (an expired token) only forgets the token here.
@@ -294,6 +302,7 @@ export {
   signInKeycloak,
   finishKeycloak,
   signOut,
+  refreshUser,
   takeSignedOut,
   progressKey,
   queueProgress,

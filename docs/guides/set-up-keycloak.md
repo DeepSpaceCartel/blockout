@@ -62,18 +62,18 @@ Blockout must be on `http://localhost:8080` or `http://localhost:5173`: those ar
 
 **Signing out** of Blockout also signs out of Keycloak, so the next **Sign in** on a shared Chromebook asks again instead of quietly being the same child. It doesn't sign out of Google (only Google can, and then for all of Google in that browser), but Google always shows its account chooser (the Google provider's `prompt` is `select_account`), so picking another account is one tap. After signing out of a Google account, Blockout offers **Also sign out of Google**, which opens Google's sign-out in a new tab. It knows the account came from Google from the `identity_provider` claim that the `blockout` client adds to the ID token.
 
-## Make someone a teacher or a parent
+## Make someone an admin
 
-Google accounts arrive without a role. Blockout makes a school-domain account (`@iusd.org`) a student and anyone else a parent. To make someone a teacher:
+Blockout keeps everyone's role itself: anyone who signs in is a student, and one-time codes make teachers and grown-ups ([Admins](admins.md)). Keycloak only says who's an **admin**:
 
 1. Open the admin console, `http://localhost:8180/admin`, user `admin`. The password:
    ```sh
    kubectl -n keycloak get secret keycloak-admin -o jsonpath='{.data.password}' | base64 -d
    ```
-2. Switch to the **blockout** realm, then **Users** › the person › **Role mapping** › **Assign role** › `teacher`.
-3. They sign out of Blockout and in again.
+2. Switch to the **blockout** realm, then **Users** › the person › **Role mapping** › **Assign role** › `admin`.
+3. They sign out of Blockout and in again, and find **Admin** on their account page (or go to `/admin/`).
 
-They need to have signed in once first, so that Keycloak has their account.
+They need to have signed in once first, so that Keycloak has their account. Taking the role away works the same way, and counts from their next token (15 minutes at most).
 
 ## Change the realm
 
