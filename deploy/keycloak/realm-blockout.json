@@ -10,16 +10,8 @@
   "roles": {
     "realm": [
       {
-        "name": "student",
-        "description": "A child in a class"
-      },
-      {
-        "name": "teacher",
-        "description": "Hosts classes, sets homework"
-      },
-      {
-        "name": "parent",
-        "description": "Sees their linked children"
+        "name": "admin",
+        "description": "Blockout admin: accounts and roles, teacher codes, schools. (Blockout keeps everyone else's role itself.)"
       }
     ]
   },
