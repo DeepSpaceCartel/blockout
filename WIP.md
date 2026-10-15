@@ -53,7 +53,7 @@ The full production-readiness plan (approved 2026-10-15) is at the end of this f
 - **trivy-action** is pinned by commit; check its release against Aqua's March 2026 supply-chain advisory before trusting or bumping it.
 - **`npm audit`** reports one high-severity advisory in `source-map-js`, a build-time dependency of Vite (not in the image or the pages); Dependabot should bring the fix.
 - **The workspace cluster has no Alertmanager:** alerts show in Prometheus and Grafana but notify nobody.
-- **Docs screenshots:** 19 were retaken after the contrast fix (menus, sign-in, homework, My kids, a student's page, shop, stats, wardrobe, the live class screens). Still the old, brighter orange: `results`, `practice`, `classroom-pairs-live`, `other-game-shop`, `other-game-stats`, `other-game-win`, `fraction-game`, `number-snake`, `number-snake-add`, `demos-all` (they need a game played through).
+- **Docs screenshots:** 21 were retaken after the contrast fix (menus, sign-in, homework, My kids, a student's page, shop, stats, wardrobe, the live class screens). `other-game-shop` and `other-game-stats` too. `practice`, `fraction-game` and `number-snake` have no primary buttons, so they're still right. Still the old, brighter orange: `results`, `other-game-win`, `classroom-pairs-live`, `number-snake-add`, `demos-all` (they need a game played through).
 - **GitHub's `ubuntu-latest`** moves to Ubuntu 26 from October 19, 2026 (a notice in the release run).
 - **Still to do from before the plan:** a real Google sign-in end to end (the "Signed out" dialog needs `identity_provider: "google"`), and the landscape layout for game-kit's menus.
 
