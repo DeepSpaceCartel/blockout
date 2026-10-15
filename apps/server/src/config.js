@@ -1,0 +1,59 @@
+// The server's settings, from the command line and the environment, in one
+// place. Pure: loadConfig(env, argv) either returns the settings or throws a
+// ConfigError naming everything that's wrong, so a bad deployment stops at
+// start-up instead of running with unsafe defaults.
+
+class ConfigError extends Error {
+  constructor(problems) {
+    super(`Blockout can't start:\n${problems.map((p) => `  - ${p}`).join('\n')}`);
+    this.problems = problems;
+  }
+}
+
+function loadConfig(env = {}, argv = []) {
+  const flag = (name) => {
+    const i = argv.indexOf(name);
+    return i === -1 ? null : argv[i + 1];
+  };
+  const problems = [];
+  const production = env.NODE_ENV === 'production';
+
+  const port = Number(argv.find((a) => /^\d+$/.test(a)) || env.PORT || 8080);
+  if (!Number.isInteger(port) || port < 0 || port > 65535) problems.push(`PORT must be a port number, not "${env.PORT}"`);
+
+  // The address students should use, when it isn't this computer's own (tunnels, proxies)
+  const publicUrl = (flag('--public-url') || env.PUBLIC_URL || '').replace(/\/*$/, '/').replace(/^\/$/, '');
+  if (publicUrl && !/^https?:\/\/[^/]+/.test(publicUrl)) problems.push(`PUBLIC_URL must be a web address like https://blockout.example.org, not "${publicUrl}"`);
+
+  const authKind = env.BLOCKOUT_AUTH || 'dev';
+  if (!['dev', 'keycloak'].includes(authKind)) problems.push(`BLOCKOUT_AUTH must be "dev" or "keycloak", not "${authKind}"`);
+  if (authKind === 'keycloak') {
+    if (!env.KEYCLOAK_ISSUER) problems.push('BLOCKOUT_AUTH=keycloak needs KEYCLOAK_ISSUER (the realm URL)');
+    if (!env.KEYCLOAK_CLIENT_ID) problems.push('BLOCKOUT_AUTH=keycloak needs KEYCLOAK_CLIENT_ID');
+  }
+
+  // How many proxies in front of us to trust for X-Forwarded-For (0: none, use the socket's address)
+  const trustProxy = Number(env.TRUST_PROXY || 0);
+  if (!Number.isInteger(trustProxy) || trustProxy < 0) problems.push(`TRUST_PROXY must be a number of proxies (0 or more), not "${env.TRUST_PROXY}"`);
+
+  // A public server must not run with the practice sign-in (anyone can pick any role) or over plain HTTP
+  if (production) {
+    if (authKind !== 'keycloak') problems.push('NODE_ENV=production needs BLOCKOUT_AUTH=keycloak: dev sign-in lets anyone be a teacher');
+    if (!publicUrl.startsWith('https://')) problems.push('NODE_ENV=production needs PUBLIC_URL to be an https:// address');
+  }
+
+  if (problems.length) throw new ConfigError(problems);
+  return {
+    production,
+    port,
+    publicUrl,
+    https: publicUrl.startsWith('https://'),
+    trustProxy,
+    // Names are also checked with OpenAI's free moderation model when this is set (and only then are names sent to OpenAI)
+    openaiKey: env.OPENAI_API_KEY || '',
+    db: env.BLOCKOUT_DB || null,
+    auth: { kind: authKind, issuer: env.KEYCLOAK_ISSUER || null, clientId: env.KEYCLOAK_CLIENT_ID || null, secret: env.BLOCKOUT_AUTH_SECRET || null },
+  };
+}
+
+export { loadConfig, ConfigError };

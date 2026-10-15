@@ -2,7 +2,7 @@
 
 # Configuration
 
-The server (`node apps/server/src/index.js`, or `npm start`) is configured with arguments and environment variables.
+The server (`node apps/server/src/index.js`, or `npm start`) is configured with arguments and environment variables. They're all read and checked at start-up (`apps/server/src/config.js`): a bad value stops the server with a message instead of running with a default.
 
 ## Arguments
 
@@ -15,6 +15,7 @@ The server (`node apps/server/src/index.js`, or `npm start`) is configured with 
 
 | Variable | Default | Meaning |
 |---|---|---|
+| `NODE_ENV` | none | `production` for a public server: Blockout then refuses to start unless `BLOCKOUT_AUTH=keycloak` and `PUBLIC_URL` is an `https://` address, listing everything that's missing |
 | `PORT` | `8080` | Port, when no port argument is given |
 | `PUBLIC_URL` | none | Same as `--public-url` |
 | `BLOCKOUT_DB` | `data/blockout.db` (repo root) | The sqlite file for accounts; `:memory:` keeps nothing (tests) |

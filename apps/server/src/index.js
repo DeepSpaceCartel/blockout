@@ -19,18 +19,20 @@ import * as Moderation from './moderation.js';
 import * as Auth from './auth.js';
 import { openStore } from './store.js';
 import { createAccounts, AccountError } from './accounts.js';
+import { loadConfig, ConfigError } from './config.js';
 
-const args = process.argv.slice(2);
-const flag = (name) => {
-  const i = args.indexOf(name);
-  return i === -1 ? null : args[i + 1];
-};
-const PORT = Number(args.find((a) => /^\d+$/.test(a)) || process.env.PORT || 8080);
-// The address students should use, when it isn't this computer's own (tunnels, proxies).
-// Names are also checked with OpenAI's free moderation model when this is set
-// (and only then are names sent to OpenAI). The word list always runs.
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
-const PUBLIC_URL = (flag('--public-url') || process.env.PUBLIC_URL || '').replace(/\/*$/, '/').replace(/^\/$/, '');
+const IS_MAIN = Boolean(process.argv[1]) && path.resolve(process.argv[1]) === import.meta.filename;
+let config;
+try {
+  config = loadConfig(process.env, process.argv.slice(2));
+} catch (e) {
+  if (!(e instanceof ConfigError) || !IS_MAIN) throw e;
+  console.error(e.message);
+  process.exit(1);
+}
+const PORT = config.port;
+const OPENAI_API_KEY = config.openaiKey;
+const PUBLIC_URL = config.publicUrl;
 // The built games: apps/<name>/dist. The multiplication game is at /, the
 // others at /<name>/ (each app is built with that base path).
 const APPS = path.resolve(import.meta.dirname, '..', '..');
@@ -673,7 +675,7 @@ setInterval(() => {
   }
 }, 10 * 60 * 1000).unref();
 
-if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
+if (IS_MAIN) {
   // Anything that slips past the request handlers: log it and exit, so the
   // process manager (Kubernetes, systemd) restarts a clean server
   const fatal = (kind) => (e) => {

@@ -34,6 +34,7 @@ Work towards 0.3.0 on the `v0.3.0` branch. Details and decisions: [the v0.3.0 wo
 - A web address with a broken `%` escape (like `/%E0`) no longer stops the server for everyone; it gets a `400` answer. Request bodies that are cut off or arrive too slowly are answered too, instead of waiting forever.
 
 ### Security
+- With `NODE_ENV=production` the server refuses to start with the practice dev sign-in or without an `https://` public address, and every setting is checked at start-up.
 - API errors no longer carry internal details, and every response has basic browser security headers.
 - Only a student's first name, last initial, role and email domain are stored; see [Privacy](https://github.com/alexanderilyin/blockout/blob/v0.3.0/docs/privacy.md).
 
