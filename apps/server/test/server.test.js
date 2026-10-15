@@ -88,6 +88,22 @@ test('HTTP: malformed addresses and cut-off bodies get an answer, and the server
   assert.equal((await call('GET', '/api/health')).status, 200);
 });
 
+test('HTTP: a class holds at most 200 live streams', async () => {
+  const http = await import('node:http');
+  const teacher = await signIn({ firstName: 'Mx', lastInitial: 'S', role: 'teacher', schoolId: 'cadence-park' });
+  const room = (await call('POST', '/api/rooms', { type: 'class' }, teacher)).data;
+  const agent = new http.Agent({ maxSockets: Infinity });
+  const open = () =>
+    new Promise((resolve) => http.get(`${base}/api/rooms/${room.code}/events?teacher=${room.teacherKey}`, { agent }, (res) => resolve(res)));
+  const streams = await Promise.all(Array.from({ length: 200 }, open));
+  assert.ok(streams.every((res) => res.statusCode === 200));
+  const extra = await open();
+  assert.equal(extra.statusCode, 429);
+  extra.resume();
+  for (const res of streams) res.destroy();
+  agent.destroy();
+});
+
 // (last: it uses up this address's wrong-code allowance)
 test('HTTP: guessing codes gets 429 after a run of wrong ones; streams with a wrong key look like no class', async () => {
   const teacher = await signIn({ firstName: 'Mr', lastInitial: 'G', role: 'teacher', schoolId: 'cadence-park' });

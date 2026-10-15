@@ -298,7 +298,15 @@ function event(res, name, data) {
   res.write(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`);
 }
 
-function openStream(req, res, room, role, player) {
+// Open streams are cheap but not free: a class needs ~41 (more with spare tabs),
+// and a school shares one address
+const MAX_ROOM_STREAMS = 200;
+const MAX_IP_STREAMS = 500;
+const ipStreams = new Map(); // address -> open streams
+
+function openStream(req, res, room, role, player, ip) {
+  if ((streams.get(room.code) || new Set()).size >= MAX_ROOM_STREAMS || (ipStreams.get(ip) || 0) >= MAX_IP_STREAMS) return tooMany(res, 30);
+  ipStreams.set(ip, (ipStreams.get(ip) || 0) + 1);
   // no-transform / X-Accel-Buffering: proxies and tunnels must pass events straight through
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -317,6 +325,9 @@ function openStream(req, res, room, role, player) {
   const beat = setInterval(() => res.write(': ♥\n\n'), HEARTBEAT_MS);
   req.on('close', () => {
     clearInterval(beat);
+    const n = ipStreams.get(ip) - 1;
+    if (n > 0) ipStreams.set(ip, n);
+    else ipStreams.delete(ip);
     streams.get(room.code)?.delete(s);
     if (player) {
       player.connections = Math.max(0, player.connections - 1);
@@ -701,7 +712,7 @@ const server = http.createServer(async (req, res) => {
       const noRoom = () => new Rooms.RoomError('room', 'No class with that code. Check the code on the board.');
       if (q.has('teacher')) {
         if (q.get('teacher') !== room.teacherKey) throw noRoom();
-        return poll ? openPoll(req, res, room, 'teacher', null, version) : openStream(req, res, room, 'teacher', null);
+        return poll ? openPoll(req, res, room, 'teacher', null, version) : openStream(req, res, room, 'teacher', null, ip);
       }
       const player = room.players.find((x) => x.id === q.get('id'));
       if (poll && !player) return send(res, 200, { removed: true });
@@ -711,7 +722,7 @@ const server = http.createServer(async (req, res) => {
       } catch {
         throw noRoom();
       }
-      return poll ? openPoll(req, res, room, 'student', p, version) : openStream(req, res, room, 'student', p);
+      return poll ? openPoll(req, res, room, 'student', p, version) : openStream(req, res, room, 'student', p, ip);
     }
     if (!r.handler) return sendProblem(res, 404, 'not-found', 'Not found.');
     send(res, 200, await r.handler(req, r.code));
