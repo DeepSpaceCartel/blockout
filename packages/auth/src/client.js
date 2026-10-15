@@ -14,7 +14,7 @@
 // local one is just a cache.
 
 import * as Progress from '@blockout/progress';
-const AUTH_KEY = 'blockout.auth'; // { token, user, refresh?, idToken?, expires? }
+const AUTH_KEY = 'blockout.auth'; // { token, user, refresh?, idToken? }
 const GUEST_KEY = 'blockout.progress';
 const MERGED_KEY = 'blockout.mergedInto'; // user ids this device's guest save went into
 const PUSH_DELAY_MS = 1500;
@@ -49,8 +49,47 @@ class AuthError extends Error {
   }
 }
 
+// A Keycloak access token lasts minutes; the refresh token renews it for as
+// long as the Keycloak session lasts (a school day). Dev tokens can't be renewed.
+const REFRESH_EARLY_S = 60;
+let refreshing = null;
+const expiresSoon = (s) => {
+  const exp = claims(s.token).exp;
+  return Boolean(exp) && exp - Date.now() / 1000 < REFRESH_EARLY_S;
+};
+
+// Swap the refresh token for a fresh access token. True if it worked. One at a
+// time, and another tab may already have done it.
+function refresh(force = false) {
+  if (!refreshing) {
+    refreshing = (async () => {
+      const stored = read(AUTH_KEY);
+      if (stored && session && stored.token !== session.token && stored.user && session.user && stored.user.id === session.user.id) session = stored;
+      if (!session || !session.refresh) return false;
+      if (!force && !expiresSoon(session)) return true; // (another tab renewed it)
+      try {
+        const c = await config();
+        if (c.provider !== 'keycloak') return false;
+        const res = await fetch(`${c.issuer}/protocol/openid-connect/token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ grant_type: 'refresh_token', client_id: c.clientId, refresh_token: session.refresh }),
+        });
+        if (!res.ok) return false; // the Keycloak session is over: sign in again
+        const t = await res.json();
+        saveSession({ ...session, token: t.access_token, refresh: t.refresh_token || session.refresh, idToken: t.id_token || session.idToken });
+        return true;
+      } catch (_) {
+        return false;
+      }
+    })().finally(() => (refreshing = null));
+  }
+  return refreshing;
+}
+
 // A JSON request with the signed-in user's token.
-async function api(method, path, body) {
+async function api(method, path, body, retried = false) {
+  if (session && session.refresh && expiresSoon(session)) await refresh();
   let res;
   try {
     res = await fetch(path, {
@@ -69,16 +108,27 @@ async function api(method, path, body) {
     throw new AuthError('offline', 'The server isn’t running here.');
   }
   if (res.status === 401 && session && data.error === 'auth') {
-    // the token expired or the server's key changed: back to guest
+    // the token expired: renew it once if we can, otherwise back to guest
+    if (!retried && session.refresh && (await refresh(true))) return api(method, path, body, true);
     signOut(false);
   }
   if (!res.ok) throw new AuthError(data.error || 'server', data.message || 'Something went wrong.', res.status);
   return data;
 }
 
+// Public, so it's fetched without the token: refreshing the token needs it
 let configCache = null;
 async function config() {
-  if (!configCache) configCache = await api('GET', '/api/auth/config');
+  if (!configCache) {
+    let res;
+    try {
+      res = await fetch('/api/auth/config');
+    } catch (e) {
+      throw new AuthError('offline', 'Can’t reach the server.');
+    }
+    if (!res.ok) throw new AuthError('server', 'The server isn’t running here.', res.status);
+    configCache = await res.json();
+  }
   return configCache;
 }
 

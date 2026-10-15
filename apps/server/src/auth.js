@@ -16,7 +16,7 @@
 import crypto from 'crypto';
 
 const ROLES = ['student', 'teacher', 'parent'];
-const TOKEN_DAYS = 30;
+const TOKEN_HOURS = 12; // dev sign-in tokens can't be renewed: a school day, then sign in again
 
 class AuthError extends Error {
   constructor(message) {
@@ -63,7 +63,7 @@ function devProvider({ secret, now = () => Date.now() }) {
       // signing in again finds the same account.
       const sub = `dev:${crypto.createHash('sha256').update(`${role}|${firstName.toLowerCase()}|${lastInitial}|${email}`).digest('hex').slice(0, 24)}`;
       const iat = Math.floor(now() / 1000);
-      const payload = { iss: 'blockout-dev', sub, given_name: firstName, family_name: lastInitial, roles: [role], iat, exp: iat + TOKEN_DAYS * 86400 };
+      const payload = { iss: 'blockout-dev', sub, given_name: firstName, family_name: lastInitial, roles: [role], iat, exp: iat + TOKEN_HOURS * 3600 };
       if (email) payload.email = email;
       const head = b64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
       const body = b64url(JSON.stringify(payload));

@@ -36,6 +36,7 @@ Work towards 0.3.0 on the `v0.3.0` branch. Details and decisions: [the v0.3.0 wo
 - A web address with a broken `%` escape (like `/%E0`) no longer stops the server for everyone; it gets a `400` answer. Request bodies that are cut off or arrive too slowly are answered too, instead of waiting forever.
 
 ### Security
+- Keycloak access tokens last 15 minutes instead of 8 hours, and the game renews them with the refresh token while the Keycloak session lasts. Dev sign-in tokens last 12 hours instead of 30 days.
 - Rate limits: guessing class, room or parent codes is stopped after a run of wrong ones, and dev sign-in and joining are limited per address and account. Behind a proxy, set `TRUST_PROXY`.
 - A Content Security Policy: pages run only Blockout's own scripts (the theme script moved out of the page into `theme.js`) and talk only to Blockout and the sign-in provider.
 - Every response, redirects and live-class streams included, now carries the security headers, plus a `Permissions-Policy` (no camera, microphone or location) and, over HTTPS, `Strict-Transport-Security`. A production server no longer tells anyone its own network addresses.

@@ -25,5 +25,5 @@ What protects Blockout, and what doesn't yet, organised by the chapters of the [
 |---|---|---|
 | Dev sign-in lets anyone pick any role | Must never be the sign-in on a public server | Keycloak before the first real deployment ([guide](../guides/set-up-keycloak.md)) |
 | Tokens are kept in `localStorage` | A cross-site scripting bug could read them | Keep the pages free of injected HTML (the game builds text with `textContent`); the Content Security Policy blocks injected scripts |
-| No token refresh or revocation | Dev tokens last 30 days | Short-lived Keycloak tokens with refresh |
+| No token revocation | A stolen token works until it expires: 15 minutes with Keycloak (renewed from a refresh token while the Keycloak session lasts), 12 hours with dev sign-in | Ending the Keycloak session (sign out) stops renewals; nothing revokes an access token early |
 | Plain HTTP by default | Tokens could be read on the network | Serve over HTTPS (a tunnel already does) |

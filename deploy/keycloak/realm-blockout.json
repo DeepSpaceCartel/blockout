@@ -4,7 +4,7 @@
   "enabled": true,
   "registrationAllowed": false,
   "loginWithEmailAllowed": true,
-  "accessTokenLifespan": 28800,
+  "accessTokenLifespan": 900,
   "ssoSessionIdleTimeout": 28800,
   "ssoSessionMaxLifespan": 36000,
   "roles": {

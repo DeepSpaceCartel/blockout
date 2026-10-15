@@ -110,7 +110,7 @@ This deletes the Secrets and the database volume too, so every account. Reinstal
 | Google says **redirect_uri_mismatch** | The redirect URI in Google Cloud Console isn't exactly `http://localhost:8180/realms/blockout/broker/google/endpoint`. |
 | Google says **Access blocked** or the app isn't verified | Add your Google account as a test user (Audience). |
 | Back in Blockout, "Sign-in token is from somewhere else" | `KEYCLOAK_ISSUER` isn't exactly `http://localhost:8180/realms/blockout`. |
-| Signed out after a while | Tokens last 8 hours, and Blockout doesn't refresh them yet: sign in again. |
+| Signed out after a while | Access tokens last 15 minutes and Blockout renews them with the refresh token, until the Keycloak session ends (8 hours idle, 10 at most): then sign in again. A realm imported before this change still has 8-hour tokens: set **Realm settings › Tokens › Access Token Lifespan** to 15 minutes. |
 | `install.sh` waits and then fails | `kubectl -n keycloak get pods` and `kubectl -n keycloak logs keycloak-keycloakx-0`. Keycloak restarts once if Postgres is still starting; that's fine. |
 
 ## On a public server
