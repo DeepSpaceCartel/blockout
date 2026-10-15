@@ -91,7 +91,7 @@ function serveStatic(req, res) {
   }
   // "/addition" without the slash: go to "/addition/" so relative paths work
   if (/^\/[a-z-]+$/.test(pathname) && fs.existsSync(path.join(APPS, pathname.slice(1), 'dist', 'index.html'))) {
-    res.writeHead(301, { Location: `${pathname}/` });
+    res.writeHead(301, { Location: `${pathname}/`, ...SECURITY_HEADERS });
     return res.end();
   }
   const file = staticFile(pathname);
@@ -107,10 +107,14 @@ function serveStatic(req, res) {
 
 // Sent with every response: no sniffing content types, no framing by other
 // sites, no full URLs (with class codes) leaked to other sites.
+// No camera, microphone or location for any page. Over HTTPS, browsers are told
+// to stay on HTTPS for a year.
 const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'same-origin',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  ...(config.https ? { 'Strict-Transport-Security': 'max-age=31536000' } : {}),
 };
 
 // An error as RFC 9457 problem details. `type` stays about:blank (the status
@@ -279,6 +283,7 @@ function openStream(req, res, room, role, player) {
     'Cache-Control': 'no-store, no-transform',
     'X-Accel-Buffering': 'no',
     Connection: 'keep-alive',
+    ...SECURITY_HEADERS,
   });
   res.write('retry: 2000\n\n');
   const s = { res, role, id: player && player.id };
@@ -383,6 +388,7 @@ function teacherOnly(room, key) {
 // this computer's addresses on the local network.
 function lanUrls() {
   const out = PUBLIC_URL ? [PUBLIC_URL] : [];
+  if (config.production) return out; // a public server's own addresses are nobody's business
   for (const list of Object.values(os.networkInterfaces())) {
     for (const a of list || []) if (a.family === 'IPv4' && !a.internal) out.push(`http://${a.address}:${PORT}/`);
   }
