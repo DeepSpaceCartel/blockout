@@ -30,7 +30,7 @@ The full production-readiness plan (approved 2026-10-15) is at the end of this f
 
 ## What I need from you
 
-1. **Let the release publish to GHCR.** `release.yml` built the image, then the push was refused: `denied: permission_denied: write_package` on `ghcr.io/deepspacecartel/blockout:0.4.0`. Check the DeepSpaceCartel org's Packages settings (can members and Actions create packages?) and whether a `blockout` package already exists that isn't linked to this repository. Then re-run the failed `release` run (#38697517015); no need to re-tag. Afterwards make the package public, or give a pull secret.
+1. **Let the release publish to GHCR.** `release.yml` built the image, then the push was refused: `denied: permission_denied: write_package` on `ghcr.io/deepspacecartel/blockout:0.4.0`. Check the DeepSpaceCartel org's Packages settings (can members and Actions create packages?) and whether a `blockout` package already exists that isn't linked to this repository. Then, rather than re-running the failed `v0.4.0` run (#38697517015), release `v0.4.1`: it adds the fix for answers lost under load (found by the load test after the tag). Afterwards make the package public, or give a pull secret.
 2. **Gateway listeners and DNS** (infra repo) on `gateway/rts-gateway`: `blockout-deepspacecartel-com` for `blockout.deepspacecartel.com` and `id-deepspacecartel-com` for `id.deepspacecartel.com`, with certificates and DNS records.
 3. **Google Cloud Console:** add `https://id.deepspacecartel.com/realms/blockout/broker/google/endpoint` to the OAuth client's redirect URIs.
 4. **Mail for Keycloak.** A postfix that delivers directly can't work here: outbound port 25 (and 465) is blocked from the cluster (Hetzner's default); 587 is open. Either a relay on 587 (Google Workspace's SMTP relay, or a transactional service), which Keycloak can use directly through a `keycloak-smtp` Secret (no postfix needed), or ask Hetzner to unblock port 25 and add SPF, DKIM and DMARC records. Until then `realm.sh` keeps email verification and password reset off; Google sign-in works.
@@ -39,9 +39,9 @@ The full production-readiness plan (approved 2026-10-15) is at the end of this f
 
 ### Then (next session)
 
-1. Re-run the release; confirm the image and chart are on GHCR.
+1. Move `[Unreleased]` to `[0.4.1]` in `CHANGELOG.md`, set 0.4.1 in the `package.json` files and `deploy/blockout/Chart.yaml`, tag `v0.4.1`; confirm the image and chart are on GHCR.
 2. `KEYCLOAK_URL=https://id.deepspacecartel.com BLOCKOUT_URLS="https://blockout.deepspacecartel.com http://localhost:8080 http://localhost:5173" GATEWAY=rts-gateway GATEWAY_NAMESPACE=gateway LISTENER=id-deepspacecartel-com deploy/keycloak/install.sh`
-3. `deploy/blockout/install.sh 0.4.0`
+3. `deploy/blockout/install.sh 0.4.1`
 4. Give the first admin the `admin` realm role; smoke test on the public address (sign in with Google, teacher code, host a class with two students, kill a pod mid-round, roll the deployment).
 
 ## Things to know
