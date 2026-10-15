@@ -87,3 +87,24 @@ test('HTTP: malformed addresses and cut-off bodies get an answer, and the server
   });
   assert.equal((await call('GET', '/api/health')).status, 200);
 });
+
+// (last: it uses up this address's wrong-code allowance)
+test('HTTP: guessing codes gets 429 after a run of wrong ones; streams with a wrong key look like no class', async () => {
+  const teacher = await signIn({ firstName: 'Mr', lastInitial: 'G', role: 'teacher', schoolId: 'cadence-park' });
+  const room = (await call('POST', '/api/rooms', { type: 'class' }, teacher)).data;
+  assert.equal((await call('GET', `/api/rooms/${room.code}/poll?teacher=nope`)).status, 404);
+  assert.equal((await call('GET', `/api/rooms/${room.code}/poll?id=x&key=y`)).data.removed, true);
+
+  let status;
+  let tries = 0;
+  do {
+    const res = await fetch(`${base}/api/rooms/QQQ${String.fromCharCode(65 + (tries % 26))}/info`);
+    status = res.status;
+    tries++;
+    if (status === 429) assert.ok(Number(res.headers.get('retry-after')) >= 1);
+  } while (status === 404 && tries < 100);
+  assert.equal(status, 429);
+  assert.ok(tries > 20 && tries < 40, `blocked after ${tries} tries`);
+  // a real class can't be looked up from here either until the minute is up
+  assert.equal((await call('GET', `/api/rooms/${room.code}/info`)).status, 429);
+});

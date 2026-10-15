@@ -20,6 +20,8 @@ import * as Auth from './auth.js';
 import { openStore } from './store.js';
 import { createAccounts, AccountError } from './accounts.js';
 import { loadConfig, ConfigError } from './config.js';
+import { createLimiter, clientIp } from './ratelimit.js';
+import crypto from 'crypto';
 
 const IS_MAIN = Boolean(process.argv[1]) && path.resolve(process.argv[1]) === import.meta.filename;
 let config;
@@ -140,7 +142,7 @@ const SECURITY_HEADERS = {
 // An error as RFC 9457 problem details. `type` stays about:blank (the status
 // says what kind of problem it is); `error` (a short code) and `message` (for
 // the player) are extension members the games read.
-const STATUS_TITLES = { 400: 'Bad Request', 401: 'Unauthorized', 403: 'Forbidden', 404: 'Not Found', 408: 'Request Timeout', 409: 'Conflict', 500: 'Internal Server Error' };
+const STATUS_TITLES = { 400: 'Bad Request', 401: 'Unauthorized', 403: 'Forbidden', 404: 'Not Found', 408: 'Request Timeout', 409: 'Conflict', 429: 'Too Many Requests', 500: 'Internal Server Error' };
 
 // A problem with the request itself (bad URL, slow body), answered with its own status
 class HttpError extends Error {
@@ -637,6 +639,22 @@ const routes = {
   },
 };
 
+// ---------------------------------------------------------------- rate limits
+
+const limiter = createLimiter();
+setInterval(() => limiter.prune(), 60 * 1000).unref();
+
+// Where a code is looked up: a run of wrong codes from one address is someone guessing
+const CODE_ROUTES = new Set(['POST /api/me/classes', 'POST /api/children']);
+const isCodeLookup = (req, r) => (r.code && !r.live) || CODE_ROUTES.has(`${req.method} ${r.url.pathname}`);
+const isMiss = (e) => (e instanceof Rooms.RoomError && e.code === 'room') || (e instanceof AccountError && e.status === 404 && e.code === 'code');
+const tokenKey = (req) => crypto.createHash('sha256').update(Auth.bearer(req) || '').digest('hex').slice(0, 16);
+
+function tooMany(res, retryAfter) {
+  res.setHeader('Retry-After', String(retryAfter));
+  sendProblem(res, 429, 'rate', 'Too many tries. Wait a minute and try again.');
+}
+
 function route(req) {
   const url = new URL(req.url, 'http://x');
   const parts = url.pathname.split('/').filter(Boolean); // api, rooms, CODE, action
@@ -650,32 +668,55 @@ function route(req) {
 }
 
 const server = http.createServer(async (req, res) => {
+  const ip = clientIp(req, config.trustProxy);
   let r;
   try {
+    const any = limiter.take('request', ip);
+    if (!any.ok) return tooMany(res, any.retryAfter);
     r = route(req);
     if (!r) return serveStatic(req, res);
     // Live updates: /api/rooms/CODE/events?teacher=KEY or ?id=ID&key=KEY
     // or, where streams don't get through, /poll with the same keys plus ?v=VERSION
-    const live = req.method === 'GET' && r.code && /\/(events|poll)$/.test(r.url.pathname);
-    if (live) {
+    r.live = req.method === 'GET' && r.code && /\/(events|poll)$/.test(r.url.pathname);
+    if (isCodeLookup(req, r)) {
+      const misses = limiter.check('miss', ip);
+      if (!misses.ok) return tooMany(res, misses.retryAfter);
+      if (CODE_ROUTES.has(`${req.method} ${r.url.pathname}`) && Auth.bearer(req)) {
+        const tries = limiter.take('codeTry', tokenKey(req));
+        if (!tries.ok) return tooMany(res, tries.retryAfter);
+      }
+    }
+    if (r.url.pathname === '/api/auth/dev') {
+      const signIns = limiter.take('devSignIn', ip);
+      if (!signIns.ok) return tooMany(res, signIns.retryAfter);
+    }
+    if (r.live) {
       const poll = r.url.pathname.endsWith('/poll');
       const code = String(r.code).toUpperCase();
       if (poll && !rooms.has(code) && closedRooms.has(code)) return send(res, 200, { closed: true });
       const room = getRoom(code);
       const q = r.url.searchParams;
       const version = Number(q.get('v'));
+      // A wrong key looks the same as no class, so streams can't be used to find codes
+      const noRoom = () => new Rooms.RoomError('room', 'No class with that code. Check the code on the board.');
       if (q.has('teacher')) {
-        teacherOnly(room, q.get('teacher'));
+        if (q.get('teacher') !== room.teacherKey) throw noRoom();
         return poll ? openPoll(req, res, room, 'teacher', null, version) : openStream(req, res, room, 'teacher', null);
       }
       const player = room.players.find((x) => x.id === q.get('id'));
       if (poll && !player) return send(res, 200, { removed: true });
-      const p = Rooms.findPlayer(room, q.get('id'), q.get('key'));
+      let p;
+      try {
+        p = Rooms.findPlayer(room, q.get('id'), q.get('key'));
+      } catch {
+        throw noRoom();
+      }
       return poll ? openPoll(req, res, room, 'student', p, version) : openStream(req, res, room, 'student', p);
     }
     if (!r.handler) return sendProblem(res, 404, 'not-found', 'Not found.');
     send(res, 200, await r.handler(req, r.code));
   } catch (e) {
+    if (r && isMiss(e) && isCodeLookup(req, r)) limiter.take('miss', ip);
     if (e instanceof HttpError) return sendProblem(res, e.status, e.code, e.message);
     if (e instanceof AccountError) return sendProblem(res, e.status, e.code, e.message);
     if (e instanceof Auth.AuthError) return sendProblem(res, 401, 'auth', e.message);

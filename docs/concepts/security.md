@@ -16,13 +16,13 @@ What protects Blockout, and what doesn't yet, organised by the chapters of the [
 | Errors | Errors are RFC 9457 problem details with a message for the player, never a stack trace or internal detail. |
 | Browser | Responses carry `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: same-origin`, a `Permissions-Policy` (no camera, microphone or location) and, over HTTPS, `Strict-Transport-Security`. A Content Security Policy allows only Blockout's own scripts, styles and images and no inline scripts or style attributes, and lets pages talk only to Blockout and the sign-in provider. |
 | Live classes | The teacher's controls need the room's secret teacher key; a student's actions need their own player key. |
+| Rate limits | Per address and per account ([HTTP API](../reference/HTTP-API.md)). Code guessing is limited by counting wrong codes, not tries, because a whole school often shares one address: 30 wrong codes a minute against 330,000 room codes and nearly 900 million class codes. Live-update streams give the same answer for a wrong key as for no class, so they can't be used to find codes. |
 
 ## Known gaps
 
 | Gap | Why it matters | Plan |
 |---|---|---|
 | Dev sign-in lets anyone pick any role | Must never be the sign-in on a public server | Keycloak before the first real deployment ([guide](../guides/set-up-keycloak.md)) |
-| No rate limiting | Codes (class 6 characters, parent 8, from 31 letters and digits) could be guessed at scale; live class codes are 4 letters but only last a lesson | Rate-limit joins and sign-in per address |
 | Tokens are kept in `localStorage` | A cross-site scripting bug could read them | Keep the pages free of injected HTML (the game builds text with `textContent`); the Content Security Policy blocks injected scripts |
 | No token refresh or revocation | Dev tokens last 30 days | Short-lived Keycloak tokens with refresh |
 | Plain HTTP by default | Tokens could be read on the network | Serve over HTTPS (a tunnel already does) |

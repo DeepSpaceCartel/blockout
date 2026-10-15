@@ -18,6 +18,7 @@ The server (`node apps/server/src/index.js`, or `npm start`) is configured with 
 | `NODE_ENV` | none | `production` for a public server: Blockout then refuses to start unless `BLOCKOUT_AUTH=keycloak` and `PUBLIC_URL` is an `https://` address, listing everything that's missing |
 | `PORT` | `8080` | Port, when no port argument is given |
 | `PUBLIC_URL` | none | Same as `--public-url` |
+| `TRUST_PROXY` | `0` | How many proxies (a gateway, a tunnel) sit in front of the server. Rate limits then use the client address the nearest proxy saw in `X-Forwarded-For`; with `0` that header is ignored, because anyone can send it |
 | `BLOCKOUT_DB` | `data/blockout.db` (repo root) | The sqlite file for accounts; `:memory:` keeps nothing (tests) |
 | `BLOCKOUT_AUTH` | `dev` | Sign-in provider: `dev` or `keycloak` |
 | `BLOCKOUT_AUTH_SECRET` | generated, kept in the database | Dev sign-in's token secret |

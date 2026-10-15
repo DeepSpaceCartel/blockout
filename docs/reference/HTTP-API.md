@@ -21,6 +21,13 @@ Everything under `/api` on the server. Requests and responses are JSON. The game
     ```
 
     `error` is a short machine-readable code, and `message` (the same as `detail`) is written for the player; the games show it as is.
+- **Rate limits** answer `429` (`rate`) with a `Retry-After` header in seconds:
+    - every request, per address: 6000 a minute (a whole school often shares one address)
+    - wrong class, room or parent codes, per address: 30, then 30 a minute. While they're used up, code lookups (joining, room info and actions, `POST /api/me/classes`, `POST /api/children`) get `429` too
+    - joining a class or linking a child, per account: 10 a minute
+    - dev sign-in, per address: 60 a minute
+
+    Live updates (`/events`, `/poll`) answer `404` for a wrong teacher or player key, the same as for a class that doesn't exist.
 - **Bad requests:** an address with a broken `%` escape gets `400` (`bad-request`). A request body that's cut off gets `400` (`aborted`), and one that takes longer than 10 seconds to arrive gets `408` (`timeout`).
 
 ## Sign-in
