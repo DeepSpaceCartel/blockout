@@ -19,7 +19,9 @@ The server (`node apps/server/src/index.js`, or `npm start`) is configured with 
 | `PORT` | `8080` | Port, when no port argument is given |
 | `PUBLIC_URL` | none | Same as `--public-url` |
 | `TRUST_PROXY` | `0` | How many proxies (a gateway, a tunnel) sit in front of the server. Rate limits then use the client address the nearest proxy saw in `X-Forwarded-For`; with `0` that header is ignored, because anyone can send it |
-| `BLOCKOUT_DB` | `data/blockout.db` (repo root) | The sqlite file for accounts; `:memory:` keeps nothing (tests) |
+| `BLOCKOUT_MONGO_URL` | none | The MongoDB for accounts, like `mongodb://user:password@host:27017/blockout?authSource=admin&replicaSet=rs0`. Needed in production |
+| `BLOCKOUT_STORE` | `mongo` with `BLOCKOUT_MONGO_URL`, otherwise `sqlite` | Where accounts are kept: `mongo`, `sqlite` (the file below) or `memory` (nothing kept: tests and quick tries) |
+| `BLOCKOUT_DB` | `data/blockout.db` (repo root) | With `BLOCKOUT_STORE=sqlite`: the sqlite file; `:memory:` keeps nothing |
 | `BLOCKOUT_AUTH` | `dev` | Sign-in provider: `dev` or `keycloak` |
 | `BLOCKOUT_AUTH_SECRET` | generated, kept in the database | Dev sign-in's token secret |
 | `KEYCLOAK_ISSUER` | none | With `BLOCKOUT_AUTH=keycloak`: the realm URL, for example `https://id.example.org/realms/blockout` |

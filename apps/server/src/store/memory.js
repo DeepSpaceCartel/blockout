@@ -2,11 +2,10 @@
 // tests and for a server run without a database (nothing survives a restart).
 // Everything goes in and out as a copy, as it would through a database, so a
 // caller can't change stored data by accident.
-import { newId, DEFAULT_SCHOOLS, nameOf } from './shared.js';
+import { newId, DEFAULT_SCHOOLS, nameOf, byName } from './shared.js';
 
 const copy = (v) => (v === undefined || v === null ? null : structuredClone(v));
 const byTime = (key) => (a, b) => a[key] - b[key];
-const byName = (a, b) => a.firstName.localeCompare(b.firstName) || a.lastInitial.localeCompare(b.lastInitial);
 
 function openMemoryStore() {
   const meta = new Map();

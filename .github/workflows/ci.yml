@@ -18,6 +18,17 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # The stores' tests also run against real MongoDB and Valkey (Redis)
+    services:
+      mongo:
+        image: mongo:8.0.34
+        ports: ['27017:27017']
+      valkey:
+        image: valkey/valkey:8.1.10-alpine
+        ports: ['6379:6379']
+    env:
+      BLOCKOUT_MONGO_URL: mongodb://localhost:27017/blockout
+      BLOCKOUT_REDIS_URL: redis://localhost:6379
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

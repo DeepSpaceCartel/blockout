@@ -21,6 +21,7 @@ nav:
       - Parents: guides/parents.md
       - Share through a tunnel: guides/share-through-a-tunnel.md
       - Switch sign-in to Keycloak: guides/set-up-keycloak.md
+      - Set up MongoDB and Valkey: guides/set-up-the-databases.md
       - Back up the database: guides/back-up-the-database.md
   - Application:
       - Architecture: concepts/architecture.md
@@ -40,6 +41,7 @@ nav:
       - 0003. sqlite through node:sqlite: decisions/0003-sqlite-with-node-builtin.md
       - 0004. Store the minimum about children: decisions/0004-store-minimum-child-data.md
       - 0005. Game modules declare at import, work in run(): decisions/0005-game-modules-run-phase.md
+      - 0006. MongoDB and Redis, for several servers: decisions/0006-mongodb-and-redis.md
 
 theme:
   name: material

@@ -51,6 +51,7 @@ function loadConfig(env = {}, argv = []) {
   if (production) {
     if (authKind !== 'keycloak') problems.push('NODE_ENV=production needs BLOCKOUT_AUTH=keycloak: dev sign-in lets anyone be a teacher');
     if (!publicUrl.startsWith('https://')) problems.push('NODE_ENV=production needs PUBLIC_URL to be an https:// address');
+    if (storeKind !== 'mongo') problems.push('NODE_ENV=production needs BLOCKOUT_MONGO_URL: accounts must be kept in MongoDB');
   }
 
   if (problems.length) throw new ConfigError(problems);

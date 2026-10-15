@@ -2,7 +2,7 @@
 
 A multiplication-as-area game for 3rd graders, based on "Blockout" from Math for Love. Two dice are rolled, you draw an a × b rectangle on a grid and answer a × b to claim it. It runs mainly on classroom Chromebooks.
 
-**A Turborepo of plain JavaScript** (ES modules, no framework), built with Vite. npm workspaces: `apps/*` and `packages/*`. The only runtime dependency is `qrcode-generator`. The server uses Node built-ins only, including `node:sqlite`.
+**A Turborepo of plain JavaScript** (ES modules, no framework), built with Vite. npm workspaces: `apps/*` and `packages/*`. The browser's only runtime dependency is `qrcode-generator`. The server's are the official `mongodb` and `redis` clients ([ADR-0006](docs/decisions/0006-mongodb-and-redis.md)); everything else is Node built-ins.
 
 ## Layout
 
@@ -18,12 +18,13 @@ A multiplication-as-area game for 3rd graders, based on "Blockout" from Math for
 | `apps/server/src/index.js` | Node server: the built apps (`apps/<name>/dist`; multiplication at `/`), JSON API, SSE plus `/poll` for classrooms, accounts routes. |
 | `apps/server/src/rooms.js`, `tournament.js` | Pure room logic: whole class, pairs, tournaments (knockout, double elimination, round robin, Swiss, king of the hill). |
 | `apps/server/src/moderation.js` | Username checks: `blocklist.txt`, plus OpenAI moderation only when `OPENAI_API_KEY` is set (fails open). |
-| `apps/server/src/store.js`, `auth.js`, `accounts.js` | Accounts: sqlite storage (`data/blockout.db` at the repo root, or `BLOCKOUT_DB`; `:memory:` in tests); sign-in providers behind one interface (dev HMAC JWT, Keycloak RS256 via JWKS; `identity()` keeps only first name, last initial, role, email domain); the rules (classes, rosters, homework, parent links, scheduled tournaments). |
+| `apps/server/src/store/`, `auth.js`, `accounts.js` | Accounts: stores behind one async interface (`mongo.js` for servers, `memory.js` for tests, `sqlite.js` the old file store; `index.js` picks one from `BLOCKOUT_STORE`/`BLOCKOUT_MONGO_URL`; every store passes `test/store.contract.js`; MongoDB schema steps in `migrations.js`); sign-in providers behind one interface (dev HMAC JWT, Keycloak RS256 via JWKS; `identity()` keeps only first name, last initial, role, email domain); the rules (classes, rosters, homework, parent links, scheduled tournaments). |
 | `packages/engine` | `@blockout/engine`: board, placement, dice, `rollForBoard`, difficulties (`DIFFICULTIES`, `diceFaces`, `createPairDice`, `fitsDifficulty`), CPU. `@blockout/engine/{fraction,boards,variants}`: the other operations' rules. Pure. |
 | `packages/progress` | `@blockout/progress`: wallet, `SHOP` (unlocks), achievements, fact stats, bonuses, practice picking, homework goals and options, cheat codes, `normalize` (save migrations). `@blockout/progress/cosmetics`: the Wardrobe (registers its items into `SHOP`). Pure. |
 | `packages/ui` | `@blockout/ui`: CSS in `src/css/*` (tokens, base, menu, game, dice skins, results, panels, rewards, wardrobe, players), the Lucide icon sprite (`icons.svg`), DOM helpers, `@blockout/ui/rewards` (toasts, achievement banners, confetti), and `@blockout/ui/vite` (`blockoutPage()`: adds the theme script and the sprite to every page). |
 | `packages/game-kit` | `@blockout/game-kit`: `startGame(variantId)`, the shared page engine of the other games, and their `style.css`. `@blockout/game-kit/meta`: each game's save (`blockout.game.<id>`): points, shop chains, achievements, question stats. Pure, tested. |
 | `packages/classroom`, `packages/auth` | Browser clients: classroom server (SSE with long-poll fallback, session in sessionStorage); sign-in (dev or Keycloak PKCE), bearer token, per-account progress key and sync. |
+| `deploy/data` | MongoDB (accounts) and Valkey (live classes) in the cluster: `install.sh` (idempotent; namespace `blockout-data`, or `NAMESPACE=blockout-dev` for development), `mongo.yaml`, `valkey.yaml`, and `forward.sh` (`npm run services`: forwards both to localhost and prints the URLs). Guide: `docs/guides/set-up-the-databases.md`. |
 | `deploy/keycloak` | Keycloak for sign-in in the workspace's cluster (namespace `keycloak`): `install.sh` (idempotent; also after a cluster rebuild), the `codecentric/keycloakx` chart's `values.yaml`, `postgres.yaml`, and the `blockout` realm (`realm-blockout.json`, imported only when the realm doesn't exist; the Google secret is `${vault.google-secret}` from the `google-oauth` Secret). Reached on `http://localhost:8180` via `npm run keycloak`. Guide: `docs/guides/set-up-keycloak.md`. |
 | `docs/` | The MkDocs Material site (`mkdocs.yml`): `home/`, `guides/`, `concepts/`, `reference/`, `project/`, `decisions/` (ADRs), `privacy.md`, screenshots in `assets/screenshots/`. The v0.3.0 plan and log are kept out of the nav. |
 | `.github/` | CI (`workflows/ci.yml`: lint, test and build on Node 26, strict docs build; `workflows/devcontainer.yml`: builds the dev container; actions pinned to commit SHAs) and Dependabot (npm, actions, dev container features). |
@@ -47,6 +48,8 @@ npm start -- --public-url https://<name>.trycloudflare.com   # behind a Cloudfla
 npm run dev         # Vite dev servers (multiplication on :5173, proxying /api) + the server with --watch
 cloudflared tunnel --url http://localhost:8080
 deploy/keycloak/install.sh   # install or update Keycloak in the cluster
+deploy/data/install.sh       # MongoDB and Valkey in the cluster (NAMESPACE=blockout-dev for development)
+npm run services    # forward the development MongoDB and Valkey to localhost; prints the URLs to start Blockout with
 npm run keycloak    # forward it to http://localhost:8180; then start Blockout with
 BLOCKOUT_AUTH=keycloak KEYCLOAK_ISSUER=http://localhost:8180/realms/blockout KEYCLOAK_CLIENT_ID=blockout npm start
 ```
@@ -62,7 +65,7 @@ Write throwaway scripts in the session scratchpad, not the repo. Build first (`n
 
 ```js
 const { chromium } = require('/workspaces/blockout/node_modules/playwright');
-const srv = spawn('node', ['/workspaces/blockout/apps/server/src/index.js', '8135'], { stdio: 'ignore', env: { ...process.env, BLOCKOUT_DB: ':memory:' } });
+const srv = spawn('node', ['/workspaces/blockout/apps/server/src/index.js', '8135'], { stdio: 'ignore', env: { ...process.env, BLOCKOUT_STORE: 'memory' } });
 // seed a save before the page loads (once per tab):
 await page.addInitScript((pr) => { if (!sessionStorage.getItem('s')) { sessionStorage.setItem('s', 1);
   localStorage.setItem('blockout.progress', JSON.stringify(pr)); } }, progress);
@@ -75,7 +78,7 @@ await page.addInitScript((pr) => { if (!sessionStorage.getItem('s')) { sessionSt
   - `[data-mode="single|multi|practice"]`, `[data-setting="difficulty"] [data-value=…]`, `#board-size [data-size=…]`
 - **Check for errors:** collect `pageerror` events and check there are none. Screenshot and look at the result.
 - **Classroom flows:** use several browser contexts (a teacher plus students). Hosting needs a teacher sign-in: POST `/api/auth/dev` with `{ role: 'teacher', firstName, schoolId: 'cadence-park' }` and store `{ token, user }` in `localStorage['blockout.auth']`, or use the sign-in dialog.
-- **Accounts:** start the test server with `BLOCKOUT_DB=:memory:` so runs don't share data.
+- **Accounts:** start the test server with `BLOCKOUT_STORE=memory` so runs don't share data.
 - **Other games:** they're at `/<id>/`. `window.PROTO_FAST = true` (an init script) makes the CPU quick, and `window.ProtoGame` exposes `state()`, `piece()` and `boards`.
 
 ## Storage
@@ -139,6 +142,6 @@ await page.addInitScript((pr) => { if (!sessionStorage.getItem('s')) { sessionSt
 ## Code style
 
 - **Match the surrounding code:** modern JavaScript ES modules, 2-space indent, single quotes, `const` arrow helpers, short comments explaining *why*.
-- **No frameworks.** Keep runtime dependencies to a minimum; the server uses only Node built-ins.
+- **No frameworks.** Keep runtime dependencies to a minimum: in the server, only the database clients.
 - **Keep logic testable:** pure logic belongs in `packages/engine`, `packages/progress` or `apps/server/src/{rooms,tournament,accounts}.js`, with unit tests. The game modules stay the UI.
 - **Keep the tests and lint green.** Add tests for new rules, and run `npm test && npm run lint` before finishing.

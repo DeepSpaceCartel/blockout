@@ -24,16 +24,17 @@ test('config: port from the command line beats PORT; public URL gets one trailin
 test('config: production refuses dev sign-in and plain HTTP, listing every problem', () => {
   assert.throws(
     () => loadConfig({ NODE_ENV: 'production' }, []),
-    (e) => e instanceof ConfigError && e.problems.length === 2 && /dev sign-in/.test(e.message) && /https/.test(e.message)
+    (e) => e instanceof ConfigError && e.problems.length === 3 && /dev sign-in/.test(e.message) && /https/.test(e.message) && /MongoDB/.test(e.message)
   );
-  const c = loadConfig({ NODE_ENV: 'production', PUBLIC_URL: 'https://blockout.example.org', TRUST_PROXY: '1', ...KEYCLOAK }, []);
+  const c = loadConfig({ NODE_ENV: 'production', PUBLIC_URL: 'https://blockout.example.org', TRUST_PROXY: '1', BLOCKOUT_MONGO_URL: 'mongodb://db/blockout', ...KEYCLOAK }, []);
   assert.equal(c.production, true);
   assert.equal(c.auth.issuer, KEYCLOAK.KEYCLOAK_ISSUER);
   assert.equal(c.trustProxy, 1);
+  assert.deepEqual(c.store, { kind: 'mongo', file: undefined, url: 'mongodb://db/blockout' });
 });
 
 test('config: bad values are caught at start-up', () => {
-  for (const env of [{ BLOCKOUT_AUTH: 'magic' }, { BLOCKOUT_AUTH: 'keycloak' }, { TRUST_PROXY: 'yes' }, { PUBLIC_URL: 'blockout.org' }, { PORT: '99999' }]) {
+  for (const env of [{ BLOCKOUT_STORE: 'mongo' }, { BLOCKOUT_STORE: 'excel' }, { BLOCKOUT_AUTH: 'magic' }, { BLOCKOUT_AUTH: 'keycloak' }, { TRUST_PROXY: 'yes' }, { PUBLIC_URL: 'blockout.org' }, { PORT: '99999' }]) {
     assert.throws(() => loadConfig(env, []), ConfigError, JSON.stringify(env));
   }
 });

@@ -9,4 +9,7 @@ const DEFAULT_SCHOOLS = [{ id: 'cadence-park', name: 'Cadence Park', domain: 'iu
 // "Maya K." (or just "Maya")
 const nameOf = (u) => (u.lastInitial ? `${u.firstName} ${u.lastInitial}.` : u.firstName);
 
-export { newId, DEFAULT_SCHOOLS, nameOf };
+// Rosters are listed by first name, then last initial
+const byName = (a, b) => a.firstName.localeCompare(b.firstName) || a.lastInitial.localeCompare(b.lastInitial);
+
+export { newId, DEFAULT_SCHOOLS, nameOf, byName };

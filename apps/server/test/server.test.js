@@ -6,11 +6,14 @@ import test from 'node:test';
 import assert from 'node:assert';
 import * as P from '@blockout/progress';
 
-const { server } = await import('../src/index.js'); // (after the environment is set)
+const { server, store } = await import('../src/index.js'); // (after the environment is set)
 
 let base;
 test.before(() => new Promise((resolve) => server.listen(0, () => ((base = `http://localhost:${server.address().port}`), resolve()))));
-test.after(() => server.close());
+test.after(async () => {
+  server.close();
+  await store.close(); // (a database connection would keep the test running)
+});
 
 async function call(method, path, body, token) {
   const res = await fetch(base + path, {
