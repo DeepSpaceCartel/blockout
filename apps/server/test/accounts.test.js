@@ -236,3 +236,20 @@ test('audit log: account changes are logged by id, never by name or code', async
   const text = JSON.stringify(lines);
   assert.ok(!text.includes('Maya') && !text.includes('Room 12') && !text.includes(c.code));
 });
+
+test('sign-in: the account is written when the token changes, otherwise once a minute', async () => {
+  const { store, signIn, tick } = setup();
+  const writes = [];
+  const upsert = store.upsertUser;
+  store.upsertUser = (u, at) => (writes.push(at), upsert(u, at));
+  const a = await signIn({ firstName: 'Maya', lastInitial: 'K', role: 'student', email: 'maya@iusd.org' });
+  await signIn({ firstName: 'Maya', lastInitial: 'K', role: 'student', email: 'maya@iusd.org' });
+  tick(30 * 1000);
+  const b = await signIn({ firstName: 'Maya', lastInitial: 'K', role: 'student', email: 'maya@iusd.org' });
+  assert.equal(b.id, a.id);
+  assert.equal(writes.length, 1, 'no write within the minute');
+  tick(31 * 1000);
+  await signIn({ firstName: 'Maya', lastInitial: 'K', role: 'student', email: 'maya@iusd.org' });
+  assert.equal(writes.length, 2);
+  assert.equal(store.user(a.id).lastSeen, writes[1]);
+});

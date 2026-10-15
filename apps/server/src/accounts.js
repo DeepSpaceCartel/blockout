@@ -56,11 +56,25 @@ function createAccounts({ store, auth, now = () => Date.now(), log = silentLogge
 
   // ---- signing in
 
+  // Every request is signed in, but the account only needs writing when
+  // something in the token changed, or once a minute for "last seen"
+  const TOUCH_MS = 60 * 1000;
+  const recent = new Map(); // sub -> { at, same: identity as JSON }
+
   async function authenticate(token) {
     if (!token) return null;
     const claims = await auth.verify(token);
     const id = Auth.identity(claims, { schoolByDomain: store.schoolByDomain });
-    return store.upsertUser(id, now());
+    const same = JSON.stringify(id);
+    const t = now();
+    const seen = recent.get(id.sub);
+    if (seen && seen.same === same && t - seen.at < TOUCH_MS) {
+      const user = store.userBySub(id.sub);
+      if (user) return user;
+    }
+    if (recent.size > 10000) recent.clear();
+    recent.set(id.sub, { at: t, same });
+    return store.upsertUser(id, t);
   }
 
   // Dev sign-in only: make a token for a made-up person.
