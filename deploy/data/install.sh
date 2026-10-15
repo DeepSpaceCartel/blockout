@@ -54,6 +54,13 @@ say "Valkey"
 kubectl -n "$NS" apply -f valkey.yaml
 kubectl -n "$NS" rollout status statefulset/valkey --timeout=5m
 
+say "Nightly backup"
+if has blockout-backup; then
+  kubectl -n "$NS" apply -f backup.yaml
+else
+  echo "  No blockout-backup Secret: no backups yet. See docs/guides/operate.md (Backups)."
+fi
+
 say "Ready in namespace $NS"
 echo "  Inside the cluster: the url keys of Secrets blockout-mongo and blockout-redis."
 echo "  From here: npm run services (NAMESPACE=$NS), then the URLs it prints."

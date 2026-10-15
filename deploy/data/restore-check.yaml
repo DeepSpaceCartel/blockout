@@ -1,0 +1,58 @@
+# The monthly restore drill (apply with -n <namespace>, then read its log and
+# delete it): fetches the newest backup, restores it into a scratch database
+# (restore_check) next to the real one, counts what's in it, and drops it.
+# A backup nobody has restored is only a hope. See docs/guides/operate.md.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: blockout-restore-check
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 1800
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        - name: fetch
+          image: rclone/rclone:1.75.2@sha256:2687085f718d3c628f7fdfb77c52a1d344332aed543110bb88088f2c70d43eb5
+          command: [sh, -c, 'latest=$(rclone lsf crypt:daily | sort | tail -1) && echo "newest: $latest" && rclone copyto "crypt:daily/$latest" /restore/backup.archive.gz']
+          envFrom:
+            - secretRef: { name: blockout-backup }
+          env:
+            - { name: RCLONE_CONFIG, value: /tmp/rclone.conf }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          volumeMounts:
+            - { name: restore, mountPath: /restore }
+            - { name: tmp, mountPath: /tmp }
+      containers:
+        - name: restore
+          image: mongo:8.0.34
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              mongorestore --uri "$MONGO_URL" --gzip --archive=/restore/backup.archive.gz --nsFrom 'blockout.*' --nsTo 'restore_check.*' --drop --quiet
+              mongosh "$MONGO_URL" --quiet --eval '
+                const r = db.getSiblingDB("restore_check");
+                for (const c of r.getCollectionNames().sort()) print(c.padEnd(14), r.getCollection(c).countDocuments());
+                r.dropDatabase();
+                print("restored, counted and dropped");'
+          env:
+            - name: MONGO_URL
+              valueFrom: { secretKeyRef: { name: blockout-mongo, key: url } }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          volumeMounts:
+            - { name: restore, mountPath: /restore, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: restore, emptyDir: { sizeLimit: 2Gi } }
+        - { name: tmp, emptyDir: {} }

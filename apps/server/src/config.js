@@ -53,6 +53,10 @@ function loadConfig(env = {}, argv = []) {
   const logFormat = env.LOG_FORMAT || (production ? 'json' : 'text');
   if (!['json', 'text'].includes(logFormat)) problems.push(`LOG_FORMAT must be json or text, not "${logFormat}"`);
 
+  // Prometheus metrics on a port of their own (never the public one): 0 for none
+  const metricsPort = Number(env.METRICS_PORT || 0);
+  if (!Number.isInteger(metricsPort) || metricsPort < 0 || metricsPort > 65535) problems.push(`METRICS_PORT must be a port number, not "${env.METRICS_PORT}"`);
+
   // A public server must not run with the practice sign-in (anyone can pick any role) or over plain HTTP
   if (production) {
     if (authKind !== 'keycloak') problems.push('NODE_ENV=production needs BLOCKOUT_AUTH=keycloak: dev sign-in lets anyone be a teacher');
@@ -68,6 +72,7 @@ function loadConfig(env = {}, argv = []) {
     publicUrl,
     https: publicUrl.startsWith('https://'),
     trustProxy,
+    metricsPort,
     log: { level: logLevel, format: logFormat },
     // Names are also checked with OpenAI's free moderation model when this is set (and only then are names sent to OpenAI)
     openaiKey: env.OPENAI_API_KEY || '',

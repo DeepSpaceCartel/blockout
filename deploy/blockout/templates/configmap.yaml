@@ -15,3 +15,4 @@ data:
   LOG_LEVEL: {{ .Values.log.level | quote }}
   LOG_FORMAT: {{ .Values.log.format | quote }}
   BLOCKOUT_REDIS_PREFIX: {{ .Values.redisPrefix | quote }}
+  METRICS_PORT: {{ .Values.metrics.port | quote }}

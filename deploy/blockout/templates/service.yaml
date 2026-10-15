@@ -7,3 +7,5 @@ spec:
   selector: {{- include "blockout.selectorLabels" . | nindent 4 }}
   ports:
     - { name: http, port: {{ .Values.service.port }}, targetPort: http }
+    # (not on the HTTPRoute: only Prometheus, inside the cluster)
+    - { name: metrics, port: {{ .Values.metrics.port }}, targetPort: metrics }

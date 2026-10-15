@@ -15,3 +15,10 @@ networkPolicy:
   enabled: true
   cilium: true
   dataNamespace: blockout-data
+metrics:
+  serviceMonitor:
+    enabled: true
+    labels: { release: kube-prometheus-stack }
+  rules:
+    enabled: true
+    labels: { release: kube-prometheus-stack }

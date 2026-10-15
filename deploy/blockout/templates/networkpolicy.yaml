@@ -13,6 +13,11 @@ spec:
   ingress:
     - fromEntities: [ingress]
       toPorts: [{ ports: [{ port: "8080", protocol: TCP }] }]
+    - fromEndpoints:
+        - matchLabels: { k8s:io.kubernetes.pod.namespace: {{ .Values.metrics.namespace }} }
+      toPorts: [{ ports: [{ port: "{{ .Values.metrics.port }}", protocol: TCP }] }]
+    # (the kubelet's health probes come from the node)
+    - fromEntities: [host]
   egress:
     - toEndpoints:
         - matchLabels: { k8s:io.kubernetes.pod.namespace: kube-system, k8s-app: kube-dns }
@@ -38,6 +43,9 @@ spec:
         - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: {{ . }} } }
         {{- end }}
       ports: [{ port: 8080, protocol: TCP }]
+    - from:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: {{ .Values.metrics.namespace }} } }
+      ports: [{ port: {{ .Values.metrics.port }}, protocol: TCP }]
   egress:
     - ports: [{ port: 53, protocol: UDP }, { port: 53, protocol: TCP }]
     - to:

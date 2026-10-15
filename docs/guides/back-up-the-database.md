@@ -4,6 +4,8 @@
 
 Accounts, classes, homework and synced progress live in MongoDB ([set up](set-up-the-databases.md)). Live classes are in Valkey and only last hours, so they aren't backed up.
 
+In the cluster, backups run every night by themselves, encrypted, to object storage: see [Run it day to day › Backups](operate.md#backups). This page is for a copy by hand.
+
 ## Back up
 
 With `npm run services` running (or from inside the cluster), `mongodump` writes the whole database to one compressed file:

@@ -22,6 +22,7 @@ import { createAccounts, AccountError } from './accounts.js';
 import { loadConfig, ConfigError } from './config.js';
 import { createLimiter, createRedisLimiter, clientIp } from './ratelimit.js';
 import { createLive } from './live.js';
+import { createMetrics } from './metrics.js';
 import { createMemoryBackend } from './roombackend/memory.js';
 import { createRedisBackend } from './roombackend/redis.js';
 import { createLogger, exception } from './log.js';
@@ -38,6 +39,14 @@ try {
 }
 const VERSION = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
 const log = createLogger({ ...config.log, version: VERSION });
+
+// Prometheus metrics (served on METRICS_PORT, see the end of this file)
+const metrics = createMetrics();
+const httpRequests = metrics.counter('http_requests_total', 'HTTP requests answered', ['method', 'route', 'status']);
+const httpSeconds = metrics.histogram('http_request_duration_seconds', 'Time to answer an HTTP request (event streams: until they end)', ['route']);
+const rateLimited = metrics.counter('rate_limited_total', 'Requests refused by a rate limit', ['rule']);
+const serverErrors = metrics.counter('server_errors_total', 'Requests that failed with a 500', ['route']);
+metrics.gauge('build_info', 'This server\'s version', () => [{ labels: { version: VERSION }, value: 1 }], ['version']);
 const PORT = config.port;
 const OPENAI_API_KEY = config.openaiKey;
 const PUBLIC_URL = config.publicUrl;
@@ -204,6 +213,9 @@ const roomBackend =
   config.rooms.kind === 'redis' ? await createRedisBackend(config.rooms.url, { prefix: config.rooms.prefix, log }) : createMemoryBackend();
 const live = createLive({ backend: roomBackend, log });
 live.start();
+metrics.gauge('streams', 'Event streams open on this server', () => live.stats().streams);
+metrics.gauge('polls', 'Long polls waiting on this server', () => live.stats().polls);
+metrics.gauge('rooms_owned', 'Live classes whose timers this server runs', () => live.stats().owned);
 
 // Open streams are cheap but not free: a class needs ~41 (more with spare tabs),
 // and a school shares one address
@@ -463,7 +475,8 @@ const isCodeLookup = (req, r) => (r.code && !r.live) || CODE_ROUTES.has(`${req.m
 const isMiss = (e) => (e instanceof Rooms.RoomError && e.code === 'room') || (e instanceof AccountError && e.status === 404 && e.code === 'code');
 const tokenKey = (req) => crypto.createHash('sha256').update(Auth.bearer(req) || '').digest('hex').slice(0, 16);
 
-function tooMany(res, retryAfter) {
+function tooMany(res, retryAfter, rule = 'streams') {
+  rateLimited.inc({ rule });
   res.setHeader('Retry-After', String(retryAfter));
   sendProblem(res, 429, 'rate', 'Too many tries. Wait a minute and try again.');
 }
@@ -478,6 +491,7 @@ function tooMany(res, retryAfter) {
 //   ready:   send traffic here (not while shutting down, not without a database)
 const LAG_LIMIT_MS = 5000;
 let started = false;
+let metricsServer = null; // (set where the server starts listening)
 let draining = false;
 let lag = 0;
 let lastTick = performance.now();
@@ -515,6 +529,7 @@ async function drain({ timeoutMs = 20000 } = {}) {
   clearInterval(scheduleTimer);
   const closed = new Promise((resolve) => server.close(resolve));
   await live.drain(); // (streams end so browsers reconnect, polls are answered, classes go to another server)
+  if (metricsServer) metricsServer.close();
   server.closeIdleConnections();
   const timeout = new Promise((resolve) => setTimeout(resolve, timeoutMs).unref());
   await Promise.race([closed, timeout]);
@@ -550,17 +565,21 @@ const server = http.createServer(async (req, res) => {
   let r;
   // One log record per request: the route's pattern (never a path with codes in it), status and time
   // (at a terminal only with LOG_LEVEL=debug: a class polls several times a second)
-  res.on('finish', () =>
+  res.on('finish', () => {
+    const route = r ? r.name : 'static';
+    const ms = performance.now() - t0;
+    httpRequests.inc({ method: req.method, route, status: res.statusCode });
+    httpSeconds.observe({ route }, ms / 1000);
     log[config.log.format === 'json' ? 'info' : 'debug']('http.request', {
       'http.request.method': req.method,
-      'http.route': r ? r.name : 'static',
+      'http.route': route,
       'http.response.status_code': res.statusCode,
-      duration_ms: Math.round(performance.now() - t0),
-    })
-  );
+      duration_ms: Math.round(ms),
+    });
+  });
   try {
     const any = await limiter.take('request', ip);
-    if (!any.ok) return tooMany(res, any.retryAfter);
+    if (!any.ok) return tooMany(res, any.retryAfter, 'request');
     r = route(req);
     if (!r) return serveStatic(req, res);
     // Live updates: /api/rooms/CODE/events?teacher=KEY or ?id=ID&key=KEY
@@ -568,15 +587,15 @@ const server = http.createServer(async (req, res) => {
     r.live = req.method === 'GET' && r.code && /\/(events|poll)$/.test(r.url.pathname);
     if (isCodeLookup(req, r)) {
       const misses = await limiter.check('miss', ip);
-      if (!misses.ok) return tooMany(res, misses.retryAfter);
+      if (!misses.ok) return tooMany(res, misses.retryAfter, 'miss');
       if (CODE_ROUTES.has(`${req.method} ${r.url.pathname}`) && Auth.bearer(req)) {
         const tries = await limiter.take('codeTry', tokenKey(req));
-        if (!tries.ok) return tooMany(res, tries.retryAfter);
+        if (!tries.ok) return tooMany(res, tries.retryAfter, 'codeTry');
       }
     }
     if (r.url.pathname === '/api/auth/dev') {
       const signIns = await limiter.take('devSignIn', ip);
-      if (!signIns.ok) return tooMany(res, signIns.retryAfter);
+      if (!signIns.ok) return tooMany(res, signIns.retryAfter, 'devSignIn');
     }
     if (r.live) {
       const poll = r.url.pathname.endsWith('/poll');
@@ -612,6 +631,7 @@ const server = http.createServer(async (req, res) => {
       const status = e.code === 'room' || e.code === 'player' ? 404 : e.code === 'teacher' ? 403 : e.code === 'busy' ? 503 : 409;
       return sendProblem(res, status, e.code, e.message);
     }
+    serverErrors.inc({ route: r ? r.name : 'static' });
     log.error('http.error', { 'http.request.method': req.method, 'http.route': r ? r.name : 'static', ...exception(e) });
     sendProblem(res, 500, 'server', 'Something went wrong.'); // (never the error itself: it stays in the log)
   }
@@ -635,6 +655,14 @@ if (IS_MAIN) {
       process.exit(0);
     });
   }
+  // Metrics on their own port: the gateway only ever reaches PORT
+  if (config.metricsPort) {
+    metricsServer = http.createServer((req, res) => {
+      if (req.url !== '/metrics') return send(res, 404, 'Not found', 'text/plain');
+      send(res, 200, metrics.render(), 'text/plain; version=0.0.4; charset=utf-8');
+    });
+    metricsServer.listen(config.metricsPort);
+  }
   server.listen(PORT, () => {
     log.info('server.started', { 'server.port': PORT, 'auth.kind': auth.name, 'store.kind': store.kind, 'rooms.kind': config.rooms.kind, 'moderation.openai': Boolean(OPENAI_API_KEY), 'deployment.production': config.production });
     if (store.kind === 'memory') log.warn('store.memory', { 'store.kind': 'memory' }); // accounts aren't kept: set BLOCKOUT_MONGO_URL
@@ -651,4 +679,4 @@ if (IS_MAIN) {
 
 started = true;
 
-export { server, live, store, accounts, drain };
+export { metrics, server, live, store, accounts, drain };

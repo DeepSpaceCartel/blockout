@@ -1,0 +1,68 @@
+# Nightly backup of Keycloak's Postgres (apply with -n keycloak): the realm's
+# users, their Google links and settings. Same as deploy/data/backup.yaml:
+# pg_dump, then rclone's crypt remote from the blockout-backup Secret (a copy
+# in this namespace), daily/ for 31 days and monthly/ for a year, under keycloak/.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: keycloak-backup
+spec:
+  schedule: "47 3 * * *"
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 3600
+      template:
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 70
+            runAsGroup: 70
+            fsGroup: 70
+            seccompProfile: { type: RuntimeDefault }
+          initContainers:
+            - name: dump
+              image: postgres:17.11-alpine
+              command: [sh, -c, 'pg_dump -h keycloak-db -U keycloak -d keycloak --format=custom --file="/backup/keycloak-$(date -u +%Y-%m-%d).dump" && ls -l /backup']
+              env:
+                - name: PGPASSWORD
+                  valueFrom: { secretKeyRef: { name: keycloak-db, key: password } }
+              securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+              resources:
+                requests: { cpu: 50m, memory: 64Mi }
+                limits: { memory: 256Mi }
+              volumeMounts: [{ name: backup, mountPath: /backup }]
+          containers:
+            - name: upload
+              image: rclone/rclone:1.75.2@sha256:2687085f718d3c628f7fdfb77c52a1d344332aed543110bb88088f2c70d43eb5
+              command:
+                - sh
+                - -c
+                - |
+                  set -e
+                  rclone mkdir crypt:keycloak/daily && rclone mkdir crypt:keycloak/monthly
+                  rclone copy /backup crypt:keycloak/daily
+                  if [ "$(date -u +%d)" = 01 ]; then rclone copy /backup crypt:keycloak/monthly; fi
+                  rclone delete --min-age 31d crypt:keycloak/daily
+                  rclone delete --min-age 366d crypt:keycloak/monthly
+                  rclone lsl crypt:keycloak | tail -3
+              envFrom:
+                - secretRef: { name: blockout-backup }
+              env:
+                - { name: RCLONE_CONFIG, value: /tmp/rclone.conf }
+              securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+              resources:
+                requests: { cpu: 50m, memory: 64Mi }
+                limits: { memory: 256Mi }
+              volumeMounts:
+                - { name: backup, mountPath: /backup, readOnly: true }
+                - { name: tmp, mountPath: /tmp }
+          volumes:
+            - { name: backup, emptyDir: { sizeLimit: 1Gi } }
+            - { name: tmp, emptyDir: {} }

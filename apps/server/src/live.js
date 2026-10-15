@@ -458,7 +458,18 @@ function createLive({ backend, log = silentLogger, replicaId = crypto.randomByte
   // One server at a time does a job (opening scheduled tournaments): true while it's this one
   const lead = (name, ttlMs) => backend.acquire(`lead:${name}`, replicaId, ttlMs).catch(() => false);
 
-  return { replicaId, lead, createRoom, getRoom, withRoom, closeRoom, isClosed, setLive, openStream, openPoll, streamsOf, start, drain, owns: (code) => owned.has(code) };
+  // What this server is doing, for metrics
+  const stats = () => {
+    let streams = 0;
+    let polls = 0;
+    for (const e of local.values()) {
+      streams += e.streams.size;
+      polls += e.polls.size;
+    }
+    return { streams, polls, owned: owned.size, rooms: local.size };
+  };
+
+  return { replicaId, stats, lead, createRoom, getRoom, withRoom, closeRoom, isClosed, setLive, openStream, openPoll, streamsOf, start, drain, owns: (code) => owned.has(code) };
 }
 
 export { createLive, DEFAULTS };

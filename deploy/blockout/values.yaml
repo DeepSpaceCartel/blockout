@@ -101,6 +101,25 @@ autoscaling:
   maxReplicas: 6
   targetCPUUtilizationPercentage: 70
 
+# Prometheus (the Prometheus Operator's ServiceMonitor and PrometheusRule).
+# The metrics port is never on the public route.
+metrics:
+  port: 9464
+  serviceMonitor:
+    enabled: false
+    # labels the cluster's Prometheus selects monitors and rules by
+    labels: {}
+    interval: 30s
+  # Alert rules (seen in Prometheus and Grafana; an Alertmanager sends them on)
+  rules:
+    enabled: false
+    labels: {}
+    # alert when this backup CronJob hasn't succeeded for a day (empty: no backup alert)
+    backupCronJob: blockout-backup
+    backupNamespace: blockout-data
+  # the namespace Prometheus runs in (allowed through the network policy)
+  namespace: observability
+
 # Who may talk to Blockout, and whom it may talk to (Cilium: traffic from the
 # gateway is the "ingress" entity, which a plain NetworkPolicy can't name)
 networkPolicy:

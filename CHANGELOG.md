@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Work towards 0.3.0 on the `v0.3.0` branch. Details and decisions: [the v0.3.0 work log](https://github.com/alexanderilyin/blockout/blob/v0.3.0/docs/v0.3.0-log.md).
 
 ### Added
+- Operations: Prometheus metrics on a port of their own (`METRICS_PORT`), alert rules for the cluster's Prometheus, nightly encrypted backups of MongoDB and Keycloak's Postgres to object storage with a monthly restore drill, and a "Run it day to day" guide.
 - A container image (`Dockerfile`) and a Helm chart (`deploy/blockout`) for running Blockout in Kubernetes, published to GitHub's registry on each release with an SBOM and signed provenance. CI builds and scans the image and checks the chart on every push.
 - Anyone can sign in as a student; one-time codes do the rest. A **teacher code** (from an admin, or a teacher inviting a colleague under **🏫 My classes**) makes a teacher; a **grown-up's code** (made by the child on their account page, or by their teacher next to the student in the roster) makes a child's grown-up and links them. Codes work once, for 7 or 14 days, with a QR code and a link.
 - An admin page at `/admin/` for accounts with the Keycloak `admin` role: find accounts, change roles, delete accounts, make teacher codes and add schools.

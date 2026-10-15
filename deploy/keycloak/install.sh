@@ -66,6 +66,13 @@ fi
 say "Realm settings (for a new or an existing realm)"
 ./realm.sh
 
+say "Nightly backup"
+if kubectl -n "$NS" get secret blockout-backup >/dev/null 2>&1; then
+  kubectl -n "$NS" apply -f backup.yaml
+else
+  echo "  No blockout-backup Secret here: no backups yet. See docs/guides/operate.md (Backups)."
+fi
+
 [[ "$KEYCLOAK_URL" == https://* ]] && cat <<MSG
 
 Keycloak is ready at $KEYCLOAK_URL. Blockout: KEYCLOAK_ISSUER=$KEYCLOAK_URL/realms/blockout KEYCLOAK_CLIENT_ID=blockout

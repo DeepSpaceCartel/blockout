@@ -41,6 +41,7 @@ spec:
           securityContext: {{- toYaml .Values.securityContext | nindent 12 }}
           ports:
             - { name: http, containerPort: 8080 }
+            - { name: metrics, containerPort: {{ .Values.metrics.port }} }
           envFrom:
             - configMapRef: { name: {{ include "blockout.fullname" . }} }
           env:
