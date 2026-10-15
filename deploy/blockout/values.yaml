@@ -3,7 +3,7 @@
 # Every server is the same, so any number can run (live classes are shared in Redis).
 
 image:
-  repository: ghcr.io/alexanderilyin/blockout
+  repository: ghcr.io/deepspacecartel/blockout
   # Defaults to the chart's appVersion. A digest (sha256:…) pins the exact image.
   tag: ""
   digest: ""

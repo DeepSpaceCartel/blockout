@@ -1,7 +1,7 @@
 site_name: Blockout
 site_description: A multiplication game for 3rd graders — roll two dice, draw the rectangle, claim the board — with classroom play, homework and more games.
-repo_url: https://github.com/alexanderilyin/blockout
-repo_name: alexanderilyin/blockout
+repo_url: https://github.com/DeepSpaceCartel/blockout
+repo_name: DeepSpaceCartel/blockout
 edit_uri: edit/main/docs/
 
 # The v0.3.0 plan and work log are real records of how this version was built,

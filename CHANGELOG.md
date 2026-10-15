@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Work towards 0.3.0 on the `v0.3.0` branch. Details and decisions: [the v0.3.0 work log](https://github.com/alexanderilyin/blockout/blob/v0.3.0/docs/v0.3.0-log.md).
+## [0.4.0] - 2026-10-15
+
+The first release since 0.2.0 (0.3.0 wasn't released on its own): accounts and homework, more games, and everything needed to run Blockout as a public service. Details and decisions: [the v0.3.0 work log](https://github.com/DeepSpaceCartel/blockout/blob/v0.4.0/docs/v0.3.0-log.md) and the [decision records](https://github.com/DeepSpaceCartel/blockout/tree/v0.4.0/docs/decisions).
 
 ### Added
 - Your data: grown-ups can download everything kept about their child (and teachers and grown-ups their own), and accounts nobody has used for 13 months are deleted by themselves (`BLOCKOUT_RETENTION_DAYS`). The privacy page says where everything is kept and for how long.
@@ -57,7 +59,7 @@ Work towards 0.3.0 on the `v0.3.0` branch. Details and decisions: [the v0.3.0 wo
 - Every response, redirects and live-class streams included, now carries the security headers, plus a `Permissions-Policy` (no camera, microphone or location) and, over HTTPS, `Strict-Transport-Security`. A production server no longer tells anyone its own network addresses.
 - With `NODE_ENV=production` the server refuses to start with the practice dev sign-in or without an `https://` public address, and every setting is checked at start-up.
 - API errors no longer carry internal details, and every response has basic browser security headers.
-- Only a student's first name, last initial, role and email domain are stored; see [Privacy](https://github.com/alexanderilyin/blockout/blob/v0.3.0/docs/privacy.md).
+- Only a student's first name, last initial, role and email domain are stored; see [Privacy](https://github.com/DeepSpaceCartel/blockout/blob/v0.4.0/docs/privacy.md).
 
 ## [0.2.0] - 2026-09-23
 
@@ -74,6 +76,7 @@ Work towards 0.3.0 on the `v0.3.0` branch. Details and decisions: [the v0.3.0 wo
 - The first playable Blockout: roll two dice, draw the rectangle, answer the multiplication, against the CPU.
 
 <!-- No release tags yet: the links point at the release commits (tag them v0.1.0 and v0.2.0 to switch to compare/v0.1.0...v0.2.0). -->
-[Unreleased]: https://github.com/alexanderilyin/blockout/compare/4921120...v0.3.0
-[0.2.0]: https://github.com/alexanderilyin/blockout/compare/382b38c...4921120
-[0.1.0]: https://github.com/alexanderilyin/blockout/tree/382b38c
+[Unreleased]: https://github.com/DeepSpaceCartel/blockout/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/DeepSpaceCartel/blockout/compare/4921120...v0.4.0
+[0.2.0]: https://github.com/DeepSpaceCartel/blockout/compare/382b38c...4921120
+[0.1.0]: https://github.com/DeepSpaceCartel/blockout/tree/382b38c

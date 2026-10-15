@@ -1,6 +1,6 @@
 {
   "name": "@blockout/classroom",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "Browser client for the classroom server: requests, live updates (SSE with long-poll fallback) and the class session.",
   "type": "module",

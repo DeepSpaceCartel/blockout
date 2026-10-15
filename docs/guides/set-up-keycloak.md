@@ -16,7 +16,7 @@ This guide runs Keycloak in the Kubernetes cluster that the dev workspace runs i
 | The `blockout` realm | `deploy/keycloak/realm-blockout.json` | The `blockout` client, the roles, Google sign-in, an 8-hour token lifespan |
 | The port-forward | the workspace (`npm run keycloak`) | Makes Keycloak `http://localhost:8180` in the workspace and, through VS Code, in your browser |
 
-Everything is in [`deploy/keycloak/`](https://github.com/alexanderilyin/blockout/tree/v0.3.0/deploy/keycloak): `install.sh`, the chart's `values.yaml`, `postgres.yaml` and the realm.
+Everything is in [`deploy/keycloak/`](https://github.com/DeepSpaceCartel/blockout/tree/main/deploy/keycloak): `install.sh`, the chart's `values.yaml`, `postgres.yaml` and the realm.
 
 Sign-in goes Blockout → Keycloak → Google and back. Blockout only knows the Keycloak client `blockout`; only Keycloak knows the Google client.
 
