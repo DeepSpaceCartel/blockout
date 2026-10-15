@@ -45,6 +45,9 @@ COPY --from=build --chown=root:root /src/packages/progress/src/ packages/progres
 # the built games (apps/<name>/dist), served by the server
 COPY --from=build --chown=root:root /src/apps/ /tmp/apps/
 RUN cd /tmp/apps && for d in */dist; do install -d "/app/apps/$d" && cp -r "$d/." "/app/apps/$d/"; done && rm -rf /tmp/apps
+# The server never runs npm: without it (and npx, corepack), the image has
+# less to patch and nothing to install packages with
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
 # Owned by root, run as node: the server can't change its own code
 USER node
 EXPOSE 8080
