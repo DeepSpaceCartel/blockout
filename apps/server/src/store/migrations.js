@@ -26,6 +26,24 @@ const MIGRATIONS = [
       }
     },
   },
+  {
+    version: 2,
+    name: 'invites replace per-student parent codes',
+    async up(db) {
+      // One-time invites (hashed codes); used and expired ones go a week after they expire
+      await db.collection('invites').createIndexes([
+        { key: { codeHash: 1 }, unique: true },
+        { key: { createdBy: 1 } },
+        { key: { childId: 1 } },
+        { key: { expiresAt: 1 }, expireAfterSeconds: 7 * 24 * 3600 },
+      ]);
+      // Permanent parent codes are retired: grown-ups get invites now
+      await db.collection('users').updateMany({ parentCode: { $exists: true } }, { $unset: { parentCode: '' } });
+      if ((await db.collection('users').indexes()).some((ix) => ix.name === 'parentCode_1')) await db.collection('users').dropIndex('parentCode_1');
+      await db.collection('users').updateMany({ invitedBy: { $exists: false } }, { $set: { invitedBy: null } });
+      await db.collection('users').createIndex({ lastSeen: -1 });
+    },
+  },
 ];
 
 const LOCK_MS = 60 * 1000;

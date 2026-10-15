@@ -278,13 +278,22 @@ const accountRoutes = [
   ['GET', '/api/me/homework', (user) => accounts.myHomework(user)],
   ['GET', '/api/me/classes', (user) => accounts.myClasses(user)],
   ['POST', '/api/me/classes', async (user, p, req) => accounts.joinClass(user, await readJson(req))],
-  ['GET', '/api/me/parent-code', (user) => accounts.parentCode(user)],
+  ['POST', '/api/me/parent-invites', (user) => accounts.parentInvite(user)],
+  ['GET', '/api/me/teacher-invites', (user) => accounts.myTeacherInvites(user)],
+  ['POST', '/api/me/teacher-invites', async (user, p, req) => accounts.teacherInvite(user, await readJson(req))],
+  ['DELETE', '/api/me/invites/:id', (user, p) => accounts.deleteMyInvite(user, p.id)],
+  ['POST', '/api/invites/redeem', async (user, p, req) => accounts.redeemInvite(user, await readJson(req))],
+  ['DELETE', '/api/me', (user) => accounts.deleteMe(user)],
   ['GET', '/api/me/live', (user) => accounts.live(user)],
   ['GET', '/api/classes', (user) => accounts.listClasses(user)],
   ['POST', '/api/classes', async (user, p, req) => accounts.createClass(user, await readJson(req))],
   ['GET', '/api/classes/:id', (user, p) => accounts.classDetail(user, p.id)],
   ['DELETE', '/api/classes/:id/students/:student', (user, p) => accounts.removeStudent(user, p.id, p.student)],
   ['GET', '/api/students/:id', (user, p) => accounts.childDetail(user, p.id)],
+  ['DELETE', '/api/students/:id', (user, p) => accounts.deleteStudent(user, p.id)],
+  ['POST', '/api/students/:id/parent-invites', (user, p) => accounts.parentInvite(user, p.id)],
+  ['GET', '/api/students/:id/parents', (user, p) => accounts.studentParents(user, p.id)],
+  ['DELETE', '/api/students/:id/parents/:parent', (user, p) => accounts.removeStudentParent(user, p.id, p.parent)],
   ['POST', '/api/homework', async (user, p, req) => accounts.createAssignment(user, await readJson(req))],
   ['DELETE', '/api/homework/:id', (user, p) => accounts.deleteAssignment(user, p.id)],
   ['GET', '/api/children', (user) => accounts.children(user)],
@@ -294,6 +303,14 @@ const accountRoutes = [
   ['POST', '/api/schedules', async (user, p, req) => accounts.createSchedule(user, await readJson(req))],
   ['DELETE', '/api/schedules/:id', (user, p) => accounts.deleteSchedule(user, p.id)],
   ['GET', '/api/schedules/:id/host', (user, p) => accounts.hostSchedule(user, p.id)],
+  // admins (the Keycloak realm role admin)
+  ['GET', '/api/admin/users', (user, p, req) => accounts.listUsers(user, Object.fromEntries(new URL(req.url, 'http://x').searchParams))],
+  ['PUT', '/api/admin/users/:id/role', async (user, p, req) => accounts.setUserRole(user, p.id, await readJson(req))],
+  ['DELETE', '/api/admin/users/:id', (user, p) => accounts.adminDeleteUser(user, p.id)],
+  ['GET', '/api/admin/invites', (user, p, req) => accounts.adminInvites(user, Object.fromEntries(new URL(req.url, 'http://x').searchParams))],
+  ['POST', '/api/admin/invites', async (user, p, req) => accounts.teacherInvite(user, await readJson(req))],
+  ['GET', '/api/admin/schools', (user) => accounts.listSchools(user)],
+  ['POST', '/api/admin/schools', async (user, p, req) => accounts.addSchool(user, await readJson(req))],
 ];
 
 function matchAccountRoute(method, pathname) {
@@ -441,7 +458,7 @@ const limiter = {
 setInterval(() => limiter.prune(), 60 * 1000).unref();
 
 // Where a code is looked up: a run of wrong codes from one address is someone guessing
-const CODE_ROUTES = new Set(['POST /api/me/classes', 'POST /api/children']);
+const CODE_ROUTES = new Set(['POST /api/me/classes', 'POST /api/children', 'POST /api/invites/redeem']);
 const isCodeLookup = (req, r) => (r.code && !r.live) || CODE_ROUTES.has(`${req.method} ${r.url.pathname}`);
 const isMiss = (e) => (e instanceof Rooms.RoomError && e.code === 'room') || (e instanceof AccountError && e.status === 404 && e.code === 'code');
 const tokenKey = (req) => crypto.createHash('sha256').update(Auth.bearer(req) || '').digest('hex').slice(0, 16);

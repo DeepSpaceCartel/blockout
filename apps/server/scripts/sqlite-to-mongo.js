@@ -14,7 +14,9 @@ async function copyInto(db, all) {
   const put = (name, docs, key) => Promise.all(docs.map((d) => db.collection(name).replaceOne(key(d), d, { upsert: true })));
   const byId = ({ _id }) => ({ _id });
   const withId = ({ id, ...rest }) => ({ _id: id, ...rest });
-  for (const name of ['schools', 'users', 'classes', 'assignments', 'schedules']) await put(name, all[name].map(withId), byId);
+  for (const name of ['schools', 'classes', 'assignments', 'schedules']) await put(name, all[name].map(withId), byId);
+  // (permanent parent codes are retired: grown-ups get invites now)
+  await put('users', all.users.map(({ parentCode: _retired, ...u }) => ({ ...withId(u), invitedBy: null })), byId);
   await put('progress', all.progress.map((p) => ({ _id: p.userId, json: JSON.stringify(p.data), updatedAt: p.updatedAt })), byId);
   await put('classMembers', all.classMembers, ({ classId, userId }) => ({ classId, userId }));
   await put('parentLinks', all.parentLinks, ({ parentId, childId }) => ({ parentId, childId }));

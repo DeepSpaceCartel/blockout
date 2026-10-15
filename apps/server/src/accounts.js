@@ -1,7 +1,13 @@
 // Blockout accounts: who can do what with classes, rosters, homework, parent
-// links and scheduled tournaments. Pure rules over the store (server/store.js)
-// and an auth provider (server/auth.js); server/classroom.js wires them to HTTP.
-// Every function takes the signed-in user (or null for a guest) first.
+// links, invites and scheduled tournaments. Rules over the store (store/) and
+// an auth provider (auth.js); index.js wires them to HTTP. Every function
+// takes the signed-in user (or null for a guest) first.
+//
+// Roles live here, not in the sign-in provider: anyone who signs in is a
+// student. A one-time invite makes someone a teacher (from an admin or a
+// teacher) or a child's grown-up (from the child, their teacher or an admin);
+// an admin can also change a role directly. Admins are the accounts with the
+// `admin` realm role in Keycloak.
 import crypto from 'crypto';
 import * as Progress from '@blockout/progress';
 import * as Auth from './auth.js';
@@ -17,9 +23,15 @@ class AccountError extends Error {
 }
 
 const MAX_PROGRESS_BYTES = 512 * 1024;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const INVITE_DAYS = { teacher: 7, parent: 14 };
+const TEACHER_INVITES_OPEN = 10; // a teacher's unused teacher invites at one time…
+const TEACHER_INVITES_A_DAY = 20; // …and made in a day
+const PARENT_INVITES_A_DAY = 50;
+const ROLES = ['student', 'teacher', 'parent'];
 const CLASS_NAME_MAX = 40;
 const TITLE_MAX = 60;
-// Class and parent codes: no 0/O, 1/I/L, so they're easy to read out loud
+// Class codes and invites: no 0/O, 1/I/L, so they're easy to read out loud
 const CODE_LETTERS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
 function randomCode(length, taken) {
@@ -31,6 +43,8 @@ function randomCode(length, taken) {
   }
 }
 const normCode = (code) => String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+// Invites are kept as hashes: a copy of the database can't be used to redeem them
+const hashCode = (code) => crypto.createHash('sha256').update(normCode(code)).digest('hex');
 
 // 'YYYY-MM-DD' for a time (the server's local day)
 function day(t = Date.now()) {
@@ -42,9 +56,12 @@ function createAccounts({ store, auth, now = () => Date.now(), log = silentLogge
   // Audit trail: who changed what, by id only (no names, no codes)
   const audit = (event, user, attrs = {}) => log.info(event, { 'user.id': user.id, 'user.role': user.role, ...attrs });
 
+  // need(user, 'teacher', 'admin'): signed in, with one of these roles ('admin': an admin, whatever their role)
   const need = (user, ...roles) => {
     if (!user) throw new AccountError('signin', 'Please sign in first.', 401);
-    if (roles.length && !roles.includes(user.role)) throw new AccountError('role', `Only ${roles.map((r) => `${r}s`).join(' and ')} can do that.`, 403);
+    if (roles.length && !roles.includes(user.role) && !(roles.includes('admin') && user.isAdmin)) {
+      throw new AccountError('role', `Only ${roles.map((r) => `${r}s`).join(' and ')} can do that.`, 403);
+    }
     return user;
   };
 
@@ -67,7 +84,7 @@ function createAccounts({ store, auth, now = () => Date.now(), log = silentLogge
   // What the page sees about a user (never the subject or the domain)
   async function publicUser(u) {
     const school = u.schoolId ? await store.school(u.schoolId) : null;
-    return { id: u.id, role: u.role, name: u.name, firstName: u.firstName, lastInitial: u.lastInitial, school: school ? { id: school.id, name: school.name } : null };
+    return { id: u.id, role: u.role, isAdmin: Boolean(u.isAdmin), name: u.name, firstName: u.firstName, lastInitial: u.lastInitial, school: school ? { id: school.id, name: school.name } : null };
   }
 
   // ---- signing in
@@ -86,13 +103,13 @@ function createAccounts({ store, auth, now = () => Date.now(), log = silentLogge
     const same = JSON.stringify(id);
     const t = now();
     const seen = recent.get(id.sub);
-    if (seen && seen.same === same && t - seen.at < TOUCH_MS) {
-      const user = await store.userBySub(id.sub);
-      if (user) return user;
+    let user = seen && seen.same === same && t - seen.at < TOUCH_MS ? await store.userBySub(id.sub) : null;
+    if (!user) {
+      if (recent.size > 10000) recent.clear();
+      recent.set(id.sub, { at: t, same });
+      user = await store.upsertUser(id, t);
     }
-    if (recent.size > 10000) recent.clear();
-    recent.set(id.sub, { at: t, same });
-    return store.upsertUser(id, t);
+    return { ...user, isAdmin: id.isAdmin }; // (from the token, never stored)
   }
 
   // Dev sign-in only: make a token for a made-up person.
@@ -106,7 +123,7 @@ function createAccounts({ store, auth, now = () => Date.now(), log = silentLogge
     }
     let token;
     try {
-      token = auth.issue({ firstName: body.firstName, lastInitial: body.lastInitial, role: body.role, email });
+      token = auth.issue({ firstName: body.firstName, lastInitial: body.lastInitial, role: body.role, admin: Boolean(body.admin), email });
     } catch (e) {
       throw new AccountError('name', e.message);
     }
@@ -143,7 +160,7 @@ function createAccounts({ store, auth, now = () => Date.now(), log = silentLogge
 
   // ---- a student's stats (teacher and parent views)
 
-  async function studentStats(student, { withParentCode = false } = {}) {
+  async function studentStats(student) {
     const state = await progressOf(student.id);
     const summary = Progress.factSummary(state, 12);
     const homework = await Promise.all((await store.assignmentsForStudent(student.id)).map((a) => homeworkRow(state, a)));
@@ -157,7 +174,6 @@ function createAccounts({ store, auth, now = () => Date.now(), log = silentLogge
       homework: { done: homework.filter((h) => h.status === 'done').length, late: homework.filter((h) => h.status === 'late').length, total: homework.length },
       assignments: homework,
       recent: activity,
-      ...(withParentCode ? { parentCode: await ensureParentCode(student) } : {}),
     };
   }
 
@@ -204,7 +220,7 @@ function createAccounts({ store, auth, now = () => Date.now(), log = silentLogge
   async function classDetail(user, classId) {
     const c = await ownClass(user, classId);
     const members = await store.members(c.id);
-    const students = await Promise.all(members.map((s) => studentStats(s, { withParentCode: true })));
+    const students = await Promise.all(members.map((s) => studentStats(s)));
     const assignments = (await store.assignmentsForClass(c.id)).map((a) => ({
       id: a.id,
       goal: a.goal,
@@ -243,34 +259,140 @@ function createAccounts({ store, auth, now = () => Date.now(), log = silentLogge
 
   const myClasses = async (user) => ({ classes: (await store.classesOfStudent(need(user, 'student').id)).map((c) => ({ id: c.id, name: c.name })) });
 
+  // ---- invites
+
+  // A fresh invite code, shown once: only its hash is kept
+  async function newInvite(kind, createdBy, { childId = null, schoolId = null } = {}) {
+    for (;;) {
+      const code = randomCode(8, () => false);
+      try {
+        await store.createInvite({ kind, codeHash: hashCode(code), createdBy: createdBy.id, childId, schoolId, expiresAt: now() + INVITE_DAYS[kind] * DAY_MS }, now());
+        audit('invite.created', createdBy, { 'invite.kind': kind, ...(childId ? { 'student.id': childId } : {}) });
+        return { kind, code, expiresAt: now() + INVITE_DAYS[kind] * DAY_MS };
+      } catch (e) {
+        if (!/taken|duplicate|E11000/i.test(e.message)) throw e; // (else: the same code twice, try another)
+      }
+    }
+  }
+
+  // A code for a child's grown-up: the child makes one for themself; their
+  // teacher or an admin for them. A new one replaces the maker's last unused one.
+  async function parentInvite(user, studentId = null) {
+    need(user, 'student', 'teacher', 'admin');
+    const childId = user.role === 'student' && !studentId ? user.id : studentId;
+    const child = childId ? await store.user(childId) : null;
+    const allowed = child && child.role === 'student' && (child.id === user.id || user.isAdmin || (user.role === 'teacher' && (await canSee(user, child.id))));
+    if (!allowed) throw new AccountError('student', 'You can’t make a code for that student.', 404);
+    if ((await store.countInvites({ createdBy: user.id, kind: 'parent', since: now() - DAY_MS })) >= PARENT_INVITES_A_DAY) {
+      throw new AccountError('limit', 'That’s a lot of codes today. Try again tomorrow.', 429);
+    }
+    await store.revokeInvites({ createdBy: user.id, kind: 'parent', childId: child.id });
+    return newInvite('parent', user, { childId: child.id });
+  }
+
+  // A code that makes a new teacher: from an admin, or from a teacher bringing in a colleague
+  async function teacherInvite(user, body = {}) {
+    need(user, 'teacher', 'admin');
+    let schoolId = user.schoolId || null;
+    if (user.isAdmin) schoolId = body.schoolId && (await store.school(body.schoolId)) ? body.schoolId : null;
+    else {
+      const open = await store.countInvites({ createdBy: user.id, kind: 'teacher', unused: true });
+      const today = await store.countInvites({ createdBy: user.id, kind: 'teacher', since: now() - DAY_MS });
+      if (open >= TEACHER_INVITES_OPEN || today >= TEACHER_INVITES_A_DAY) throw new AccountError('limit', 'You have lots of teacher codes waiting. Remove some, or wait for them to be used.', 429);
+    }
+    return newInvite('teacher', user, { schoolId });
+  }
+
+  // Invites someone made (never the codes themselves: only hashes are kept)
+  async function inviteView(i) {
+    const [usedBy, child, maker] = await Promise.all([i.usedBy && store.user(i.usedBy), i.childId && store.user(i.childId), store.user(i.createdBy)]);
+    return {
+      id: i.id,
+      kind: i.kind,
+      createdAt: i.createdAt,
+      expiresAt: i.expiresAt,
+      by: maker ? maker.name : null,
+      child: child ? child.name : null,
+      usedBy: usedBy ? usedBy.name : i.usedBy ? 'a deleted account' : null,
+      usedAt: i.usedAt,
+      expired: !i.usedAt && i.expiresAt <= now(),
+    };
+  }
+
+  const myTeacherInvites = async (user) => ({
+    invites: await Promise.all((await store.invitesBy(need(user, 'teacher', 'admin').id)).filter((i) => i.kind === 'teacher').map(inviteView)),
+  });
+
+  async function deleteMyInvite(user, id) {
+    need(user);
+    const i = await store.invite(id);
+    if (!i || (i.createdBy !== user.id && !user.isAdmin)) throw new AccountError('invite', 'That isn’t one of your codes.', 404);
+    await store.deleteInvite(id);
+    audit('invite.deleted', user, { 'invite.id': id, 'invite.kind': i.kind });
+    return { ok: true };
+  }
+
+  // Someone already playing or linked keeps their account as it is: a new role
+  // needs a fresh one (a child's classes or grown-ups never move to a teacher)
+  async function isFresh(user) {
+    const [classesIn, children, parents] = await Promise.all([store.classesOfStudent(user.id), store.childrenOf(user.id), store.parentsOf(user.id)]);
+    return !classesIn.length && !children.length && !parents.length;
+  }
+
+  // Uses an invite: { code }. Answers with the account as it is now.
+  async function redeemInvite(user, body = {}, { only = null } = {}) {
+    need(user);
+    const notFound = () => new AccountError('code', 'That code doesn’t work. Check it, or ask for a new one.', 404);
+    const invite = await store.inviteByHash(hashCode(body.code));
+    if (!invite || invite.usedAt !== null || invite.expiresAt <= now() || (only && invite.kind !== only)) throw notFound();
+    let role = user.role;
+    if (invite.kind === 'teacher') {
+      if (user.role === 'teacher') throw new AccountError('role', 'You’re a teacher already.', 409);
+      if (user.role !== 'student' || !(await isFresh(user))) {
+        throw new AccountError('role', 'This account is already a student or a grown-up. Sign in with another account to teach.', 409);
+      }
+      role = 'teacher';
+    } else {
+      if (invite.childId === user.id) throw new AccountError('role', 'That code is for a grown-up: give it to them.', 409);
+      if (user.role === 'teacher') throw new AccountError('role', 'Teachers see their students in My classes. Use a separate account as a grown-up.', 409);
+      if (user.role === 'student') {
+        if (!(await isFresh(user))) throw new AccountError('role', 'This account plays in a class. Sign in with your own account to be a grown-up.', 409);
+        role = 'parent';
+      }
+    }
+    const used = await store.redeemInvite(invite.codeHash, user.id, now());
+    if (!used) throw notFound(); // (someone else used it just now)
+    if (role !== user.role) await store.setRole(user.id, role, { invitedBy: invite.createdBy });
+    if (invite.kind === 'parent') await store.linkParent(user.id, invite.childId, now());
+    const after = { ...(await store.user(user.id)), isAdmin: user.isAdmin };
+    audit('invite.redeemed', after, { 'invite.id': invite.id, 'invite.kind': invite.kind, ...(role !== user.role ? { 'role.from': user.role } : {}) });
+    const child = invite.childId ? await store.user(invite.childId) : null;
+    return { user: await publicUser(after), ...(child ? { child: { id: child.id, name: child.name } } : {}) };
+  }
+
   // ---- parents
 
-  async function ensureParentCode(student) {
-    if (student.parentCode) return student.parentCode;
-    const code = await freshCode(8, async (c) => Boolean(await store.userByParentCode(c)));
-    await store.setParentCode(student.id, code);
-    student.parentCode = code;
-    return code;
-  }
-
-  async function parentCode(user) {
-    need(user, 'student');
-    return { code: await ensureParentCode(user) };
-  }
-
-  async function linkChild(user, body = {}) {
-    need(user, 'parent');
-    const child = await store.userByParentCode(normCode(body.code));
-    if (!child || child.role !== 'student') throw new AccountError('code', 'That code doesn’t match a student. Check it and try again.', 404);
-    await store.linkParent(user.id, child.id, now());
-    audit('parent.linked', user, { 'student.id': child.id });
-    return { child: { id: child.id, name: child.name } };
-  }
+  // A grown-up links a child with the code the child (or their teacher) made
+  const linkChild = (user, body = {}) => redeemInvite(user, body, { only: 'parent' });
 
   async function unlinkChild(user, childId) {
     need(user, 'parent');
     await store.unlinkParent(user.id, childId);
     audit('parent.unlinked', user, { 'student.id': childId });
+    return { ok: true };
+  }
+
+  // A child's grown-ups, for their teacher (to spot a wrong one) or an admin
+  async function studentParents(user, studentId) {
+    need(user, 'teacher', 'admin');
+    if (!user.isAdmin && !(await canSee(user, studentId))) throw new AccountError('student', 'You can’t see that student.', 404);
+    return { parents: (await store.parentsOf(studentId)).map((p) => ({ id: p.id, name: p.name })) };
+  }
+
+  async function removeStudentParent(user, studentId, parentId) {
+    await studentParents(user, studentId);
+    await store.unlinkParent(parentId, studentId);
+    audit('parent.removed', user, { 'student.id': studentId, 'parent.id': parentId });
     return { ok: true };
   }
 
@@ -290,7 +412,7 @@ function createAccounts({ store, auth, now = () => Date.now(), log = silentLogge
     // the detail view also draws the whole Times Table grid
     const state = await progressOf(child.id);
     const facts = ((state && state.facts && state.facts.you) || { facts: {} }).facts;
-    return { ...(await studentStats(child, { withParentCode: user.role === 'teacher' })), facts, options: Progress.availableOptions(state) };
+    return { ...(await studentStats(child)), facts, options: Progress.availableOptions(state) };
   }
 
   // ---- homework
@@ -398,6 +520,86 @@ function createAccounts({ store, auth, now = () => Date.now(), log = silentLogge
     return opened;
   }
 
+  // ---- admins
+
+  // What an admin sees of an account: no more than the account holds (ADR-0004)
+  const adminUser = (u) => ({ id: u.id, name: u.name, role: u.role, domain: u.domain, schoolId: u.schoolId, invitedBy: u.invitedBy, createdAt: u.createdAt, lastSeen: u.lastSeen });
+
+  async function listUsers(user, query = {}) {
+    need(user, 'admin');
+    const limit = Math.min(100, Math.max(1, Number(query.limit) || 50));
+    const page = Math.max(0, Number(query.page) || 0);
+    const role = ROLES.includes(query.role) ? query.role : null;
+    const { users, total } = await store.listUsers({ q: String(query.q || '').slice(0, 40), role, limit, offset: page * limit });
+    return { users: users.map(adminUser), total, page, limit };
+  }
+
+  // A teacher who still has classes or tournaments keeps the role until they're gone
+  async function stillTeaching(id) {
+    const [classesTaught, schedules] = await Promise.all([store.classesOfTeacher(id), store.schedulesOfTeacher(id)]);
+    return classesTaught.length > 0 || schedules.length > 0;
+  }
+
+  async function setUserRole(user, id, body = {}) {
+    need(user, 'admin');
+    const target = await store.user(id);
+    if (!target) throw new AccountError('user', 'No such account.', 404);
+    if (!ROLES.includes(body.role)) throw new AccountError('role', 'Pick student, teacher or parent.');
+    if (target.role === body.role) return { user: adminUser(target) };
+    if (target.role === 'teacher' && (await stillTeaching(id))) throw new AccountError('role', 'This teacher still has classes or tournaments. Move or delete them first.', 409);
+    await store.setRole(id, body.role, { invitedBy: user.id });
+    audit('role.changed', user, { 'target.id': id, 'role.from': target.role, 'role.to': body.role });
+    return { user: adminUser(await store.user(id)) };
+  }
+
+  async function deleteAccount(user, id, reason) {
+    await store.deleteUser(id);
+    recent.clear(); // (a cached sign-in mustn't bring it back for a minute)
+    audit('user.deleted', user, { 'target.id': id, 'deletion.reason': reason });
+    return { ok: true };
+  }
+
+  // Admins can remove any account (a school's or a family's request)
+  async function adminDeleteUser(user, id) {
+    need(user, 'admin');
+    if (!(await store.user(id))) throw new AccountError('user', 'No such account.', 404);
+    return deleteAccount(user, id, 'admin');
+  }
+
+  // Teachers and grown-ups can remove their own account (a teacher's classes go first)
+  async function deleteMe(user) {
+    need(user, 'teacher', 'parent');
+    if (user.role === 'teacher' && (await stillTeaching(user.id))) throw new AccountError('role', 'Delete your classes and tournaments first.', 409);
+    return deleteAccount(user, user.id, 'self');
+  }
+
+  // A child's grown-up can remove the child's account and everything in it
+  async function deleteStudent(user, studentId) {
+    need(user, 'parent', 'admin');
+    const child = await store.user(studentId);
+    if (!child || child.role !== 'student' || !(user.isAdmin || (await store.isParentOf(user.id, studentId)))) throw new AccountError('student', 'You can’t remove that account.', 404);
+    return deleteAccount(user, studentId, user.isAdmin ? 'admin' : 'parent');
+  }
+
+  const adminInvites = async (user, query = {}) => ({
+    invites: await Promise.all((await store.allInvites({ kind: query.kind === 'parent' ? 'parent' : 'teacher' })).map(inviteView)),
+  });
+
+  const listSchools = async (user) => (need(user, 'admin'), { schools: await store.schools() });
+
+  async function addSchool(user, body = {}) {
+    need(user, 'admin');
+    const name = String(body.name || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+    const domain = String(body.domain || '').trim().toLowerCase();
+    if (!name || !/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(domain)) throw new AccountError('school', 'Give the school a name and its email domain, like iusd.org.');
+    if (await store.schoolByDomain(domain)) throw new AccountError('school', 'A school already has that domain.', 409);
+    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || domain.replace(/\./g, '-');
+    await store.addSchool({ id: (await store.school(id)) ? `${id}-${randomCode(4, () => false).toLowerCase()}` : id, name, domain });
+    schoolsCache = null;
+    audit('school.added', user, { 'school.domain': domain });
+    return { school: await store.schoolByDomain(domain) };
+  }
+
   // Tournaments open right now for a student (their classes' and their school's)
   async function live(user) {
     if (!user || user.role !== 'student') return { live: [] };
@@ -418,7 +620,21 @@ function createAccounts({ store, auth, now = () => Date.now(), log = silentLogge
     removeStudent,
     joinClass,
     myClasses,
-    parentCode,
+    parentInvite,
+    teacherInvite,
+    myTeacherInvites,
+    deleteMyInvite,
+    redeemInvite,
+    studentParents,
+    removeStudentParent,
+    listUsers,
+    setUserRole,
+    adminDeleteUser,
+    deleteMe,
+    deleteStudent,
+    adminInvites,
+    listSchools,
+    addSchool,
     linkChild,
     unlinkChild,
     children,
@@ -435,4 +651,4 @@ function createAccounts({ store, auth, now = () => Date.now(), log = silentLogge
   };
 }
 
-export { createAccounts, AccountError, day, normCode };
+export { createAccounts, AccountError, day, normCode, hashCode };

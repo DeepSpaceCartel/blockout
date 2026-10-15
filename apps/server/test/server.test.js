@@ -109,6 +109,29 @@ test('HTTP: a class holds at most 200 live streams', async () => {
   agent.destroy();
 });
 
+test('HTTP: invites make teachers and grown-ups; admins manage accounts', async () => {
+  const admin = await signIn({ firstName: 'Root', role: 'student', admin: true });
+  const me = (await call('GET', '/api/me', null, admin)).data.user;
+  assert.deepEqual([me.role, me.isAdmin], ['student', true]);
+  const invite = (await call('POST', '/api/admin/invites', {}, admin)).data;
+  const newTeacher = await signIn({ firstName: 'Nia', role: 'student' });
+  const redeemed = await call('POST', '/api/invites/redeem', { code: invite.code }, newTeacher);
+  assert.equal(redeemed.data.user.role, 'teacher');
+  assert.equal((await call('POST', '/api/invites/redeem', { code: invite.code }, newTeacher)).status, 404);
+  // a student's grown-up code
+  const kid = await signIn({ firstName: 'Ivy', role: 'student' });
+  const grownUp = (await call('POST', '/api/me/parent-invites', null, kid)).data;
+  const mom = await signIn({ firstName: 'Ada', role: 'student' });
+  assert.equal((await call('POST', '/api/children', { code: grownUp.code }, mom)).data.user.role, 'parent');
+  // admins only
+  assert.equal((await call('GET', '/api/admin/users', null, kid)).status, 403);
+  const users = (await call('GET', '/api/admin/users?q=iv', null, admin)).data;
+  assert.deepEqual(users.users.map((u) => u.name), ['Ivy']);
+  assert.equal((await call('DELETE', `/api/admin/users/${users.users[0].id}`, null, admin)).status, 200);
+  assert.equal((await call('GET', '/api/me', null, kid)).data.user.name, 'Ivy', '(signing in again makes a new, empty account)');
+  assert.equal((await call('GET', '/api/me/parent-code', null, kid)).status, 404, 'permanent parent codes are gone');
+});
+
 test('HTTP: one health endpoint per Kubernetes probe', async () => {
   for (const [path, status] of [['/health/startup', 'started'], ['/health/live', 'live'], ['/health/ready', 'ready']]) {
     const res = await fetch(base + path);

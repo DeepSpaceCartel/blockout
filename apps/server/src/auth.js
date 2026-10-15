@@ -1,16 +1,18 @@
 // Blockout sign-in: one interface, swappable providers. No dependencies.
 //
 // Every provider turns a bearer token into the same claims shape (OIDC-style):
-//   { sub, given_name, family_name, email?, roles: ['student'|'teacher'|'parent'] }
+//   { sub, given_name, family_name, email?, roles: [...] }
 // and `identity(claims)` turns claims into what we store (first name, last
-// initial, role, email *domain* only).
+// initial, email *domain* only). Roles are Blockout's own (accounts.js): a new
+// account is a student, and only `admin` comes from the token.
 //
 // Providers:
 //   dev       issues and checks HMAC-SHA256 signed JWTs ("dev login": pick any
 //             name and role). For development and the first classroom trials.
 //   keycloak  checks RS256 JWTs from a Keycloak realm (OIDC with PKCE in the
 //             browser). Keycloak can broker Google sign-in, restricted to a
-//             school's domain (e.g. @iusd.org). Roles come from realm roles.
+//             school's domain (e.g. @iusd.org). The realm role `admin` makes a
+//             Blockout admin.
 //
 //   BLOCKOUT_AUTH=keycloak KEYCLOAK_ISSUER=https://id.example.org/realms/blockout KEYCLOAK_CLIENT_ID=blockout
 import crypto from 'crypto';
@@ -51,7 +53,7 @@ function devProvider({ secret, now = () => Date.now() }) {
   const sign = (data) => crypto.createHmac('sha256', secret).update(data).digest();
   return {
     name: 'dev',
-    // Issue a token for a made-up person: { firstName, lastInitial, role, email? }
+    // Issue a token for a made-up person: { firstName, lastInitial, role, admin?, email? }
     issue(person) {
       const role = ROLES.includes(person.role) ? person.role : 'student';
       const firstName = cleanFirstName(person.firstName);
@@ -63,7 +65,7 @@ function devProvider({ secret, now = () => Date.now() }) {
       // signing in again finds the same account.
       const sub = `dev:${crypto.createHash('sha256').update(`${role}|${firstName.toLowerCase()}|${lastInitial}|${email}`).digest('hex').slice(0, 24)}`;
       const iat = Math.floor(now() / 1000);
-      const payload = { iss: 'blockout-dev', sub, given_name: firstName, family_name: lastInitial, roles: [role], iat, exp: iat + TOKEN_HOURS * 3600 };
+      const payload = { iss: 'blockout-dev', sub, given_name: firstName, family_name: lastInitial, roles: person.admin ? [role, 'admin'] : [role], iat, exp: iat + TOKEN_HOURS * 3600 };
       if (email) payload.email = email;
       const head = b64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
       const body = b64url(JSON.stringify(payload));
@@ -138,18 +140,20 @@ function cleanInitial(s) {
   return c ? c.toUpperCase() : '';
 }
 
-// Claims -> what we keep. Role: the first of our roles the token has; without
-// one, a school-domain account is a student and anyone else a parent.
+// Claims -> what we keep. A new account starts as a student (Blockout keeps the
+// role from then on); only dev sign-in picks the starting role. The token's
+// `admin` role makes an admin for as long as the token says so (never stored).
 function identity(claims, { schoolByDomain = () => null } = {}) {
   const email = String(claims.email || '').toLowerCase();
   const domain = email.includes('@') ? email.split('@').pop() : null;
   const school = domain ? schoolByDomain(domain) : null;
   const roles = [].concat(claims.roles || []);
-  const role = ROLES.find((r) => roles.includes(r)) || (school ? 'student' : 'parent');
+  const devRole = claims.iss === 'blockout-dev' ? ROLES.find((r) => roles.includes(r)) : undefined;
   const firstName = cleanFirstName(claims.given_name || claims.name || claims.preferred_username) || 'Player';
   return {
     sub: String(claims.sub),
-    role,
+    ...(devRole ? { role: devRole } : {}),
+    isAdmin: roles.includes('admin'),
     firstName,
     lastInitial: cleanInitial(claims.family_name),
     domain,

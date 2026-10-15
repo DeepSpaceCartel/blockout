@@ -17,6 +17,7 @@ function openMemoryStore() {
   const links = []; // { parentId, childId, createdAt }
   const assignments = new Map();
   const schedules = new Map();
+  const invites = new Map();
   for (const s of DEFAULT_SCHOOLS) schools.set(s.id, { ...s });
 
   const user = (u) => (u ? { ...copy(u), name: nameOf(u) } : null);
@@ -47,25 +48,49 @@ function openMemoryStore() {
     // ---- users
     userBySub: async (sub) => user(find(users, (u) => u.sub === sub)),
     user: async (id) => user(users.get(id)),
-    userByParentCode: async (code) => user(code ? find(users, (u) => u.parentCode === code) : null),
-    // Creates the user, or updates name/role/school when they sign in again
+    // Creates the user (with u.role, else as a student), or updates their name
+    // and school when they sign in again. The role is never changed here.
     async upsertUser(u, now = Date.now()) {
-      const fields = { role: u.role, firstName: u.firstName, lastInitial: u.lastInitial || '', domain: u.domain || null, schoolId: u.schoolId || null, lastSeen: now };
+      const fields = { firstName: u.firstName, lastInitial: u.lastInitial || '', domain: u.domain || null, schoolId: u.schoolId || null, lastSeen: now };
       const existing = find(users, (x) => x.sub === u.sub);
       if (existing) {
         Object.assign(existing, fields);
         return user(existing);
       }
-      const created = { id: newId(), sub: u.sub, ...fields, parentCode: null, createdAt: now };
+      const created = { id: newId(), sub: u.sub, role: u.role || 'student', ...fields, invitedBy: null, createdAt: now };
       users.set(created.id, created);
       return user(created);
     },
+    async setRole(id, role, { invitedBy } = {}) {
+      const u = users.get(id);
+      if (!u) return;
+      u.role = role;
+      if (invitedBy !== undefined) u.invitedBy = invitedBy;
+    },
+    // For admins: newest first, by first name (any case) and role; { users, total }
+    async listUsers({ q = '', role = null, limit = 50, offset = 0 } = {}) {
+      const prefix = String(q).toLowerCase();
+      const list = [...users.values()]
+        .filter((u) => (!role || u.role === role) && u.firstName.toLowerCase().startsWith(prefix))
+        .sort((a, b) => b.lastSeen - a.lastSeen);
+      return { users: list.slice(offset, offset + limit).map(user), total: list.length };
+    },
+    // Everything that belongs to a user goes with them: their save, memberships,
+    // links, the classes they teach (with those classes' rosters, homework and
+    // tournaments), the homework and tournaments they set, and their invites.
+    async deleteUser(id) {
+      const taught = [...classes.values()].filter((c) => c.teacherId === id).map((c) => c.id);
+      for (const [cid] of classes) if (taught.includes(cid)) classes.delete(cid);
+      for (let i = members.length - 1; i >= 0; i--) if (members[i].userId === id || taught.includes(members[i].classId)) members.splice(i, 1);
+      for (let i = links.length - 1; i >= 0; i--) if (links[i].parentId === id || links[i].childId === id) links.splice(i, 1);
+      for (const [aid, a] of assignments) if (a.createdBy === id || a.studentId === id || taught.includes(a.classId)) assignments.delete(aid);
+      for (const [sid, sc] of schedules) if (sc.teacherId === id || taught.includes(sc.classId)) schedules.delete(sid);
+      for (const [iid, inv] of invites) if (inv.createdBy === id || inv.childId === id) invites.delete(iid);
+      progress.delete(id);
+      users.delete(id);
+    },
     async touchUser(id, now = Date.now()) {
       if (users.has(id)) users.get(id).lastSeen = now;
-    },
-    async setParentCode(id, code) {
-      if (code && find(users, (u) => u.parentCode === code && u.id !== id)) throw new Error('parent code taken');
-      if (users.has(id)) users.get(id).parentCode = code;
     },
     usersWithRole: async (role) => [...users.values()].filter((u) => u.role === role).map(user).sort(byName),
 
@@ -120,6 +145,38 @@ function openMemoryStore() {
         .filter(Boolean)
         .sort((a, b) => a.firstName.localeCompare(b.firstName)),
     isParentOf: async (parentId, childId) => links.some((l) => l.parentId === parentId && l.childId === childId),
+    parentsOf: async (childId) =>
+      links
+        .filter((l) => l.childId === childId)
+        .map((l) => user(users.get(l.parentId)))
+        .filter(Boolean)
+        .sort(byName),
+
+    // ---- invites (one-time codes, kept as hashes)
+    async createInvite(i, now = Date.now()) {
+      if (find(invites, (x) => x.codeHash === i.codeHash)) throw new Error('invite code taken');
+      const created = { id: newId(), kind: i.kind, codeHash: i.codeHash, createdBy: i.createdBy, childId: i.childId || null, schoolId: i.schoolId || null, expiresAt: i.expiresAt, usedBy: null, usedAt: null, createdAt: now };
+      invites.set(created.id, created);
+      return copy(created);
+    },
+    invite: async (id) => copy(invites.get(id)),
+    inviteByHash: async (codeHash) => copy(find(invites, (x) => x.codeHash === codeHash)),
+    // Uses an invite if it's still good: the invite, or null (unknown, used or expired)
+    async redeemInvite(codeHash, userId, now = Date.now()) {
+      const i = find(invites, (x) => x.codeHash === codeHash);
+      if (!i || i.usedAt !== null || i.expiresAt <= now) return null;
+      Object.assign(i, { usedBy: userId, usedAt: now });
+      return copy(i);
+    },
+    invitesBy: async (createdBy) => [...invites.values()].filter((i) => i.createdBy === createdBy).sort((a, b) => b.createdAt - a.createdAt).map(copy),
+    allInvites: async ({ kind = null } = {}) => [...invites.values()].filter((i) => !kind || i.kind === kind).sort((a, b) => b.createdAt - a.createdAt).map(copy),
+    deleteInvite: async (id) => void invites.delete(id),
+    // Removes someone's unused invites of a kind (for one child, if given)
+    async revokeInvites({ createdBy, kind, childId }) {
+      for (const [id, i] of invites) if (i.createdBy === createdBy && i.kind === kind && i.usedAt === null && (childId === undefined || i.childId === childId)) invites.delete(id);
+    },
+    countInvites: async ({ createdBy, kind, since = 0, unused = false }) =>
+      [...invites.values()].filter((i) => i.createdBy === createdBy && i.kind === kind && i.createdAt >= since && (!unused || i.usedAt === null)).length,
 
     // ---- homework
     async createAssignment(a, now = Date.now()) {
@@ -186,6 +243,7 @@ function openMemoryStore() {
       parentLinks: links.map(copy),
       assignments: [...assignments.values()].map(copy),
       schedules: [...schedules.values()].map(copy),
+      invites: [...invites.values()].map(copy),
     }),
   };
 }

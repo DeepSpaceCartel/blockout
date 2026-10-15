@@ -40,9 +40,11 @@ function runStoreContract(name, open) {
     assert.equal(a.name, 'Maya K.');
     assert.equal(a.createdAt, 1000);
     assert.equal(a.lastSeen, 1000);
-    const again = await store.upsertUser({ ...maya, firstName: 'Mia' }, 2000);
+    const again = await store.upsertUser({ ...maya, firstName: 'Mia', role: 'teacher' }, 2000);
     assert.equal(again.id, a.id);
     assert.equal(again.firstName, 'Mia');
+    assert.equal(again.role, 'student', 'signing in never changes the role');
+    assert.equal(again.invitedBy, null);
     assert.equal(again.createdAt, 1000);
     assert.equal(again.lastSeen, 2000);
     assert.equal((await store.userBySub('kc:maya')).id, a.id);
@@ -50,12 +52,88 @@ function runStoreContract(name, open) {
     assert.equal(await store.user('nope'), null);
     await store.touchUser(a.id, 3000);
     assert.equal((await store.user(a.id)).lastSeen, 3000);
-    await store.setParentCode(a.id, 'ABCD2345');
-    assert.equal((await store.userByParentCode('ABCD2345')).id, a.id);
-    assert.equal(await store.userByParentCode('NOPE'), null);
+    await store.setRole(a.id, 'teacher', { invitedBy: 'someone' });
+    assert.equal((await store.user(a.id)).role, 'teacher');
+    assert.equal((await store.user(a.id)).invitedBy, 'someone');
+    await store.setRole(a.id, 'student');
+    assert.equal((await store.user(a.id)).invitedBy, 'someone', 'kept when not given');
+    assert.equal((await store.upsertUser({ ...ben, role: undefined })).role, 'student', 'new accounts are students');
     const p = await store.upsertUser(mom, 1000);
     assert.equal(p.name, 'Ana', 'no initial, no dot');
-    assert.deepEqual((await store.usersWithRole('student')).map((u) => u.id), [a.id]);
+    assert.deepEqual((await store.usersWithRole('parent')).map((u) => u.id), [p.id]);
+  });
+
+  withStore('users for admins: newest first, by first name and role', async (store) => {
+    await store.upsertUser(maya, 10);
+    await store.upsertUser(ben, 30);
+    await store.upsertUser(msR, 20);
+    await store.upsertUser({ ...maya, sub: 'kc:m2', firstName: 'Max' }, 5);
+    assert.deepEqual((await store.listUsers()).users.map((u) => u.firstName), ['Ben', 'Ms', 'Maya', 'Max']);
+    assert.equal((await store.listUsers()).total, 4);
+    assert.deepEqual((await store.listUsers({ q: 'ma' })).users.map((u) => u.firstName), ['Maya', 'Max']);
+    assert.deepEqual((await store.listUsers({ q: 'm', role: 'teacher' })).users.map((u) => u.firstName), ['Ms']);
+    const page = await store.listUsers({ limit: 2, offset: 1 });
+    assert.deepEqual([page.users.map((u) => u.firstName), page.total], [['Ms', 'Maya'], 4]);
+    assert.equal((await store.listUsers({ q: '.*' })).total, 0, 'the search is text, not a pattern');
+  });
+
+  withStore('invites: one use each, until they expire', async (store) => {
+    const t = await store.upsertUser(msR);
+    const a = await store.upsertUser(maya);
+    const b = await store.upsertUser(ben);
+    const i = await store.createInvite({ kind: 'parent', codeHash: 'h1', createdBy: t.id, childId: a.id, expiresAt: 1000 }, 100);
+    assert.equal(i.usedBy, null);
+    assert.equal((await store.invite(i.id)).childId, a.id);
+    assert.equal((await store.inviteByHash('h1')).id, i.id);
+    assert.equal(await store.inviteByHash('nope'), null);
+    await assert.rejects(store.createInvite({ kind: 'parent', codeHash: 'h1', createdBy: t.id, expiresAt: 1000 }, 100), 'codes are unique');
+    assert.equal(await store.redeemInvite('nope', b.id, 200), null);
+    const [won, lost] = await Promise.all([store.redeemInvite('h1', b.id, 200), store.redeemInvite('h1', a.id, 200)]);
+    assert.ok(Boolean(won) !== Boolean(lost), 'one of two at once wins');
+    assert.equal((await store.invite(i.id)).usedAt, 200);
+    await store.createInvite({ kind: 'teacher', codeHash: 'h2', createdBy: t.id, schoolId: 'cadence-park', expiresAt: 1000 }, 300);
+    assert.equal(await store.redeemInvite('h2', b.id, 1000), null, 'expired');
+    await store.createInvite({ kind: 'parent', codeHash: 'h3', createdBy: t.id, childId: a.id, expiresAt: 5000 }, 400);
+    await store.createInvite({ kind: 'parent', codeHash: 'h4', createdBy: t.id, childId: b.id, expiresAt: 5000 }, 500);
+    assert.deepEqual((await store.invitesBy(t.id)).map((x) => x.codeHash), ['h4', 'h3', 'h2', 'h1']);
+    assert.equal(await store.countInvites({ createdBy: t.id, kind: 'parent', since: 150 }), 2);
+    assert.equal(await store.countInvites({ createdBy: t.id, kind: 'parent', unused: true }), 2);
+    await store.revokeInvites({ createdBy: t.id, kind: 'parent', childId: a.id });
+    assert.deepEqual((await store.invitesBy(t.id)).map((x) => x.codeHash), ['h4', 'h2', 'h1'], 'used ones stay');
+    assert.deepEqual((await store.allInvites({ kind: 'teacher' })).map((x) => x.codeHash), ['h2']);
+    await store.deleteInvite((await store.allInvites({ kind: 'teacher' }))[0].id);
+    assert.deepEqual((await store.allInvites()).map((x) => x.codeHash), ['h4', 'h1']);
+  });
+
+  withStore('deleting a user takes everything of theirs with them', async (store) => {
+    const t = await store.upsertUser(msR);
+    const a = await store.upsertUser(maya);
+    const b = await store.upsertUser(ben);
+    const p = await store.upsertUser(mom);
+    const c = await store.createClass({ teacherId: t.id, name: 'Room 12', code: 'ABC234' });
+    await store.addMember(c.id, a.id);
+    await store.addMember(c.id, b.id);
+    await store.linkParent(p.id, a.id);
+    await store.putProgress(a.id, { coins: 1 });
+    await store.putProgress(t.id, { coins: 2 });
+    await store.createAssignment({ createdBy: t.id, classId: c.id, goal: { type: 'games', games: 1 } });
+    await store.createAssignment({ createdBy: p.id, studentId: a.id, goal: { type: 'games', games: 1 } });
+    await store.createSchedule({ teacherId: t.id, scope: 'class', classId: c.id, title: 'Cup', startsAt: 1 });
+    await store.createInvite({ kind: 'parent', codeHash: 'x1', createdBy: t.id, childId: b.id, expiresAt: 9e12 });
+    await store.createInvite({ kind: 'parent', codeHash: 'x2', createdBy: p.id, childId: a.id, expiresAt: 9e12 });
+
+    await store.deleteUser(a.id);
+    let all = JSON.stringify(await store.exportAll());
+    assert.ok(!all.includes(a.id), 'nothing refers to the child any more');
+    assert.deepEqual((await store.members(c.id)).map((u) => u.id), [b.id]);
+    assert.deepEqual(await store.parentsOf(a.id), []);
+
+    await store.deleteUser(t.id);
+    all = await store.exportAll();
+    assert.ok(!JSON.stringify(all).includes(t.id), 'nor to the teacher');
+    assert.deepEqual([all.classes, all.classMembers, all.schedules], [[], [], []], 'their class went with them');
+    assert.deepEqual(all.users.map((u) => u.id).sort(), [b.id, p.id].sort());
+    assert.equal((await store.parentsOf(b.id)).length, 0);
   });
 
   withStore('progress: one save per user, replaced whole', async (store) => {
@@ -99,6 +177,7 @@ function runStoreContract(name, open) {
     await store.linkParent(p.id, b.id, 2);
     await store.linkParent(p.id, b.id, 3);
     assert.deepEqual((await store.childrenOf(p.id)).map((u) => u.firstName), ['Ben', 'Maya']);
+    assert.deepEqual((await store.parentsOf(a.id)).map((u) => u.id), [p.id]);
     assert.ok(await store.isParentOf(p.id, a.id));
     await store.unlinkParent(p.id, a.id);
     assert.ok(!(await store.isParentOf(p.id, a.id)));
@@ -150,7 +229,7 @@ function runStoreContract(name, open) {
     const t = await store.upsertUser(msR);
     await store.putProgress(t.id, { coins: 3 }, 5);
     const all = await store.exportAll();
-    for (const key of ['meta', 'schools', 'users', 'progress', 'classes', 'classMembers', 'parentLinks', 'assignments', 'schedules']) assert.ok(key in all, key);
+    for (const key of ['meta', 'schools', 'users', 'progress', 'classes', 'classMembers', 'parentLinks', 'assignments', 'schedules', 'invites']) assert.ok(key in all, key);
     assert.deepEqual(all.progress, [{ userId: t.id, data: { coins: 3 }, updatedAt: 5 }]);
     assert.equal(all.users[0].sub, 'kc:r');
     assert.ok(!('name' in all.users[0]), 'the shown name is derived, not stored');

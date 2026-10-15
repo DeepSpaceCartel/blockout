@@ -22,6 +22,8 @@ function withoutId(doc) {
 }
 const userOut = (doc) => (doc ? { ...out(doc), name: nameOf(doc) } : null);
 const noId = { projection: { _id: 0 } };
+// (expiresAt is a Date in the database, for its expiry index; a number everywhere else)
+const inviteOut = (doc) => (doc ? { ...out(doc), expiresAt: +doc.expiresAt } : null);
 const isDuplicate = (e) => e && e.code === 11000;
 
 async function openMongoStore(url, { dbName } = {}) {
@@ -29,7 +31,7 @@ async function openMongoStore(url, { dbName } = {}) {
   await client.connect();
   const db = client.db(dbName || undefined); // (the database named in the URL, else "test")
   const col = (name) => db.collection(name);
-  const [meta, schools, users, progress, classes, classMembers, parentLinks, assignments, schedules] = [
+  const [meta, schools, users, progress, classes, classMembers, parentLinks, assignments, schedules, invites] = [
     'meta',
     'schools',
     'users',
@@ -39,6 +41,7 @@ async function openMongoStore(url, { dbName } = {}) {
     'parentLinks',
     'assignments',
     'schedules',
+    'invites',
   ].map(col);
 
   const classIdsOf = async (userId) => (await classMembers.find({ userId }, noId).toArray()).map((m) => m.classId);
@@ -70,14 +73,14 @@ async function openMongoStore(url, { dbName } = {}) {
     // ---- users
     userBySub: async (sub) => userOut(await users.findOne({ sub })),
     user: async (id) => userOut(await users.findOne({ _id: id })),
-    userByParentCode: async (code) => (code ? userOut(await users.findOne({ parentCode: code })) : null),
-    // Creates the user, or updates name/role/school when they sign in again
+    // Creates the user (with u.role, else as a student), or updates their name
+    // and school when they sign in again. The role is never changed here.
     async upsertUser(u, now = Date.now()) {
-      const fields = { role: u.role, firstName: u.firstName, lastInitial: u.lastInitial || '', domain: u.domain || null, schoolId: u.schoolId || null, lastSeen: now };
+      const fields = { firstName: u.firstName, lastInitial: u.lastInitial || '', domain: u.domain || null, schoolId: u.schoolId || null, lastSeen: now };
       const write = () =>
         users.findOneAndUpdate(
           { sub: u.sub },
-          { $set: fields, $setOnInsert: { _id: newId(), parentCode: null, createdAt: now } },
+          { $set: fields, $setOnInsert: { _id: newId(), role: u.role || 'student', invitedBy: null, createdAt: now } },
           { upsert: true, returnDocument: 'after' }
         );
       try {
@@ -88,7 +91,27 @@ async function openMongoStore(url, { dbName } = {}) {
       }
     },
     touchUser: async (id, now = Date.now()) => void (await users.updateOne({ _id: id }, { $set: { lastSeen: now } })),
-    setParentCode: async (id, code) => void (await users.updateOne({ _id: id }, { $set: { parentCode: code } })),
+    setRole: async (id, role, { invitedBy } = {}) =>
+      void (await users.updateOne({ _id: id }, { $set: { role, ...(invitedBy !== undefined ? { invitedBy } : {}) } })),
+    // For admins: newest first, by first name (any case) and role; { users, total }
+    async listUsers({ q = '', role = null, limit = 50, offset = 0 } = {}) {
+      const escaped = String(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const filter = { ...(role ? { role } : {}), ...(q ? { firstName: { $regex: `^${escaped}`, $options: 'i' } } : {}) };
+      const [list, total] = await Promise.all([users.find(filter).sort({ lastSeen: -1 }).skip(offset).limit(limit).toArray(), users.countDocuments(filter)]);
+      return { users: list.map(userOut), total };
+    },
+    // Everything that belongs to a user goes with them (see memory.js)
+    async deleteUser(id) {
+      const taught = (await classes.find({ teacherId: id }, { projection: { _id: 1 } }).toArray()).map((c) => c._id);
+      await classMembers.deleteMany({ $or: [{ userId: id }, { classId: { $in: taught } }] });
+      await parentLinks.deleteMany({ $or: [{ parentId: id }, { childId: id }] });
+      await assignments.deleteMany({ $or: [{ createdBy: id }, { studentId: id }, { classId: { $in: taught } }] });
+      await schedules.deleteMany({ $or: [{ teacherId: id }, { classId: { $in: taught } }] });
+      await invites.deleteMany({ $or: [{ createdBy: id }, { childId: id }] });
+      await classes.deleteMany({ _id: { $in: taught } });
+      await progress.deleteOne({ _id: id });
+      await users.deleteOne({ _id: id });
+    },
     usersWithRole: async (role) => (await users.find({ role }).toArray()).map(userOut).sort(byName),
 
     // ---- progress (as JSON text: a save's keys are the game's, not ours to restrict)
@@ -123,6 +146,28 @@ async function openMongoStore(url, { dbName } = {}) {
     childrenOf: async (parentId) =>
       (await usersByIds((await parentLinks.find({ parentId }, noId).toArray()).map((l) => l.childId))).sort((a, b) => a.firstName.localeCompare(b.firstName)),
     isParentOf: async (parentId, childId) => Boolean(await parentLinks.findOne({ parentId, childId })),
+    parentsOf: async (childId) => (await usersByIds((await parentLinks.find({ childId }, noId).toArray()).map((l) => l.parentId))).sort(byName),
+
+    // ---- invites (one-time codes, kept as hashes)
+    async createInvite(i, now = Date.now()) {
+      const doc = { _id: newId(), kind: i.kind, codeHash: i.codeHash, createdBy: i.createdBy, childId: i.childId || null, schoolId: i.schoolId || null, expiresAt: i.expiresAt, usedBy: null, usedAt: null, createdAt: now };
+      await invites.insertOne({ ...doc, expiresAt: new Date(doc.expiresAt) }); // (a Date, for the expiry index)
+      return out(doc);
+    },
+    invite: async (id) => inviteOut(await invites.findOne({ _id: id })),
+    inviteByHash: async (codeHash) => inviteOut(await invites.findOne({ codeHash })),
+    // Uses an invite if it's still good (one request wins): the invite, or null
+    redeemInvite: async (codeHash, userId, now = Date.now()) =>
+      inviteOut(
+        await invites.findOneAndUpdate({ codeHash, usedAt: null, expiresAt: { $gt: new Date(now) } }, { $set: { usedBy: userId, usedAt: now } }, { returnDocument: 'after' })
+      ),
+    invitesBy: async (createdBy) => (await invites.find({ createdBy }).sort({ createdAt: -1 }).toArray()).map(inviteOut),
+    allInvites: async ({ kind = null } = {}) => (await invites.find(kind ? { kind } : {}).sort({ createdAt: -1 }).toArray()).map(inviteOut),
+    deleteInvite: async (id) => void (await invites.deleteOne({ _id: id })),
+    revokeInvites: async ({ createdBy, kind, childId }) =>
+      void (await invites.deleteMany({ createdBy, kind, usedAt: null, ...(childId !== undefined ? { childId } : {}) })),
+    countInvites: async ({ createdBy, kind, since = 0, unused = false }) =>
+      invites.countDocuments({ createdBy, kind, createdAt: { $gte: since }, ...(unused ? { usedAt: null } : {}) }),
 
     // ---- homework
     async createAssignment(a, now = Date.now()) {
@@ -186,6 +231,7 @@ async function openMongoStore(url, { dbName } = {}) {
         parentLinks: await all(parentLinks, strip),
         assignments: await all(assignments),
         schedules: await all(schedules),
+        invites: await all(invites, inviteOut),
       };
     },
   };

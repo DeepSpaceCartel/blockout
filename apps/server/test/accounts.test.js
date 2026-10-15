@@ -42,7 +42,7 @@ test('privacy: only first name, last initial, role and email domain are stored',
   assert.ok(!text.includes('Martinez'), 'no last name');
   assert.equal(rows[0].firstName, 'Olivia');
   assert.equal(rows[0].lastInitial, 'M');
-  assert.deepEqual(Object.keys(rows[0]).sort(), ['createdAt', 'domain', 'firstName', 'id', 'lastInitial', 'lastSeen', 'parentCode', 'role', 'schoolId', 'sub']);
+  assert.deepEqual(Object.keys(rows[0]).sort(), ['createdAt', 'domain', 'firstName', 'id', 'invitedBy', 'lastInitial', 'lastSeen', 'role', 'schoolId', 'sub']);
 });
 
 test('keycloak provider: checks RS256 signature, issuer and client; roles from realm_access', async () => {
@@ -63,9 +63,11 @@ test('keycloak provider: checks RS256 signature, issuer and client; roles from r
   await assert.rejects(kc.verify(make({ ...good, exp: 1_000 })), /expired/);
   const other = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey;
   await assert.rejects(kc.verify(make(good, other)), /isn’t valid/);
-  // Google-brokered student without a role: school domain -> student
-  const id = Auth.identity({ sub: 'g1', given_name: 'Leo', email: 'leo@iusd.org' }, { schoolByDomain: (d) => (d === 'iusd.org' ? { id: 'cadence-park' } : null) });
-  assert.deepEqual([id.role, id.schoolId, id.domain], ['student', 'cadence-park', 'iusd.org']);
+  // Roles are Blockout's: a token's realm roles don't pick one, only `admin` counts
+  const schoolByDomain = (d) => (d === 'iusd.org' ? { id: 'cadence-park' } : null);
+  const id = Auth.identity(claims, { schoolByDomain });
+  assert.deepEqual([id.role, id.isAdmin, id.schoolId, id.domain], [undefined, false, 'cadence-park', 'iusd.org']);
+  assert.equal(Auth.identity({ ...claims, roles: ['admin'] }, { schoolByDomain }).isAdmin, true);
 });
 
 test('classes: teacher creates, any @iusd.org student joins with the code, others cannot', async () => {
@@ -85,7 +87,7 @@ test('classes: teacher creates, any @iusd.org student joins with the code, other
   const detail = await accounts.classDetail(teacher, c.id);
   assert.equal(detail.students.length, 1);
   assert.equal(detail.students[0].name, 'Maya K.');
-  assert.match(detail.students[0].parentCode, /^[A-Z2-9]{8}$/);
+  assert.ok(!('parentCode' in detail.students[0]), 'no permanent parent codes any more');
 });
 
 test('progress sync: saves round-trip, cheats stay on the device, stats come from the save', async () => {
@@ -136,7 +138,7 @@ test('homework: teacher sets class homework, parent sets extra; progress detecte
   await accounts.joinClass(kid, { code: c.code });
   const parent = await signIn({ firstName: 'Ana', role: 'parent', email: 'ana@gmail.com' });
   await assert.rejects(accounts.createAssignment(parent, { studentId: kid.id, goal: { type: 'games', games: 1 } }), /Link your child/);
-  const code = (await accounts.parentCode(kid)).code;
+  const code = (await accounts.parentInvite(kid)).code;
   assert.equal((await accounts.linkChild(parent, { code: code.toLowerCase() })).child.name, 'Maya');
   await accounts.createAssignment(teacher, { classId: c.id, goal: { type: 'practice', rounds: 2, difficulty: 'easy' }, due: '2026-09-25' });
   await accounts.createAssignment(parent, { studentId: kid.id, goal: { type: 'master', table: 7 } });
@@ -253,4 +255,157 @@ test('sign-in: the account is written when the token changes, otherwise once a m
   await signIn({ firstName: 'Maya', lastInitial: 'K', role: 'student', email: 'maya@iusd.org' });
   assert.equal(writes.length, 2);
   assert.equal((await store.user(a.id)).lastSeen, writes[1]);
+});
+
+// ---------------------------------------------------------------- roles and invites
+
+// A Keycloak-style sign-in (no role in the token; admin only from the realm role)
+function keycloakSetup() {
+  const base = setup();
+  const kcAuth = {
+    name: 'keycloak',
+    verify: async (token) => JSON.parse(token),
+  };
+  const accounts = createAccounts({ store: base.store, auth: kcAuth, now: base.now });
+  let n = 0;
+  const signIn = (person = {}) => accounts.authenticate(JSON.stringify({ sub: person.sub || `kc:${n++}`, given_name: person.firstName || 'Sam', family_name: 'X', email: person.email || 'sam@gmail.com', roles: person.roles || [] }));
+  return { ...base, accounts, signIn };
+}
+
+test('roles: anyone who signs in is a student; the token only makes admins', async () => {
+  const { signIn, store } = keycloakSetup();
+  const a = await signIn({ sub: 'kc:a', roles: ['teacher', 'parent'] });
+  assert.deepEqual([a.role, a.isAdmin], ['student', false]);
+  const admin = await signIn({ sub: 'kc:boss', roles: ['admin'] });
+  assert.deepEqual([admin.role, admin.isAdmin], ['student', true]);
+  assert.ok(!('isAdmin' in (await store.user(admin.id))), 'admin is never stored');
+  await store.setRole(a.id, 'teacher');
+  assert.equal((await signIn({ sub: 'kc:a', roles: [] })).role, 'teacher', 'the role Blockout keeps wins over the token');
+});
+
+test('invites: an admin makes a teacher, who invites a colleague; codes work once and expire', async () => {
+  const { accounts, signIn, tick } = keycloakSetup();
+  const admin = await signIn({ sub: 'kc:boss', roles: ['admin'] });
+  const first = await signIn({ sub: 'kc:t1', firstName: 'Ana' });
+  const { code, expiresAt } = await accounts.teacherInvite(admin, { schoolId: 'cadence-park' });
+  assert.match(code, /^[A-Z2-9]{8}$/);
+  const after = await accounts.redeemInvite(first, { code: code.toLowerCase() });
+  assert.equal(after.user.role, 'teacher');
+  await assert.rejects(accounts.redeemInvite(await signIn({ sub: 'kc:x' }), { code }), /doesn’t work/, 'used once');
+  // the new teacher brings in a colleague
+  const teacher = { ...(await signIn({ sub: 'kc:t1' })) };
+  const theirs = await accounts.teacherInvite(teacher, {});
+  const colleague = await signIn({ sub: 'kc:t2', firstName: 'Bo' });
+  assert.equal((await accounts.redeemInvite(colleague, { code: theirs.code })).user.role, 'teacher');
+  assert.equal((await signIn({ sub: 'kc:t2' })).invitedBy, teacher.id);
+  assert.ok((await accounts.createClass(await signIn({ sub: 'kc:t2' }), { name: 'Room 9' })).code);
+  // codes expire
+  const late = await accounts.teacherInvite(admin, {});
+  tick(expiresAt);
+  await assert.rejects(accounts.redeemInvite(await signIn({ sub: 'kc:y' }), { code: late.code }), /doesn’t work/);
+  // students can't make teacher codes
+  await assert.rejects(accounts.teacherInvite(await signIn({ sub: 'kc:z' }), {}), /Only teachers and admins/);
+});
+
+test('invites: a teacher has a limit on open teacher codes, and can take them back', async () => {
+  const { accounts, signIn, store } = keycloakSetup();
+  const t = await signIn({ sub: 'kc:t' });
+  await store.setRole(t.id, 'teacher');
+  const teacher = await signIn({ sub: 'kc:t' });
+  for (let i = 0; i < 10; i++) await accounts.teacherInvite(teacher, {});
+  await assert.rejects(accounts.teacherInvite(teacher, {}), /lots of teacher codes/);
+  const { invites } = await accounts.myTeacherInvites(teacher);
+  assert.equal(invites.length, 10);
+  assert.ok(!JSON.stringify(invites).match(/[A-Z2-9]{8}/), 'the codes themselves are never shown again');
+  await accounts.deleteMyInvite(teacher, invites[0].id);
+  assert.ok(await accounts.teacherInvite(teacher, {}));
+  await assert.rejects(accounts.deleteMyInvite(await signIn({ sub: 'kc:other' }), invites[1].id), /isn’t one of your codes/);
+});
+
+test('invites: a child (or their teacher) makes a grown-up code; the grown-up becomes a parent and is linked', async () => {
+  const { accounts, signIn, store } = keycloakSetup();
+  const t = await signIn({ sub: 'kc:t', email: 'r@iusd.org' });
+  await store.setRole(t.id, 'teacher');
+  const teacher = await signIn({ sub: 'kc:t', email: 'r@iusd.org' });
+  const c = await accounts.createClass(teacher, { name: 'Room 12' });
+  const kid = await signIn({ sub: 'kc:kid', firstName: 'Maya', email: 'maya@iusd.org' });
+  await accounts.joinClass(kid, { code: c.code });
+  // the child's own code
+  const mine = await accounts.parentInvite(kid);
+  await assert.rejects(accounts.redeemInvite(kid, { code: mine.code }), /give it to them/);
+  const mom = await signIn({ sub: 'kc:mom', firstName: 'Ana' });
+  const linked = await accounts.redeemInvite(mom, { code: mine.code });
+  assert.deepEqual([linked.user.role, linked.child.name], ['parent', 'Maya X.']);
+  // the teacher's code for the same child, for a second grown-up who is a parent already
+  const fromTeacher = await accounts.parentInvite(teacher, kid.id);
+  const dad = await signIn({ sub: 'kc:dad', firstName: 'Leo' });
+  await store.setRole(dad.id, 'parent');
+  await accounts.linkChild(await signIn({ sub: 'kc:dad', firstName: 'Leo' }), { code: fromTeacher.code });
+  assert.deepEqual((await accounts.studentParents(teacher, kid.id)).parents.map((p) => p.name).sort(), ['Ana X.', 'Leo X.']);
+  // a new code replaces the maker's last unused one
+  const one = await accounts.parentInvite(teacher, kid.id);
+  await accounts.parentInvite(teacher, kid.id);
+  await assert.rejects(accounts.redeemInvite(await signIn({ sub: 'kc:gran' }), { code: one.code }), /doesn’t work/);
+  // the teacher removes a wrong grown-up
+  await accounts.removeStudentParent(teacher, kid.id, (await signIn({ sub: 'kc:dad', firstName: 'Leo' })).id);
+  assert.deepEqual((await accounts.studentParents(teacher, kid.id)).parents.map((p) => p.name), ['Ana X.']);
+  // only for students they can see
+  const stranger = await signIn({ sub: 'kc:s2' });
+  await assert.rejects(accounts.parentInvite(teacher, stranger.id), /can’t make a code/);
+});
+
+test('invites: accounts already in use keep their role', async () => {
+  const { accounts, signIn, store } = keycloakSetup();
+  const admin = await signIn({ sub: 'kc:boss', roles: ['admin'] });
+  const t = await signIn({ sub: 'kc:t', email: 'r@iusd.org' });
+  await store.setRole(t.id, 'teacher');
+  const c = await accounts.createClass(await signIn({ sub: 'kc:t', email: 'r@iusd.org' }), { name: 'Room 12' });
+  const kid = await signIn({ sub: 'kc:kid', email: 'k@iusd.org' });
+  await accounts.joinClass(kid, { code: c.code });
+  const teach = await accounts.teacherInvite(admin, {});
+  await assert.rejects(accounts.redeemInvite(kid, { code: teach.code }), /another account to teach/);
+  const other = await signIn({ sub: 'kc:other' });
+  const grownUp = await accounts.parentInvite(other);
+  await assert.rejects(accounts.redeemInvite(kid, { code: grownUp.code }), /your own account/);
+  await assert.rejects(accounts.redeemInvite(await signIn({ sub: 'kc:t', email: 'r@iusd.org' }), { code: grownUp.code }), /separate account/);
+  // a failed try doesn't use the code up
+  assert.equal((await accounts.redeemInvite(await signIn({ sub: 'kc:fresh' }), { code: teach.code })).user.role, 'teacher');
+});
+
+test('admins: find accounts, change roles (not a teacher with classes), and delete accounts', async () => {
+  const { accounts, signIn, store } = keycloakSetup();
+  const admin = await signIn({ sub: 'kc:boss', roles: ['admin'], firstName: 'Root' });
+  const maya = await signIn({ sub: 'kc:maya', firstName: 'Maya', email: 'maya@iusd.org' });
+  await signIn({ sub: 'kc:max', firstName: 'Max' });
+  const found = await accounts.listUsers(admin, { q: 'ma' });
+  assert.deepEqual(found.users.map((u) => u.name).sort(), ['Max X.', 'Maya X.']);
+  assert.deepEqual(Object.keys(found.users[0]).sort(), ['createdAt', 'domain', 'id', 'invitedBy', 'lastSeen', 'name', 'role', 'schoolId']);
+  await assert.rejects(accounts.listUsers(maya, {}), /Only admins/);
+  // promote, then can't demote while teaching
+  await accounts.setUserRole(admin, maya.id, { role: 'teacher' });
+  const c = await accounts.createClass(await signIn({ sub: 'kc:maya', firstName: 'Maya', email: 'maya@iusd.org' }), { name: 'Room 1' });
+  await assert.rejects(accounts.setUserRole(admin, maya.id, { role: 'parent' }), /still has classes/);
+  await assert.rejects(accounts.deleteMe(await signIn({ sub: 'kc:maya', firstName: 'Maya', email: 'maya@iusd.org' })), /Delete your classes/);
+  // schools
+  const { school } = await accounts.addSchool(admin, { name: 'Oak Hill', domain: 'Oak.edu' });
+  assert.deepEqual([school.id, school.domain], ['oak-hill', 'oak.edu']);
+  await assert.rejects(accounts.addSchool(admin, { name: 'Again', domain: 'oak.edu' }), /already has that domain/);
+  // delete: everything goes
+  await accounts.adminDeleteUser(admin, maya.id);
+  assert.equal(await store.user(maya.id), null);
+  assert.equal(await store.classById(c.id), null);
+});
+
+test('deleting: a grown-up removes their child\'s account; teachers and grown-ups remove their own', async () => {
+  const { accounts, signIn, store } = keycloakSetup();
+  const kid = await signIn({ sub: 'kc:kid' });
+  const mom = await signIn({ sub: 'kc:mom' });
+  await accounts.redeemInvite(mom, { code: (await accounts.parentInvite(kid)).code });
+  const parent = await signIn({ sub: 'kc:mom' });
+  await assert.rejects(accounts.deleteStudent(await signIn({ sub: 'kc:stranger' }), kid.id), /Only parents and admins/);
+  await accounts.deleteStudent(parent, kid.id);
+  assert.equal(await store.user(kid.id), null);
+  await assert.rejects(accounts.deleteMe(await signIn({ sub: 'kc:someone' })), /Only teachers and parents/, 'students ask a grown-up');
+  await accounts.deleteMe(parent);
+  assert.equal(await store.user(mom.id), null);
 });

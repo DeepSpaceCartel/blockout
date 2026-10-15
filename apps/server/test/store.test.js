@@ -2,7 +2,7 @@
 // BLOCKOUT_MONGO_URL is set (CI starts one), each test in a database of its own.
 import { runStoreContract } from './store.contract.js';
 import { openMemoryStore } from '../src/store/memory.js';
-import { openSqliteStore } from '../src/store/sqlite.js';
+import { openSqliteStore } from '../src/store/sqlite.js'; // (for the copy test)
 
 runStoreContract('memory', () => openMemoryStore());
 
@@ -75,9 +75,11 @@ if (MONGO_URL) {
       await copyInto(mongo.db, before);
       const after = await mongo.exportAll();
       const sorted = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, Array.isArray(v) ? [...v].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))) : v]));
-      assert.deepEqual(sorted(after), sorted(before));
+      // (parent codes are retired; accounts start with no one who invited them)
+      const expected = { ...before, users: before.users.map(({ parentCode: _retired, ...u }) => ({ ...u, invitedBy: null })), invites: [] };
+      assert.deepEqual(sorted(after), sorted(expected));
       // and the store reads it as its own
-      assert.equal((await mongo.userByParentCode('ABCD2345')).name, 'Maya K.');
+      assert.equal((await mongo.user(kid.id)).name, 'Maya K.');
       assert.deepEqual((await mongo.members(c.id)).map((u) => u.id), [kid.id]);
       assert.deepEqual((await mongo.openSchedulesForStudent(kid)).map((x) => x.roomCode), ['ROOM']);
     } finally {
