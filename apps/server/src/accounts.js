@@ -384,11 +384,15 @@ function createAccounts({ store, auth, now = () => Date.now(), log = silentLogge
 
   // Called every few seconds: opens the lobby of every tournament that's due.
   // createRoom(settings) -> { code, teacherKey } (a live room), or a promise of one.
-  async function openDue(createRoom) {
+  // If another server opened it first, closeRoom(code) closes ours again.
+  async function openDue(createRoom, closeRoom = () => {}) {
     const opened = [];
     for (const s of await store.dueSchedules(now())) {
       const room = await createRoom(s.settings);
-      await store.markOpened(s.id, room.code, room.teacherKey, now());
+      if (!(await store.markOpened(s.id, room.code, room.teacherKey, now()))) {
+        await closeRoom(room.code);
+        continue;
+      }
       opened.push({ id: s.id, code: room.code });
     }
     return opened;

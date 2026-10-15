@@ -21,6 +21,8 @@ import { openStore } from './store/index.js';
 import { createAccounts, AccountError } from './accounts.js';
 import { loadConfig, ConfigError } from './config.js';
 import { createLimiter, clientIp } from './ratelimit.js';
+import { createLive } from './live.js';
+import { createMemoryBackend } from './roombackend/memory.js';
 import { createLogger, exception } from './log.js';
 import crypto from 'crypto';
 
@@ -42,24 +44,10 @@ const PUBLIC_URL = config.publicUrl;
 // others at /<name>/ (each app is built with that base path).
 const APPS = path.resolve(import.meta.dirname, '..', '..');
 const HOME_APP = 'multiplication';
-const ROOM_IDLE_MS = 4 * 60 * 60 * 1000; // forget a class after 4 hours without activity
-const AUTO_NEXT_MS = 2500; // pause after everyone is done, so the class sees the last answers land
-const CPU_ROLL_MS = 1500; // pairs: the CPU's turn, slow enough to watch
-const CPU_PLACE_MS = 2200;
-const CPU_SPEED = { slow: 1.6, normal: 1, fast: 0.4 }; // the teacher's "CPU speed" setting
-const ROUND_PAUSE_MS = 5000; // tournaments: time to see your result before the next round
-const HEARTBEAT_MS = 25000;
-const POLL_HOLD_MS = 25000; // a long poll waits this long for a change before answering anyway
-const CLOSED_MEMORY_MS = 30 * 60 * 1000; // pollers of a closed class are told so for this long
 const MAX_BODY = 16 * 1024;
 const MAX_PROGRESS_BODY = 600 * 1024; // a signed-in student's whole save
 const BODY_TIMEOUT_MS = 10 * 1000;
 const SCHEDULE_TICK_MS = 10 * 1000; // how often due tournaments are opened
-
-const rooms = new Map(); // code -> room
-const streams = new Map(); // code -> Set of { res, role: 'teacher' | 'student', id }
-const pollers = new Map(); // code -> Set of { res, role, id, timer } waiting for a change
-const closedRooms = new Map(); // code -> when it was closed
 
 // ---------------------------------------------------------------- static files
 
@@ -145,7 +133,7 @@ const SECURITY_HEADERS = {
 // An error as RFC 9457 problem details. `type` stays about:blank (the status
 // says what kind of problem it is); `error` (a short code) and `message` (for
 // the player) are extension members the games read.
-const STATUS_TITLES = { 400: 'Bad Request', 401: 'Unauthorized', 403: 'Forbidden', 404: 'Not Found', 408: 'Request Timeout', 409: 'Conflict', 429: 'Too Many Requests', 500: 'Internal Server Error' };
+const STATUS_TITLES = { 400: 'Bad Request', 401: 'Unauthorized', 403: 'Forbidden', 404: 'Not Found', 408: 'Request Timeout', 409: 'Conflict', 429: 'Too Many Requests', 500: 'Internal Server Error', 503: 'Service Unavailable' };
 
 // A problem with the request itself (bad URL, slow body), answered with its own status
 class HttpError extends Error {
@@ -207,99 +195,12 @@ function readJson(req, max = MAX_BODY) {
   });
 }
 
-// ---------------------------------------------------------------- live updates
+// ---------------------------------------------------------------- live classes
+// Kept in a shared backend so several servers can run them (live.js): Redis
+// (Valkey) on a server, memory for one server and tests.
 
-// Everyone in the room gets their own view of it. Several changes in a row are
-// sent once.
-const pending = new Map(); // code -> timeout
-function broadcast(room) {
-  if (pending.has(room.code)) return;
-  pending.set(
-    room.code,
-    setTimeout(() => {
-      pending.delete(room.code);
-      room.version = (room.version || 0) + 1;
-      for (const s of streams.get(room.code) || []) pushView(room, s);
-      for (const w of pollers.get(room.code) || []) answerPoll(room, w);
-      scheduleCpu(room);
-      scheduleRound(room);
-    }, 60)
-  );
-}
-
-// Pairs: a partner's live move (dragging, answering) goes only to the two players
-// in that match, a few times a second at most, without bumping the room's version
-// (so nobody else's long poll wakes up for it).
-const LIVE_MS = 80;
-const livePending = new Map(); // `${code}:${match}` -> timeout
-function broadcastMatch(room, m) {
-  const key = `${room.code}:${m.id}`;
-  if (livePending.has(key)) return;
-  livePending.set(
-    key,
-    setTimeout(() => {
-      livePending.delete(key);
-      if (!rooms.has(room.code)) return;
-      for (const s of streams.get(room.code) || []) if (s.role !== 'teacher' && m.ids.includes(s.id)) pushView(room, s);
-      for (const w of pollers.get(room.code) || []) if (w.role !== 'teacher' && m.ids.includes(w.id)) answerPoll(room, w);
-    }, LIVE_MS)
-  );
-}
-
-// Tournaments: when a round is done (or a king-of-the-hill match), start the next
-// one after a pause, by itself if the teacher left "auto" on (king of the hill always).
-const roundTimers = new Map(); // code -> timeout
-function scheduleRound(room) {
-  if (room.type !== 'tournament' || !room.roundReady || room.state !== 'playing' || roundTimers.has(room.code)) return;
-  if (!room.autoNext && room.tournament.format !== 'koth') return; // waits for "Next round"
-  roundTimers.set(
-    room.code,
-    setTimeout(() => {
-      roundTimers.delete(room.code);
-      if (!rooms.has(room.code) || !room.roundReady || room.state !== 'playing') return;
-      Rooms.advanceTournament(room);
-      broadcast(room);
-    }, ROUND_PAUSE_MS)
-  );
-}
-
-// Pairs: the CPU (playing an odd one out) rolls, then places, on its own.
-const cpuTimers = new Map(); // `${code}:${match}` -> timeout
-function scheduleCpu(room) {
-  if (room.type !== 'pairs') return;
-  for (const m of room.matches) {
-    const key = `${room.code}:${m.id}`;
-    if (!Rooms.cpuToMove(room, m) || cpuTimers.has(key)) continue;
-    const turn = m.turn;
-    cpuTimers.set(
-      key,
-      setTimeout(
-        () => {
-          cpuTimers.delete(key);
-          if (!rooms.has(room.code) || !Rooms.cpuToMove(room, m) || m.turn !== turn) return;
-          if (m.roll) Rooms.cpuPlace(room, m);
-          else Rooms.cpuRoll(room, m);
-          broadcast(room);
-        },
-        (m.roll ? CPU_PLACE_MS : CPU_ROLL_MS) * CPU_SPEED[room.settings.cpuSpeed]
-      )
-    );
-  }
-}
-
-function pushView(room, s) {
-  if (s.role === 'teacher') return event(s.res, 'view', Rooms.teacherView(room));
-  const p = room.players.find((x) => x.id === s.id);
-  if (p) event(s.res, 'view', Rooms.studentView(room, p));
-  else {
-    event(s.res, 'removed', {});
-    s.res.end();
-  }
-}
-
-function event(res, name, data) {
-  res.write(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`);
-}
+const live = createLive({ backend: createMemoryBackend(), log });
+live.start();
 
 // Open streams are cheap but not free: a class needs ~41 (more with spare tabs),
 // and a school shares one address
@@ -307,9 +208,9 @@ const MAX_ROOM_STREAMS = 200;
 const MAX_IP_STREAMS = 500;
 const ipStreams = new Map(); // address -> open streams
 
-function openStream(req, res, room, role, player, ip) {
-  if ((streams.get(room.code) || new Set()).size >= MAX_ROOM_STREAMS || (ipStreams.get(ip) || 0) >= MAX_IP_STREAMS) return tooMany(res, 30);
-  ipStreams.set(ip, (ipStreams.get(ip) || 0) + 1);
+// An event stream for a teacher or a student: their view now and after every change
+async function openStream(req, res, code, role, playerId, ip) {
+  if (live.streamsOf(code) >= MAX_ROOM_STREAMS || (ipStreams.get(ip) || 0) >= MAX_IP_STREAMS) return tooMany(res, 30);
   // no-transform / X-Accel-Buffering: proxies and tunnels must pass events straight through
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -319,101 +220,19 @@ function openStream(req, res, room, role, player, ip) {
     ...SECURITY_HEADERS,
   });
   res.write('retry: 2000\n\n');
-  const s = { res, role, id: player && player.id };
-  if (!streams.has(room.code)) streams.set(room.code, new Set());
-  streams.get(room.code).add(s);
-  if (player) player.connections++;
-  pushView(room, s);
-  broadcast(room);
-  const beat = setInterval(() => res.write(': ♥\n\n'), HEARTBEAT_MS);
-  req.on('close', () => {
-    clearInterval(beat);
+  ipStreams.set(ip, (ipStreams.get(ip) || 0) + 1);
+  await live.openStream(code, role, playerId, res, () => {
     const n = ipStreams.get(ip) - 1;
     if (n > 0) ipStreams.set(ip, n);
     else ipStreams.delete(ip);
-    streams.get(room.code)?.delete(s);
-    if (player) {
-      player.connections = Math.max(0, player.connections - 1);
-      maybeAutoNext(room); // don't keep the class waiting for someone who left
-    }
-    broadcast(room);
   });
 }
 
 // Long polling: GET /api/rooms/CODE/poll?v=VERSION&teacher=KEY (or &id=ID&key=KEY).
 // Answers straight away if the room has moved on from VERSION, otherwise at the
-// next change (or after POLL_HOLD_MS). Polling students count as here while they poll.
-function openPoll(req, res, room, role, player, version) {
-  if (player) player.seenAt = Date.now();
-  const w = { res, role, id: player && player.id, timer: null };
-  if (version !== (room.version || 0)) return answerPoll(room, w);
-  if (!pollers.has(room.code)) pollers.set(room.code, new Set());
-  pollers.get(room.code).add(w);
-  w.timer = setTimeout(() => answerPoll(room, w), POLL_HOLD_MS);
-  req.on('close', () => {
-    clearTimeout(w.timer);
-    pollers.get(room.code)?.delete(w);
-  });
-}
-
-function answerPoll(room, w) {
-  clearTimeout(w.timer);
-  pollers.get(room.code)?.delete(w);
-  if (w.res.writableEnded) return;
-  if (w.role === 'teacher') return send(w.res, 200, { v: room.version || 0, view: Rooms.teacherView(room) });
-  const p = room.players.find((x) => x.id === w.id);
-  if (!p) return send(w.res, 200, { removed: true });
-  p.seenAt = Date.now();
-  send(w.res, 200, { v: room.version || 0, view: Rooms.studentView(room, p) });
-}
-
-// Polling students who stop polling drop off after a while; keep "who's here"
-// and "everyone's done" up to date for them.
-const presence = new Map(); // code -> last "who's here" signature
-setInterval(() => {
-  for (const room of rooms.values()) {
-    const sig = room.players.map((p) => Rooms.isHere(p)).join();
-    if (presence.get(room.code) === sig) continue;
-    presence.set(room.code, sig);
-    broadcast(room);
-    maybeAutoNext(room);
-  }
-  const now = Date.now();
-  for (const [code, at] of closedRooms) if (now - at > CLOSED_MEMORY_MS) closedRooms.delete(code);
-}, 5000).unref();
-
-// ---------------------------------------------------------------- pacing
-
-const autoTimers = new Map(); // code -> timeout
-
-function cancelAutoNext(room) {
-  clearTimeout(autoTimers.get(room.code));
-  autoTimers.delete(room.code);
-}
-
-function maybeAutoNext(room) {
-  if (room.type !== 'class' || !room.autoNext || !Rooms.allDone(room) || autoTimers.has(room.code)) return;
-  const round = room.round;
-  autoTimers.set(
-    room.code,
-    setTimeout(() => {
-      autoTimers.delete(room.code);
-      if (room.state === 'playing' && room.round === round && Rooms.allDone(room)) {
-        Rooms.nextRound(room);
-        broadcast(room);
-        maybeAutoNext(room); // e.g. everyone had to pass
-      }
-    }, AUTO_NEXT_MS)
-  );
-}
-
-// ---------------------------------------------------------------- API
-
-function getRoom(code) {
-  const room = rooms.get(String(code || '').toUpperCase());
-  if (!room) throw new Rooms.RoomError('room', 'No class with that code. Check the code on the board.');
-  room.touchedAt = Date.now();
-  return room;
+// next change (or after a while). Polling students count as here while they poll.
+function openPoll(req, res, code, role, playerId, version) {
+  return live.openPoll(code, role, playerId, version, (body) => send(res, 200, body), (onGone) => req.on('close', onGone));
 }
 
 function teacherOnly(room, key) {
@@ -444,11 +263,7 @@ const accounts = createAccounts({ store, auth, log });
 // The signed-in user for a request, or null (a guest)
 const signedIn = (req) => accounts.authenticate(Auth.bearer(req));
 
-function openRoom(settings) {
-  const room = Rooms.createRoom(settings, { taken: new Set(rooms.keys()) });
-  rooms.set(room.code, room);
-  return room;
-}
+const openRoom = (settings) => live.createRoom(settings);
 
 // [method, path pattern, handler(user, params, req)]; :names in the pattern become params
 const accountRoutes = [
@@ -491,8 +306,10 @@ function matchAccountRoute(method, pathname) {
 }
 
 // Scheduled tournaments: open each one's lobby when it's due
-const scheduleTimer = setInterval(() => {
-  accounts.openDue(openRoom).catch((e) => log.error('schedule.error', exception(e)));
+// (by one server at a time)
+const scheduleTimer = setInterval(async () => {
+  if (!(await live.lead('schedules', SCHEDULE_TICK_MS * 3))) return;
+  accounts.openDue(openRoom, (code) => live.closeRoom(code)).catch((e) => log.error('schedule.error', exception(e)));
 }, SCHEDULE_TICK_MS).unref();
 
 const routes = {
@@ -503,7 +320,7 @@ const routes = {
     const user = await signedIn(req);
     if (!user || user.role !== 'teacher') throw new AccountError('teacher', 'Teachers: please sign in to host a class.', 401);
     const body = await readJson(req);
-    const room = openRoom(body.settings);
+    const room = await openRoom(body.settings);
     return { code: room.code, teacherKey: room.teacherKey, lan: lanUrls() };
   },
 
@@ -511,141 +328,98 @@ const routes = {
   // odd one out) with { teacher: KEY } from the projector screen or { play: KEY }
   // from another device.
   'POST /api/rooms/:code/join': async (req, code) => {
-    const room = getRoom(code);
+    const room = await live.getRoom(code);
     const body = await readJson(req);
-    let p;
+    let join;
     if (body.teacher || body.play) {
       if (body.teacher !== room.teacherKey && body.play !== room.playKey) throw new Rooms.RoomError('teacher', 'That teacher link isn’t right.');
-      p = Rooms.joinTeacher(room, body.look);
+      join = (r) => Rooms.joinTeacher(r, body.look);
     } else {
       // Signed-in students play under their account's name (their school
       // already knows it): no name check, nothing sent to OpenAI.
       const user = await signedIn(req);
-      if (user && user.role === 'student') p = Rooms.join(room, user.firstName, body.look);
+      if (user && user.role === 'student') join = (r) => Rooms.join(r, user.firstName, body.look);
       else {
         const check = await Moderation.checkName(body.name, { apiKey: OPENAI_API_KEY, log });
         if (!check.ok) throw new Rooms.RoomError('name', 'Please use your real first name.');
-        p = Rooms.join(room, body.name, body.look);
+        join = (r) => Rooms.join(r, body.name, body.look);
       }
     }
-    broadcast(room);
+    const p = await live.withRoom(room.code, join);
     return { id: p.id, key: p.key, name: p.name, teacher: Boolean(p.isTeacher) };
   },
 
   // Does this class exist? (A join link checks before asking for a name.)
   'GET /api/rooms/:code/info': async (req, code) => {
-    const room = getRoom(code);
+    const room = await live.getRoom(code);
     return { code: room.code, type: room.type, state: room.state };
   },
 
   // Pairs: roll for your turn.
   'POST /api/rooms/:code/roll': async (req, code) => {
-    const room = getRoom(code);
     const body = await readJson(req);
-    const p = Rooms.findPlayer(room, body.id, body.key);
-    const result = Rooms.pairRoll(room, p);
-    broadcast(room);
-    return result;
+    return live.withRoom(code, (r) => Rooms.pairRoll(r, Rooms.findPlayer(r, body.id, body.key)));
   },
 
   // Pairs: what the player on turn is doing (dragging, answering), for their partner
   'POST /api/rooms/:code/live': async (req, code) => {
-    const room = getRoom(code);
     const body = await readJson(req);
-    const p = Rooms.findPlayer(room, body.id, body.key);
-    const m = Rooms.setLive(room, p, body.live);
-    broadcastMatch(room, m);
+    await live.setLive(code, body.id, body.key, body.live);
     return { ok: true };
   },
 
   'POST /api/rooms/:code/leave': async (req, code) => {
-    const room = getRoom(code);
     const body = await readJson(req);
-    const p = Rooms.findPlayer(room, body.id, body.key);
-    Rooms.removePlayer(room, p.id);
-    broadcast(room);
-    maybeAutoNext(room);
+    await live.withRoom(code, (r) => Rooms.removePlayer(r, Rooms.findPlayer(r, body.id, body.key).id));
     return { ok: true };
   },
 
   'POST /api/rooms/:code/result': async (req, code) => {
-    const room = getRoom(code);
     const body = await readJson(req);
-    const p = Rooms.findPlayer(room, body.id, body.key);
-    Rooms.submit(room, p, body);
-    broadcast(room);
-    maybeAutoNext(room);
-    return { ok: true, score: p.score };
+    const score = await live.withRoom(code, (r) => {
+      const p = Rooms.findPlayer(r, body.id, body.key);
+      Rooms.submit(r, p, body);
+      return p.score;
+    });
+    return { ok: true, score };
   },
 
+  // (The owning server starts the next round by itself when it's time: live.js.)
   'POST /api/rooms/:code/teacher': async (req, code) => {
-    const room = getRoom(code);
     const body = await readJson(req);
-    teacherOnly(room, body.key);
-    switch (body.action) {
-      case 'settings':
-        Rooms.setSettings(room, body.settings || {});
-        break;
-      case 'pairOptions':
-        Rooms.setPairOptions(room, body.options || {});
-        break;
-      case 'swap':
-        Rooms.swapOrder(room, body.a, body.b);
-        break;
-      case 'start':
-        cancelAutoNext(room);
-        Rooms.start(room);
-        break;
-      case 'next':
-        cancelAutoNext(room);
-        if (room.type === 'tournament') {
-          clearTimeout(roundTimers.get(room.code));
-          roundTimers.delete(room.code);
-          if (room.roundReady) Rooms.advanceTournament(room);
-        } else Rooms.nextRound(room);
-        break;
-      case 'autoNext':
-        room.autoNext = Boolean(body.on);
-        if (!room.autoNext) cancelAutoNext(room);
-        break;
-      case 'end':
-        cancelAutoNext(room);
-        Rooms.end(room);
-        break;
-      case 'lobby':
-        cancelAutoNext(room);
-        Rooms.backToLobby(room);
-        break;
-      case 'remove':
-        Rooms.removePlayer(room, body.id);
-        break;
-      case 'close':
-        cancelAutoNext(room);
-        for (const s of streams.get(room.code) || []) {
-          event(s.res, 'closed', {});
-          s.res.end();
-        }
-        for (const w of pollers.get(room.code) || []) {
-          clearTimeout(w.timer);
-          send(w.res, 200, { closed: true });
-        }
-        rooms.delete(room.code);
-        streams.delete(room.code);
-        pollers.delete(room.code);
-        closedRooms.set(room.code, Date.now());
-        clearTimeout(roundTimers.get(room.code));
-        roundTimers.delete(room.code);
-        for (const [key, t] of cpuTimers) {
-          if (!key.startsWith(`${room.code}:`)) continue;
-          clearTimeout(t);
-          cpuTimers.delete(key);
-        }
-        return { ok: true };
-      default:
-        throw new Rooms.RoomError('action', 'Unknown action.');
+    if (body.action === 'close') {
+      teacherOnly(await live.getRoom(code), body.key);
+      await live.closeRoom(code);
+      return { ok: true };
     }
-    broadcast(room);
-    maybeAutoNext(room);
+    await live.withRoom(code, (room) => {
+      teacherOnly(room, body.key);
+      switch (body.action) {
+        case 'settings':
+          return Rooms.setSettings(room, body.settings || {});
+        case 'pairOptions':
+          return Rooms.setPairOptions(room, body.options || {});
+        case 'swap':
+          return Rooms.swapOrder(room, body.a, body.b);
+        case 'start':
+          return Rooms.start(room);
+        case 'next':
+          if (room.type !== 'tournament') return Rooms.nextRound(room);
+          if (room.roundReady) Rooms.advanceTournament(room);
+          return;
+        case 'autoNext':
+          room.autoNext = Boolean(body.on);
+          return;
+        case 'end':
+          return Rooms.end(room);
+        case 'lobby':
+          return Rooms.backToLobby(room);
+        case 'remove':
+          return Rooms.removePlayer(room, body.id);
+        default:
+          throw new Rooms.RoomError('action', 'Unknown action.');
+      }
+    });
     return { ok: true };
   },
 };
@@ -712,16 +486,7 @@ async function drain({ timeoutMs = 20000 } = {}) {
   draining = true;
   clearInterval(scheduleTimer);
   const closed = new Promise((resolve) => server.close(resolve));
-  for (const set of streams.values()) {
-    for (const s of set) {
-      s.res.write('retry: 2000\n\n');
-      s.res.end();
-    }
-  }
-  for (const [code, set] of pollers) {
-    const room = rooms.get(code);
-    for (const w of set) room ? answerPoll(room, w) : send(w.res, 200, { closed: true });
-  }
+  await live.drain(); // (streams end, polls are answered, classes go to another server)
   server.closeIdleConnections();
   const timeout = new Promise((resolve) => setTimeout(resolve, timeoutMs).unref());
   await Promise.race([closed, timeout]);
@@ -787,15 +552,15 @@ const server = http.createServer(async (req, res) => {
     if (r.live) {
       const poll = r.url.pathname.endsWith('/poll');
       const code = String(r.code).toUpperCase();
-      if (poll && !rooms.has(code) && closedRooms.has(code)) return send(res, 200, { closed: true });
-      const room = getRoom(code);
+      if (poll && (await live.isClosed(code))) return send(res, 200, { closed: true });
+      const room = await live.getRoom(code);
       const q = r.url.searchParams;
       const version = Number(q.get('v'));
       // A wrong key looks the same as no class, so streams can't be used to find codes
       const noRoom = () => new Rooms.RoomError('room', 'No class with that code. Check the code on the board.');
       if (q.has('teacher')) {
         if (q.get('teacher') !== room.teacherKey) throw noRoom();
-        return poll ? openPoll(req, res, room, 'teacher', null, version) : openStream(req, res, room, 'teacher', null, ip);
+        return poll ? await openPoll(req, res, code, 'teacher', null, version) : await openStream(req, res, code, 'teacher', null, ip);
       }
       const player = room.players.find((x) => x.id === q.get('id'));
       if (poll && !player) return send(res, 200, { removed: true });
@@ -805,7 +570,7 @@ const server = http.createServer(async (req, res) => {
       } catch {
         throw noRoom();
       }
-      return poll ? openPoll(req, res, room, 'student', p, version) : openStream(req, res, room, 'student', p, ip);
+      return poll ? await openPoll(req, res, code, 'student', p.id, version) : await openStream(req, res, code, 'student', p.id, ip);
     }
     if (!r.handler) return sendProblem(res, 404, 'not-found', 'Not found.');
     send(res, 200, await r.handler(req, r.code));
@@ -815,7 +580,7 @@ const server = http.createServer(async (req, res) => {
     if (e instanceof AccountError) return sendProblem(res, e.status, e.code, e.message);
     if (e instanceof Auth.AuthError) return sendProblem(res, 401, 'auth', e.message);
     if (e instanceof Rooms.RoomError) {
-      const status = e.code === 'room' || e.code === 'player' ? 404 : e.code === 'teacher' ? 403 : 409;
+      const status = e.code === 'room' || e.code === 'player' ? 404 : e.code === 'teacher' ? 403 : e.code === 'busy' ? 503 : 409;
       return sendProblem(res, status, e.code, e.message);
     }
     log.error('http.error', { 'http.request.method': req.method, 'http.route': r ? r.name : 'static', ...exception(e) });
@@ -823,18 +588,6 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-// Forget classes nobody has touched for a while.
-setInterval(() => {
-  const now = Date.now();
-  for (const [code, room] of rooms) {
-    if (now - room.touchedAt > ROOM_IDLE_MS && !(streams.get(code) || new Set()).size) {
-      rooms.delete(code);
-      streams.delete(code);
-      pollers.delete(code);
-      presence.delete(code);
-    }
-  }
-}, 10 * 60 * 1000).unref();
 
 if (IS_MAIN) {
   // Anything that slips past the request handlers: log it and exit, so the
@@ -866,4 +619,4 @@ if (IS_MAIN) {
 
 started = true;
 
-export { server, rooms, store, accounts, drain };
+export { server, live, store, accounts, drain };
