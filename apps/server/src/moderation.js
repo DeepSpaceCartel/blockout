@@ -66,7 +66,7 @@ function listedWord(name, list = (LIST = LIST || loadList())) {
 
 // OpenAI's moderation model: true if it flags the name, false if not,
 // null if it couldn't answer (no key, network down, error, too slow).
-async function openAiFlags(name, { apiKey, fetch = globalThis.fetch, timeoutMs = OPENAI_TIMEOUT_MS } = {}) {
+async function openAiFlags(name, { apiKey, fetch = globalThis.fetch, timeoutMs = OPENAI_TIMEOUT_MS, log = null } = {}) {
   if (!apiKey || !fetch) return null;
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), timeoutMs);
@@ -81,7 +81,7 @@ async function openAiFlags(name, { apiKey, fetch = globalThis.fetch, timeoutMs =
     const data = await res.json();
     return Boolean(data.results && data.results[0] && data.results[0].flagged);
   } catch (e) {
-    console.warn(`Name check with OpenAI skipped: ${e.message}`);
+    if (log) log.warn('moderation.skipped', { 'exception.type': e.name, 'exception.message': e.message });
     return null;
   } finally {
     clearTimeout(timer);

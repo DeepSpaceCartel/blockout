@@ -3,6 +3,7 @@ import assert from 'node:assert';
 import crypto from 'crypto';
 import { openStore } from '../src/store.js';
 import * as Auth from '../src/auth.js';
+import { createLogger } from '../src/log.js';
 import { createAccounts } from '../src/accounts.js';
 import * as P from '@blockout/progress';
 
@@ -214,4 +215,24 @@ test('scheduled tournaments open on time; students of the class (or school) see 
   accounts.openDue(createRoom);
   assert.deepEqual(accounts.live(other).live.map((l) => l.title), ['Cadence Park Cup']); // the whole school
   assert.equal(accounts.openDue(createRoom).length, 0); // each opens once
+});
+
+test('audit log: account changes are logged by id, never by name or code', async () => {
+  const lines = [];
+  const store = openStore(':memory:');
+  const auth = Auth.devProvider({ secret: 'test-secret' });
+  const accounts = createAccounts({ store, auth, log: createLogger({ write: (l) => lines.push(JSON.parse(l)) }) });
+  const signIn = async (person) => accounts.authenticate((await accounts.devSignIn(person)).token);
+  const teacher = await signIn({ role: 'teacher', firstName: 'Ms', lastInitial: 'R', schoolId: 'cadence-park' });
+  const kid = await signIn({ role: 'student', firstName: 'Maya', lastInitial: 'K', email: 'maya@iusd.org' });
+  const c = accounts.createClass(teacher, { name: 'Room 12' });
+  accounts.joinClass(kid, { code: c.code });
+  accounts.removeStudent(teacher, c.id, kid.id);
+  assert.deepEqual(
+    lines.map((l) => [l['event.name'], l['user.role']]),
+    [['class.created', 'teacher'], ['class.joined', 'student'], ['class.student_removed', 'teacher']]
+  );
+  assert.equal(lines[2]['student.id'], kid.id);
+  const text = JSON.stringify(lines);
+  assert.ok(!text.includes('Maya') && !text.includes('Room 12') && !text.includes(c.code));
 });

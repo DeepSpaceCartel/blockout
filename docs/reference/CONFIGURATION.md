@@ -24,6 +24,8 @@ The server (`node apps/server/src/index.js`, or `npm start`) is configured with 
 | `BLOCKOUT_AUTH_SECRET` | generated, kept in the database | Dev sign-in's token secret |
 | `KEYCLOAK_ISSUER` | none | With `BLOCKOUT_AUTH=keycloak`: the realm URL, for example `https://id.example.org/realms/blockout` |
 | `KEYCLOAK_CLIENT_ID` | none | With `BLOCKOUT_AUTH=keycloak`: the public client's ID |
+| `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` or `silent` |
+| `LOG_FORMAT` | `json` in production, otherwise `text` | `json`: one JSON object per line with OpenTelemetry field names (`timestamp`, `severity_text`, `event.name`, `http.route`, …) for a log stack. `text`: short lines for a terminal; request lines only at `LOG_LEVEL=debug` |
 | `OPENAI_API_KEY` | none | Adds OpenAI's free moderation model to the name check for guests joining live classes. Without it only the built-in word list runs, and no names leave the server. |
 
 ## Schools

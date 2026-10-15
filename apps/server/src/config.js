@@ -36,6 +36,12 @@ function loadConfig(env = {}, argv = []) {
   const trustProxy = Number(env.TRUST_PROXY || 0);
   if (!Number.isInteger(trustProxy) || trustProxy < 0) problems.push(`TRUST_PROXY must be a number of proxies (0 or more), not "${env.TRUST_PROXY}"`);
 
+  const logLevel = env.LOG_LEVEL || 'info';
+  if (!['debug', 'info', 'warn', 'error', 'silent'].includes(logLevel)) problems.push(`LOG_LEVEL must be debug, info, warn, error or silent, not "${logLevel}"`);
+  // JSON lines for a log stack in production; short text lines at a terminal
+  const logFormat = env.LOG_FORMAT || (production ? 'json' : 'text');
+  if (!['json', 'text'].includes(logFormat)) problems.push(`LOG_FORMAT must be json or text, not "${logFormat}"`);
+
   // A public server must not run with the practice sign-in (anyone can pick any role) or over plain HTTP
   if (production) {
     if (authKind !== 'keycloak') problems.push('NODE_ENV=production needs BLOCKOUT_AUTH=keycloak: dev sign-in lets anyone be a teacher');
@@ -49,6 +55,7 @@ function loadConfig(env = {}, argv = []) {
     publicUrl,
     https: publicUrl.startsWith('https://'),
     trustProxy,
+    log: { level: logLevel, format: logFormat },
     // Names are also checked with OpenAI's free moderation model when this is set (and only then are names sent to OpenAI)
     openaiKey: env.OPENAI_API_KEY || '',
     db: env.BLOCKOUT_DB || null,

@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import * as Progress from '@blockout/progress';
 import * as Auth from './auth.js';
 import * as Tournament from './tournament.js';
+import { silentLogger } from './log.js';
 
 class AccountError extends Error {
   constructor(code, message, status = 400) {
@@ -37,7 +38,10 @@ function day(t = Date.now()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function createAccounts({ store, auth, now = () => Date.now() }) {
+function createAccounts({ store, auth, now = () => Date.now(), log = silentLogger }) {
+  // Audit trail: who changed what, by id only (no names, no codes)
+  const audit = (event, user, attrs = {}) => log.info(event, { 'user.id': user.id, 'user.role': user.role, ...attrs });
+
   const need = (user, ...roles) => {
     if (!user) throw new AccountError('signin', 'Please sign in first.', 401);
     if (roles.length && !roles.includes(user.role)) throw new AccountError('role', `Only ${roles.map((r) => `${r}s`).join(' and ')} can do that.`, 403);
@@ -154,6 +158,7 @@ function createAccounts({ store, auth, now = () => Date.now() }) {
     if (!name) throw new AccountError('name', 'Give the class a name, like “Room 12”.');
     const code = randomCode(6, (c) => Boolean(store.classByCode(c)));
     const c = store.createClass({ teacherId: user.id, schoolId: user.schoolId, name, code }, now());
+    audit('class.created', user, { 'class.id': c.id });
     return classSummary(c);
   }
 
@@ -184,6 +189,7 @@ function createAccounts({ store, auth, now = () => Date.now() }) {
   function removeStudent(user, classId, studentId) {
     const c = ownClass(user, classId);
     store.removeMember(c.id, studentId);
+    audit('class.student_removed', user, { 'class.id': c.id, 'student.id': studentId });
     return { ok: true };
   }
 
@@ -198,6 +204,7 @@ function createAccounts({ store, auth, now = () => Date.now() }) {
       throw new AccountError('school', `This class is for ${school.name}. Sign in with your school account (@${school.domain}).`, 403);
     }
     store.addMember(c.id, user.id, now());
+    audit('class.joined', user, { 'class.id': c.id });
     return { class: { id: c.id, name: c.name } };
   }
 
@@ -223,12 +230,14 @@ function createAccounts({ store, auth, now = () => Date.now() }) {
     const child = store.userByParentCode(normCode(body.code));
     if (!child || child.role !== 'student') throw new AccountError('code', 'That code doesn’t match a student. Check it and try again.', 404);
     store.linkParent(user.id, child.id, now());
+    audit('parent.linked', user, { 'student.id': child.id });
     return { child: { id: child.id, name: child.name } };
   }
 
   function unlinkChild(user, childId) {
     need(user, 'parent');
     store.unlinkParent(user.id, childId);
+    audit('parent.unlinked', user, { 'student.id': childId });
     return { ok: true };
   }
 
@@ -261,13 +270,17 @@ function createAccounts({ store, auth, now = () => Date.now() }) {
     if (user.role === 'teacher') {
       if (body.classId) {
         ownClass(user, body.classId);
-        return { assignment: store.createAssignment({ createdBy: user.id, classId: body.classId, goal, due }, now()) };
+        const a = store.createAssignment({ createdBy: user.id, classId: body.classId, goal, due }, now());
+        audit('homework.created', user, { 'homework.id': a.id, 'class.id': body.classId });
+        return { assignment: a };
       }
       if (!body.studentId || !canSee(user, body.studentId)) throw new AccountError('student', 'Pick one of your classes or students.', 404);
     } else if (!body.studentId || !store.isParentOf(user.id, body.studentId)) {
       throw new AccountError('student', 'Link your child’s account first.', 404);
     }
-    return { assignment: store.createAssignment({ createdBy: user.id, studentId: body.studentId, goal, due }, now()) };
+    const a = store.createAssignment({ createdBy: user.id, studentId: body.studentId, goal, due }, now());
+    audit('homework.created', user, { 'homework.id': a.id, 'student.id': body.studentId });
+    return { assignment: a };
   }
 
   function deleteAssignment(user, id) {
@@ -275,6 +288,7 @@ function createAccounts({ store, auth, now = () => Date.now() }) {
     const a = store.assignment(id);
     if (!a || a.createdBy !== user.id) throw new AccountError('assignment', 'Only whoever set that homework can remove it.', 404);
     store.deleteAssignment(id);
+    audit('homework.deleted', user, { 'homework.id': id });
     return { ok: true };
   }
 
@@ -302,7 +316,9 @@ function createAccounts({ store, auth, now = () => Date.now() }) {
       difficulty: ['easy', 'medium', 'hard'].includes(s.difficulty) ? s.difficulty : 'easy',
     };
     const title = String(body.title || '').replace(/\s+/g, ' ').trim().slice(0, TITLE_MAX) || (scope === 'school' ? 'School tournament' : 'Class tournament');
-    return { schedule: scheduleView(store.createSchedule({ teacherId: user.id, scope, classId, schoolId: user.schoolId, title, startsAt, settings }, now())) };
+    const created = store.createSchedule({ teacherId: user.id, scope, classId, schoolId: user.schoolId, title, startsAt, settings }, now());
+    audit('schedule.created', user, { 'schedule.id': created.id, 'schedule.scope': scope });
+    return { schedule: scheduleView(created) };
   }
 
   function scheduleView(s) {
@@ -317,6 +333,7 @@ function createAccounts({ store, auth, now = () => Date.now() }) {
     const s = store.schedule(id);
     if (!s || s.teacherId !== user.id) throw new AccountError('schedule', 'That isn’t one of your tournaments.', 404);
     store.deleteSchedule(id);
+    audit('schedule.deleted', user, { 'schedule.id': id });
     return { ok: true };
   }
 

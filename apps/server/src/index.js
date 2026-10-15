@@ -21,6 +21,7 @@ import { openStore } from './store.js';
 import { createAccounts, AccountError } from './accounts.js';
 import { loadConfig, ConfigError } from './config.js';
 import { createLimiter, clientIp } from './ratelimit.js';
+import { createLogger, exception } from './log.js';
 import crypto from 'crypto';
 
 const IS_MAIN = Boolean(process.argv[1]) && path.resolve(process.argv[1]) === import.meta.filename;
@@ -32,6 +33,8 @@ try {
   console.error(e.message);
   process.exit(1);
 }
+const VERSION = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
+const log = createLogger({ ...config.log, version: VERSION });
 const PORT = config.port;
 const OPENAI_API_KEY = config.openaiKey;
 const PUBLIC_URL = config.publicUrl;
@@ -435,7 +438,7 @@ function lanUrls() {
 
 const store = openStore();
 const auth = Auth.fromEnv(process.env, store);
-const accounts = createAccounts({ store, auth });
+const accounts = createAccounts({ store, auth, log });
 
 // The signed-in user for a request, or null (a guest)
 const signedIn = (req) => accounts.authenticate(Auth.bearer(req));
@@ -481,7 +484,7 @@ function matchAccountRoute(method, pathname) {
     const want = pattern.split('/').filter(Boolean);
     if (want.length !== parts.length) continue;
     const params = {};
-    if (want.every((w, i) => (w.startsWith(':') ? (params[w.slice(1)] = decodePath(parts[i])) : w === parts[i]))) return { handler, params };
+    if (want.every((w, i) => (w.startsWith(':') ? (params[w.slice(1)] = decodePath(parts[i])) : w === parts[i]))) return { handler, params, pattern };
   }
   return null;
 }
@@ -491,7 +494,7 @@ const scheduleTimer = setInterval(() => {
   try {
     accounts.openDue(openRoom);
   } catch (e) {
-    console.error(e);
+    log.error('schedule.error', exception(e));
   }
 }, SCHEDULE_TICK_MS).unref();
 
@@ -523,7 +526,7 @@ const routes = {
       const user = await signedIn(req);
       if (user && user.role === 'student') p = Rooms.join(room, user.firstName, body.look);
       else {
-        const check = await Moderation.checkName(body.name, { apiKey: OPENAI_API_KEY });
+        const check = await Moderation.checkName(body.name, { apiKey: OPENAI_API_KEY, log });
         if (!check.ok) throw new Rooms.RoomError('name', 'Please use your real first name.');
         p = Rooms.join(room, body.name, body.look);
       }
@@ -735,11 +738,15 @@ function route(req) {
   const parts = url.pathname.split('/').filter(Boolean); // api, rooms, CODE, action
   if (parts[0] !== 'api') return null;
   const account = matchAccountRoute(req.method, url.pathname);
-  if (account) return { handler: async (r) => account.handler(await signedIn(r), account.params, r), url };
+  if (account) return { handler: async (r) => account.handler(await signedIn(r), account.params, r), url, name: account.pattern };
   if (parts.length === 4 && parts[1] === 'rooms') {
-    return { handler: routes[`${req.method} /api/rooms/:code/${parts[3]}`], code: parts[2], url };
+    const handler = routes[`${req.method} /api/rooms/:code/${parts[3]}`];
+    const live = req.method === 'GET' && /^(events|poll)$/.test(parts[3]);
+    // (the route's name for logs never includes the code, and only known actions)
+    return { handler, code: parts[2], url, name: handler || live ? `/api/rooms/:code/${parts[3]}` : '/api/rooms/:code/:action' };
   }
-  return { handler: routes[`${req.method} ${url.pathname}`], url };
+  const handler = routes[`${req.method} ${url.pathname}`];
+  return { handler, url, name: handler ? url.pathname : '/api/:unknown' };
 }
 
 const server = http.createServer(async (req, res) => {
@@ -749,7 +756,18 @@ const server = http.createServer(async (req, res) => {
     return send(res, status, body);
   }
   const ip = clientIp(req, config.trustProxy);
+  const t0 = performance.now();
   let r;
+  // One log record per request: the route's pattern (never a path with codes in it), status and time
+  // (at a terminal only with LOG_LEVEL=debug: a class polls several times a second)
+  res.on('finish', () =>
+    log[config.log.format === 'json' ? 'info' : 'debug']('http.request', {
+      'http.request.method': req.method,
+      'http.route': r ? r.name : 'static',
+      'http.response.status_code': res.statusCode,
+      duration_ms: Math.round(performance.now() - t0),
+    })
+  );
   try {
     const any = limiter.take('request', ip);
     if (!any.ok) return tooMany(res, any.retryAfter);
@@ -804,7 +822,7 @@ const server = http.createServer(async (req, res) => {
       const status = e.code === 'room' || e.code === 'player' ? 404 : e.code === 'teacher' ? 403 : 409;
       return sendProblem(res, status, e.code, e.message);
     }
-    console.error(e);
+    log.error('http.error', { 'http.request.method': req.method, 'http.route': r ? r.name : 'static', ...exception(e) });
     sendProblem(res, 500, 'server', 'Something went wrong.'); // (never the error itself: it stays in the log)
   }
 });
@@ -825,21 +843,24 @@ setInterval(() => {
 if (IS_MAIN) {
   // Anything that slips past the request handlers: log it and exit, so the
   // process manager (Kubernetes, systemd) restarts a clean server
-  const fatal = (kind) => (e) => {
-    console.error(kind, e);
+  const fatal = (event) => (e) => {
+    log.error(event, exception(e));
     process.exit(1);
   };
-  process.on('unhandledRejection', fatal('Unhandled rejection:'));
-  process.on('uncaughtException', fatal('Uncaught exception:'));
+  process.on('unhandledRejection', fatal('process.unhandled_rejection'));
+  process.on('uncaughtException', fatal('process.uncaught_exception'));
   // Kubernetes sends SIGTERM before stopping a pod; Ctrl+C is SIGINT
   for (const signal of ['SIGTERM', 'SIGINT']) {
     process.once(signal, async () => {
-      console.log(`${signal}: finishing up`);
+      log.info('server.draining', { signal });
       await drain();
       process.exit(0);
     });
   }
   server.listen(PORT, () => {
+    log.info('server.started', { 'server.port': PORT, 'auth.kind': auth.name, 'moderation.openai': Boolean(OPENAI_API_KEY), 'deployment.production': config.production });
+    if (config.log.format === 'json') return;
+    // a person at a terminal: where to go
     console.log(`Blockout server on http://localhost:${PORT}/`);
     for (const url of lanUrls()) console.log(url === PUBLIC_URL ? `  Students join at: ${url}` : `  Chromebooks on this network: ${url}`);
     console.log(`  Name check: word list${OPENAI_API_KEY ? ' + OpenAI moderation' : ' (set OPENAI_API_KEY to add OpenAI moderation)'}`);

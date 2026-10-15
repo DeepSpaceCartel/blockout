@@ -1,6 +1,7 @@
 // Shutting down (SIGTERM): not ready any more, streams and held polls are
 // answered so browsers move on, and the server stops. (Its own file: it closes the server.)
 process.env.BLOCKOUT_DB = ':memory:';
+process.env.LOG_LEVEL = 'silent';
 process.env.BLOCKOUT_AUTH_SECRET = 'test-secret';
 import test from 'node:test';
 import assert from 'node:assert';

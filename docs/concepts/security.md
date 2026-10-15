@@ -17,6 +17,7 @@ What protects Blockout, and what doesn't yet, organised by the chapters of the [
 | Browser | Responses carry `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: same-origin`, a `Permissions-Policy` (no camera, microphone or location) and, over HTTPS, `Strict-Transport-Security`. A Content Security Policy allows only Blockout's own scripts, styles and images and no inline scripts or style attributes, and lets pages talk only to Blockout and the sign-in provider. |
 | Live classes | The teacher's controls need the room's secret teacher key; a student's actions need their own player key. |
 | Rate limits | Per address and per account ([HTTP API](../reference/HTTP-API.md)). Code guessing is limited by counting wrong codes, not tries, because a whole school often shares one address: 30 wrong codes a minute against 330,000 room codes and nearly 900 million class codes. Live-update streams give the same answer for a wrong key as for no class, so they can't be used to find codes. |
+| Logging | Structured JSON logs: one record per request with the route's pattern (never the path, which can hold a code), status and time; and an audit record for every account change (`class.created`, `class.joined`, `class.student_removed`, `parent.linked`, `homework.created`, `schedule.deleted`, …) with the ids and role of who did it. Names, codes, keys and tokens are never logged. |
 
 ## Known gaps
 
@@ -26,4 +27,3 @@ What protects Blockout, and what doesn't yet, organised by the chapters of the [
 | Tokens are kept in `localStorage` | A cross-site scripting bug could read them | Keep the pages free of injected HTML (the game builds text with `textContent`); the Content Security Policy blocks injected scripts |
 | No token refresh or revocation | Dev tokens last 30 days | Short-lived Keycloak tokens with refresh |
 | Plain HTTP by default | Tokens could be read on the network | Serve over HTTPS (a tunnel already does) |
-| No audit log | Hard to answer "who changed this homework?" | Structured logs for account actions |
