@@ -102,23 +102,29 @@ function listen(base, query, handlers) {
   src.addEventListener('removed', () => stop('removed'));
   src.addEventListener('error', () => {
     if (closed || unloading || !src) return;
-    // A 404 closes the stream for good (readyState CLOSED): the class is gone.
-    if (src.readyState === EventSource.CLOSED) stop('lost');
+    // Any error answer (a 404, but also a server that's restarting, or too
+    // busy) closes the stream for good (readyState CLOSED). Polling finds out
+    // which: it stops on a 404 and keeps trying otherwise.
+    if (src.readyState === EventSource.CLOSED) poll();
   });
   setTimeout(() => {
     if (closed || got) return;
-    src.close();
-    src = null;
     poll();
   }, STREAM_WAIT_MS);
 
+  let polling = false;
   async function poll() {
+    if (polling) return;
+    polling = true;
+    if (src) src.close();
+    src = null;
     let version = -1;
     while (!closed) {
       let data;
       try {
         const res = await fetch(`${base}/poll?${query}&v=${version}`, { cache: 'no-store' });
         if (res.status === 404) return stop('lost');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`); // (restarting, busy: try again shortly)
         data = await res.json();
       } catch (e) {
         if (closed || unloading) return;

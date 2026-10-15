@@ -34,6 +34,7 @@ Work towards 0.3.0 on the `v0.3.0` branch. Details and decisions: [the v0.3.0 wo
 - On Chromebooks, laptops and iPads held sideways, the main menu is laid out in two columns (modes and menu on the left, settings on the right), so Start is on screen without scrolling. Phones and portrait screens keep the one column.
 
 ### Fixed
+- A class no longer shows "lost" when the server is restarting or busy for a moment: the page switches to polling and keeps trying until the class answers, and only gives up when the class is really gone.
 - A web address with a broken `%` escape (like `/%E0`) no longer stops the server for everyone; it gets a `400` answer. Request bodies that are cut off or arrive too slowly are answered too, instead of waiting forever.
 
 ### Security

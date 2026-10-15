@@ -11,6 +11,7 @@
     "@blockout/auth": "*"
   },
   "scripts": {
-    "lint": "eslint src"
+    "test": "node --test",
+    "lint": "eslint src test"
   }
 }
