@@ -16,6 +16,8 @@ Open **Admin** on your account page, or go to `/admin/`.
 
 ## Accounts
 
+![The admin page: accounts with their roles](../assets/screenshots/admin-accounts.png)
+
 **Accounts** lists everyone, newest sign-ins first. Blockout only keeps a first name, a last initial and an email domain ([Privacy](../privacy.md)), so find people by first name and their school's domain.
 
 - **Role:** change it from the list. A teacher who still has classes or tournaments stays a teacher until those are deleted.

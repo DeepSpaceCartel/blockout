@@ -51,6 +51,8 @@ For each student you see:
 - when they last played, and how their homework is going
 - **Grown-ups**: who follows them, and a one-time code for a new grown-up (it works once, for 14 days; take off a grown-up who shouldn't be there)
 
+![A student's grown-ups, with a new grown-up's code and its QR code](../assets/screenshots/teacher-grown-ups.png)
+
 Tap a name for their page: the full Times Table, their homework (and a form to set homework just for them) and what they've played recently.
 
 ![A student's page](../assets/screenshots/teacher-student.png)
