@@ -63,6 +63,7 @@ test('HTTP: errors are RFC 9457 problem details (and keep error/message for the 
   assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
   assert.equal(res.headers.get('permissions-policy'), 'camera=(), microphone=(), geolocation=()');
   assert.equal(res.headers.get('strict-transport-security'), null); // (only over https)
+  assert.match(res.headers.get('content-security-policy'), /script-src 'self';.*frame-ancestors 'none'/);
   const body = await res.json();
   assert.deepEqual(body, { type: 'about:blank', title: 'Unauthorized', status: 401, detail: 'Please sign in first.', error: 'signin', message: 'Please sign in first.' });
   const missing = await fetch(`${base}/api/nope`);

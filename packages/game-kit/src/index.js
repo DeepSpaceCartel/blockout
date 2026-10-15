@@ -1018,7 +1018,8 @@ export function startGame(variantId) {
     game.scores.forEach((s, i) => {
       const li = make('li');
       li.style.setProperty('--c', COLORS[i]);
-      li.innerHTML = `<span>${who[i]}</span><span class="result-pts">${fracHTML(fmtScore(s))} ${V.unit}</span><span class="result-bar"><span style="width:${(100 * s.n) / s.d / top}%"></span></span>`;
+      li.innerHTML = `<span>${who[i]}</span><span class="result-pts">${fracHTML(fmtScore(s))} ${V.unit}</span><span class="result-bar"><span></span></span>`;
+      li.querySelector('.result-bar > span').style.width = `${(100 * s.n) / s.d / top}%`; // (not a style attribute: the page's CSP blocks those)
       list.append(li);
     });
     $('over-extra').innerHTML = '';

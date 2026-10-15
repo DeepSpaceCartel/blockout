@@ -21,7 +21,10 @@ export function mount(stage, ctx) {
   const { canvas, ctx: g, point } = ctx.canvas(stage, W, H);
   const pads = document.createElement('div');
   pads.className = 'demo-choices';
-  for (let i = 0; i < nLanes; i++) pads.insertAdjacentHTML('beforeend', `<button type="button" class="btn" data-lane="${i}" style="min-width:${Math.floor(300 / nLanes)}px">${i + 1}</button>`);
+  for (let i = 0; i < nLanes; i++) {
+    pads.insertAdjacentHTML('beforeend', `<button type="button" class="btn" data-lane="${i}">${i + 1}</button>`);
+    pads.lastElementChild.style.minWidth = `${Math.floor(300 / nLanes)}px`; // (set from script: the page's CSP blocks style attributes)
+  }
   stage.append(pads);
 
   // the whole song: two tables, each counted from ×1 up to the level's top

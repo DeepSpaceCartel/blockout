@@ -105,6 +105,25 @@ function serveStatic(req, res) {
   });
 }
 
+// Only this server's own scripts, styles and images (plus the QR code's data:
+// image), and only this server and the sign-in provider (it hands out tokens)
+// to talk to. No inline scripts or style attributes: the pages don't need them.
+function contentSecurityPolicy() {
+  const signIn = config.auth.kind === 'keycloak' ? ` ${new URL(config.auth.issuer).origin}` : '';
+  return [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self'",
+    "img-src 'self' data:",
+    "font-src 'self'",
+    `connect-src 'self'${signIn}`,
+    "object-src 'none'",
+    "base-uri 'none'",
+    "frame-ancestors 'none'",
+    `form-action 'self'${signIn}`,
+  ].join('; ');
+}
+
 // Sent with every response: no sniffing content types, no framing by other
 // sites, no full URLs (with class codes) leaked to other sites.
 // No camera, microphone or location for any page. Over HTTPS, browsers are told
@@ -114,6 +133,7 @@ const SECURITY_HEADERS = {
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'same-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  'Content-Security-Policy': contentSecurityPolicy(),
   ...(config.https ? { 'Strict-Transport-Security': 'max-age=31536000' } : {}),
 };
 
