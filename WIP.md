@@ -2,58 +2,42 @@
 
 Where things stand on the `v0.3.0` branch, for picking the work up again. No secrets, tokens, passwords, IDs or addresses are recorded here: they live in the cluster's Secrets or in 1Password.
 
-## Done and committed (`fdb8f12 Cleanup` and earlier)
+## The production-readiness plan
 
-- **Dev container:** Node 26 image (`typescript-node:5-26-trixie`), `hostRequirements` (1 CPU, 4 GB, 10 GB). A full test run peaks at about 2.4 GB, so 4 GB is about the minimum.
-- **Local Dev Container Features** in `.devcontainer/features/`: `cloudflared`, `playwright-chromium` (Chromium in `/ms-playwright`), `python-venv`, `agent-skills` (DeepSpaceCartel skills, pinned to a commit, user-level in `~/.claude/skills`), `coder-cli` (from the Coder deployment, so it matches the server). Official features: `github-cli`, `kubectl-helm-minikube` (minikube off).
-- **`postCreateCommand.sh`** only installs npm packages, checks Playwright's Chromium and creates the docs venv (`.venv`).
-- **CI:** `ci.yml` on Node 26 with `node .devcontainer/check.mjs` (Playwright version in `devcontainer.json` must match `package-lock.json`); `devcontainer.yml` builds the container and smoke-tests the tools; Dependabot covers dev container features.
-- **Node 26 everywhere:** `engines` `>=26`, CI, docs, changelog.
+Milestones M0–M8 (approved 2026-10-15). Status:
 
-## Done, not committed yet
-
-| Area | Files | What |
+| | Milestone | State |
 |---|---|---|
-| Landscape menu | `packages/ui/src/css/menu.css`, 3 screenshots, `CHANGELOG.md` | Two-column start menu on landscape screens ≥ 900×560 (Chromebooks, sideways iPads): Start is on screen without scrolling. Phones and portrait unchanged. Menu buttons 3 a row (2 below 1100 px), last row stretches. |
-| 1Password CLI | `.devcontainer/features/1password-cli/`, `devcontainer.json`, `devcontainer.yml`, `CLAUDE.md`, `docs/project/installing.md` | `op` from 1Password's signed apt repo; key fingerprint checked; pinned to 2.40.0. |
-| Keycloak in the cluster | `deploy/keycloak/` (`install.sh`, `values.yaml`, `postgres.yaml`, `realm-blockout.json`), `package.json` (`npm run keycloak`), port 8180 in `devcontainer.json`, `docs/guides/set-up-keycloak.md`, `CLAUDE.md` | See below. |
-| Sign out of Keycloak too | `packages/auth/src/client.js`, `apps/multiplication/src/accounts.js` | Sign out ends the Keycloak session (via `id_token_hint`), so the next Sign in asks again. After signing out of a Google account, a "Signed out" dialog offers **Also sign out of Google** (opens Google's sign-out in a new tab). |
+| M0 | Housekeeping | Done |
+| M1 | Server hardening: crash fix, config guard, headers and CSP, secure codes, rate limits, stream caps, `/health/*` and drain, structured logs, fewer writes, token refresh | Done |
+| M2 | MongoDB for accounts, Valkey (Redis) for live classes; several servers; classes survive restarts | Done. Checked with two servers behind a proxy: a class carries on through a killed server and a rolling restart |
+| M3 | Roles kept by Blockout, one-time invites, admins (`/admin/`), deleting accounts | Done (ADR-0008) |
+| M4 | Container image, Helm chart (`deploy/blockout`), release workflow | Done. Image built with the cluster's BuildKit; chart passes server-side validation. CI and release have not run on GitHub yet (nothing pushed) |
+| M5 | First public deployment in the workspace cluster | In-repo parts done (public Keycloak via `KEYCLOAK_URL`, `realm.sh`, chart values for the workspace). Waiting on the decisions below |
+| M6 | Metrics, alert rules, nightly encrypted backups, restore drill, runbooks | Done; backups and restore drill run in `blockout-dev` with a local remote. Real backups wait for object storage |
+| M7 | Retention (13 months), data export, privacy page, accessibility pass | Done |
+| M8 | Production cluster: operators, GitOps, load test, cutover | Not started |
 
-Tests, lint and `mkdocs build --strict` pass with all of it.
+## Waiting on decisions (M5, M8)
 
-## Keycloak: how it's set up
+1. **Hostnames** for Blockout and Keycloak (the workspace values assume `blockout.` and `id.` under the cluster's domain).
+2. **Gateway listeners and DNS** for them on `gateway/rts-gateway`: set up outside this repo.
+3. **An image in a registry:** push a `v*` tag (GitHub Actions publishes to GHCR), and make the package public or add a pull secret.
+4. **SMTP** for Keycloak (address checks, password resets). Without it, `realm.sh` turns both off.
+5. **Self-registration:** `realm-blockout.json` has open registration (`registrationAllowed: true`, uncommitted, from before the plan). It's safe with ADR-0008 (new accounts are students), but it's the owner's call; Google's **Hosted domain** is the other lever.
+6. **Object storage** for backups (the `blockout-backup` Secret: see `docs/guides/operate.md`).
+7. **Google Cloud Console:** add Keycloak's public broker redirect URI.
+8. **The production cluster** (M8): provider and region.
 
-- **Development only:** Keycloak runs in the workspace's cluster (namespace `keycloak`) and is reached on `http://localhost:8180` through `npm run keycloak` (a `kubectl port-forward`). Only the browser of the person running the port-forward can sign in.
-- **Pieces:** Helm chart `codecentric/keycloakx` 7.3.2 (Keycloak 26.7.4), Postgres 17 on a 10 GB volume, Secrets `keycloak-admin`, `keycloak-db` (random passwords) and `google-oauth` (the Google client secret).
-- **Realm `blockout`** (`realm-blockout.json`, imported only when the realm doesn't exist):
-  - public client `blockout`, PKCE S256, redirects to `http://localhost:8080/*` and `:5173/*`
-  - realm roles `student`, `teacher`, `parent`
-  - access tokens last 8 hours (Blockout doesn't refresh tokens yet)
-  - Google identity provider: secret read as `${vault.google-secret}` from the mounted `google-oauth` Secret, `prompt=select_account`
-  - a mapper adding `identity_provider` to the ID token
-- **The running Keycloak matches the file:** the Google provider, the vault reference, `prompt` and the mapper were also applied through the admin API.
-- **Rebuild:** `deploy/keycloak/install.sh` (idempotent; asks for the Google client secret when the `google-oauth` Secret is missing). Tested from scratch in a throwaway namespace.
-- **Run Blockout against it:**
-  ```sh
-  npm run keycloak
-  BLOCKOUT_AUTH=keycloak KEYCLOAK_ISSUER=http://localhost:8180/realms/blockout KEYCLOAK_CLIENT_ID=blockout npm start
-  ```
-- **Tested** with temporary password users (deleted afterwards): sign in as a teacher, sign out ends the Keycloak session, the Google button sends the right client and `prompt=select_account`.
+## Development setup in the cluster
 
-## Still to do
+- **`blockout-dev`:** MongoDB and Valkey for development (`NAMESPACE=blockout-dev deploy/data/install.sh`); `npm run services` forwards them and prints the URLs.
+- **`keycloak`:** development Keycloak on `http://localhost:8180` (`npm run keycloak`). `realm.sh` has been applied: the `admin` role, brute-force protection, a 10-character password policy, no mail.
 
-1. **Check a real Google sign-in end to end:** sign in with Google, then sign out: the "Signed out" dialog should appear (it needs `identity_provider: "google"` in the ID token, which hasn't been seen from a real Google login yet).
-2. **Read the Google secret from 1Password** in `install.sh` (`op read "op://<vault>/<item>/<field>"`, keeping the prompt as a fallback). Needs a 1Password service account, given to workspaces as `OP_SERVICE_ACCOUNT_TOKEN` (ideally a Coder secret). Vault and item names not decided.
-3. **Decide** whether the Google OAuth client ID should stay in `realm-blockout.json` (it isn't secret, but it's committed with the repo).
-4. **Commit** the work above (Conventional Commits; probably separate commits for the menu, the 1Password feature, Keycloak deploy, and sign-out).
-5. **Later:**
-   - token refresh in `@blockout/auth`, then shorter token lifespans
-   - an option to send people straight to Google (`kc_idp_hint=google`)
-   - a public Keycloak (and Blockout) hostname for classrooms (gateway listener, certificate, DNS; see "On a public server" in the guide)
-   - secrets synced into the cluster (External Secrets Operator or 1Password's operator) once more apps need them
-   - the landscape layout for the other games' menus (game-kit), and phones held sideways
-   - pinning `cloudflared`, `agent-skills`, Playwright and `op` versions by hand when they move on (Dependabot can't see local features)
+## Notes
 
-## Security to fix
-
-- **The workspace's Kubernetes service account is cluster-admin.** Any code running in a workspace (an npm install script, a dependency, an agent) can read every Secret and change anything in the cluster. A Role limited to the namespaces the workspace needs (like `keycloak`) is enough for this work.
+- **trivy-action** is pinned by commit; check its release against Aqua's March 2026 advisory before trusting or bumping it.
+- **`npm audit`** reports one high-severity advisory in `source-map-js`, a build-time dependency of Vite (not in the image or the pages); Dependabot should bring the fix.
+- **The workspace cluster has no Alertmanager:** alerts show in Prometheus and Grafana but notify nobody.
+- **Docs screenshots** show the brighter orange buttons from before the contrast fix; retake them with the next round.
+- **Still to do from before:** a real Google sign-in end to end (the "Signed out" dialog needs `identity_provider: "google"`), and the landscape layout for game-kit's menus.
