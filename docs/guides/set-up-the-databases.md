@@ -38,6 +38,17 @@ This forwards MongoDB to `localhost:27017` and Valkey to `localhost:6379`, and p
 
 The tests use the same URLs: with `BLOCKOUT_MONGO_URL` set, `npm test` also runs the store tests against MongoDB, each in a database of its own that it drops afterwards.
 
+## Move accounts from the sqlite file
+
+A server that ran without MongoDB kept its accounts in `data/blockout.db`. To bring them along:
+
+```sh
+node apps/server/scripts/sqlite-to-mongo.js --dry-run                 # count what's there
+BLOCKOUT_MONGO_URL='mongodb://…' node apps/server/scripts/sqlite-to-mongo.js [data/blockout.db]
+```
+
+It copies every account, save, class, link, homework and schedule by its id, so it's safe to run again, and prints the counts on both sides. Start Blockout with `BLOCKOUT_MONGO_URL` afterwards.
+
 ## Troubleshooting
 
 | Problem | What to do |
