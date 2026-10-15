@@ -312,11 +312,13 @@ test('invites: a teacher has a limit on open teacher codes, and can take them ba
   const t = await signIn({ sub: 'kc:t' });
   await store.setRole(t.id, 'teacher');
   const teacher = await signIn({ sub: 'kc:t' });
-  for (let i = 0; i < 10; i++) await accounts.teacherInvite(teacher, {});
+  const codes = [];
+  for (let i = 0; i < 10; i++) codes.push((await accounts.teacherInvite(teacher, {})).code);
   await assert.rejects(accounts.teacherInvite(teacher, {}), /lots of teacher codes/);
   const { invites } = await accounts.myTeacherInvites(teacher);
   assert.equal(invites.length, 10);
-  assert.ok(!JSON.stringify(invites).match(/[A-Z2-9]{8}/), 'the codes themselves are never shown again');
+  const listed = JSON.stringify(invites);
+  assert.ok(codes.every((c) => !listed.includes(c)), 'the codes themselves are never shown again');
   await accounts.deleteMyInvite(teacher, invites[0].id);
   assert.ok(await accounts.teacherInvite(teacher, {}));
   await assert.rejects(accounts.deleteMyInvite(await signIn({ sub: 'kc:other' }), invites[1].id), /isn’t one of your codes/);
