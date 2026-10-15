@@ -44,3 +44,28 @@ test('client address: the socket, or the one the nearest trusted proxy saw', () 
   assert.equal(clientIp(req('6.6.6.6, 1.2.3.4, 10.1.1.1'), 2), '1.2.3.4');
   assert.equal(clientIp(req(''), 1), '10.0.0.9');
 });
+
+// The Redis buckets answer like the memory ones (when Redis is here)
+if (process.env.BLOCKOUT_REDIS_URL) {
+  const { createClient } = await import('redis');
+  const { createRedisLimiter } = await import('../src/ratelimit.js');
+  test('rate limit (redis): the same buckets, shared by every server', async () => {
+    const client = await createClient({ url: process.env.BLOCKOUT_REDIS_URL }).connect();
+    let t = 1_000_000;
+    const prefix = `test:${process.pid}:${Math.random().toString(36).slice(2)}:`;
+    const rules = { r: { perMinute: 6, burst: 3 } };
+    const [one, two] = [createRedisLimiter(client, { prefix, now: () => t, rules }), createRedisLimiter(client, { prefix, now: () => t, rules })];
+    try {
+      assert.ok((await one.check('r', 'a')).ok);
+      for (let i = 0; i < 3; i++) assert.ok((await (i % 2 ? one : two).take('r', 'a')).ok);
+      assert.deepEqual(await one.take('r', 'a'), { ok: false, retryAfter: 10 });
+      assert.equal((await two.check('r', 'a')).ok, false, 'the other server sees the same bucket');
+      assert.ok((await two.take('r', 'b')).ok);
+      t += 10000;
+      assert.ok((await two.take('r', 'a')).ok);
+      assert.equal((await one.take('r', 'a')).ok, false);
+    } finally {
+      await client.close();
+    }
+  });
+}

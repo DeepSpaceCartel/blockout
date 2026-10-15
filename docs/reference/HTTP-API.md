@@ -28,6 +28,7 @@ Everything under `/api` on the server. Requests and responses are JSON. The game
     - dev sign-in, per address: 60 a minute
 
     Live updates (`/events`, `/poll`) answer `404` for a wrong teacher or player key, the same as for a class that doesn't exist. A class takes at most 200 open event streams, and an address at most 500; past that `/events` answers `429`.
+- **Busy classes:** when a class changes too often from several places at once to save a change, the request gets `503` (`busy`); try it again.
 - **Bad requests:** an address with a broken `%` escape gets `400` (`bad-request`). A request body that's cut off gets `400` (`aborted`), and one that takes longer than 10 seconds to arrive gets `408` (`timeout`).
 
 ## Health

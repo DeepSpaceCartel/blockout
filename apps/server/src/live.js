@@ -151,11 +151,14 @@ function createLive({ backend, log = silentLogger, replicaId = crypto.randomByte
 
   // ---- this server's listeners
 
+  // This server's listeners for a room, subscribed to its messages. Await
+  // e.ready before reading the room, so no change slips in between.
   function entry(code) {
     if (!local.has(code)) {
-      const e = { streams: new Set(), polls: new Set(), unsubscribe: null, pending: null, live: new Map(), presenceTimer: null };
+      const e = { streams: new Set(), polls: new Set(), unsubscribe: null, ready: null, pending: null, live: new Map(), presenceTimer: null };
       local.set(code, e);
       e.unsubscribe = backend.subscribe(code, (msg) => onMessage(code, msg));
+      e.ready = e.unsubscribe.then(() => {});
     }
     return local.get(code);
   }
@@ -200,9 +203,13 @@ function createLive({ backend, log = silentLogger, replicaId = crypto.randomByte
 
   // A stream: the room's view now and after every change. res is set up by the caller.
   async function openStream(code, role, playerId, res, onClose = () => {}) {
-    const room = await load(code, { withLive: true });
-    if (!room) throw noRoom();
     const e = entry(code);
+    await e.ready;
+    const room = await load(code, { withLive: true });
+    if (!room) {
+      drop(code);
+      throw noRoom();
+    }
     const s = { res, role, id: playerId };
     e.streams.add(s);
     if (playerId) {
@@ -227,11 +234,15 @@ function createLive({ backend, log = silentLogger, replicaId = crypto.randomByte
   // next change (or after pollHoldMs). send(body) writes the answer.
   async function openPoll(code, role, playerId, version, send, onClose) {
     if (playerId) await backend.setField(code, 'presence', `${playerId}|poll`, now());
-    const room = await load(code, { withLive: true });
-    if (!room) throw noRoom();
-    const w = { role, id: playerId, send, done: false, timer: null };
-    if (version !== room.version) return answer(room, w);
     const e = entry(code);
+    await e.ready;
+    const room = await load(code, { withLive: true });
+    const w = { role, id: playerId, send, done: false, timer: null };
+    if (!room || version !== room.version) {
+      drop(code);
+      if (!room) throw noRoom();
+      return answer(room, w);
+    }
     e.polls.add(w);
     w.timer = setTimeout(async () => {
       const latest = await load(code, { withLive: true }).catch(() => null);
@@ -306,7 +317,7 @@ function createLive({ backend, log = silentLogger, replicaId = crypto.randomByte
     if (!(await backend.acquire(`room:${code}`, replicaId, o.leaseMs))) return false;
     const fresh = !owned.has(code);
     if (fresh) owned.set(code, new Map());
-    entry(code);
+    await entry(code).ready;
     if (fresh) {
       const room = await load(code);
       if (room) reconcile(room);

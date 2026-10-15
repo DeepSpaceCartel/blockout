@@ -20,9 +20,10 @@ import * as Auth from './auth.js';
 import { openStore } from './store/index.js';
 import { createAccounts, AccountError } from './accounts.js';
 import { loadConfig, ConfigError } from './config.js';
-import { createLimiter, clientIp } from './ratelimit.js';
+import { createLimiter, createRedisLimiter, clientIp } from './ratelimit.js';
 import { createLive } from './live.js';
 import { createMemoryBackend } from './roombackend/memory.js';
+import { createRedisBackend } from './roombackend/redis.js';
 import { createLogger, exception } from './log.js';
 import crypto from 'crypto';
 
@@ -199,7 +200,9 @@ function readJson(req, max = MAX_BODY) {
 // Kept in a shared backend so several servers can run them (live.js): Redis
 // (Valkey) on a server, memory for one server and tests.
 
-const live = createLive({ backend: createMemoryBackend(), log });
+const roomBackend =
+  config.rooms.kind === 'redis' ? await createRedisBackend(config.rooms.url, { prefix: config.rooms.prefix, log }) : createMemoryBackend();
+const live = createLive({ backend: roomBackend, log });
 live.start();
 
 // Open streams are cheap but not free: a class needs ~41 (more with spare tabs),
@@ -426,7 +429,15 @@ const routes = {
 
 // ---------------------------------------------------------------- rate limits
 
-const limiter = createLimiter();
+// (in Redis when live classes are: then every server counts together). If
+// Redis can't answer, requests go through: a limit is no reason to stop a class.
+const counted = roomBackend.client ? createRedisLimiter(roomBackend.client, { prefix: config.rooms.prefix }) : createLimiter();
+const allow = (e) => (log.warn('rate.unavailable', exception(e)), { ok: true });
+const limiter = {
+  check: (rule, key) => Promise.resolve(counted.check(rule, key)).catch(allow),
+  take: (rule, key) => Promise.resolve(counted.take(rule, key)).catch(allow),
+  prune: () => counted.prune(),
+};
 setInterval(() => limiter.prune(), 60 * 1000).unref();
 
 // Where a code is looked up: a run of wrong codes from one address is someone guessing
@@ -459,9 +470,10 @@ setInterval(() => {
   lastTick = t;
 }, 1000).unref();
 
+// The databases answer (accounts, and live classes when they're in Redis)
 async function storeOk() {
   try {
-    return Boolean(await store.ping());
+    return Boolean(await store.ping()) && Boolean(await roomBackend.ping());
   } catch {
     return false;
   }
@@ -492,6 +504,7 @@ async function drain({ timeoutMs = 20000 } = {}) {
   await Promise.race([closed, timeout]);
   server.closeAllConnections();
   await store.close();
+  await roomBackend.quit();
 }
 
 function route(req) {
@@ -530,7 +543,7 @@ const server = http.createServer(async (req, res) => {
     })
   );
   try {
-    const any = limiter.take('request', ip);
+    const any = await limiter.take('request', ip);
     if (!any.ok) return tooMany(res, any.retryAfter);
     r = route(req);
     if (!r) return serveStatic(req, res);
@@ -538,15 +551,15 @@ const server = http.createServer(async (req, res) => {
     // or, where streams don't get through, /poll with the same keys plus ?v=VERSION
     r.live = req.method === 'GET' && r.code && /\/(events|poll)$/.test(r.url.pathname);
     if (isCodeLookup(req, r)) {
-      const misses = limiter.check('miss', ip);
+      const misses = await limiter.check('miss', ip);
       if (!misses.ok) return tooMany(res, misses.retryAfter);
       if (CODE_ROUTES.has(`${req.method} ${r.url.pathname}`) && Auth.bearer(req)) {
-        const tries = limiter.take('codeTry', tokenKey(req));
+        const tries = await limiter.take('codeTry', tokenKey(req));
         if (!tries.ok) return tooMany(res, tries.retryAfter);
       }
     }
     if (r.url.pathname === '/api/auth/dev') {
-      const signIns = limiter.take('devSignIn', ip);
+      const signIns = await limiter.take('devSignIn', ip);
       if (!signIns.ok) return tooMany(res, signIns.retryAfter);
     }
     if (r.live) {
@@ -575,7 +588,7 @@ const server = http.createServer(async (req, res) => {
     if (!r.handler) return sendProblem(res, 404, 'not-found', 'Not found.');
     send(res, 200, await r.handler(req, r.code));
   } catch (e) {
-    if (r && isMiss(e) && isCodeLookup(req, r)) limiter.take('miss', ip);
+    if (r && isMiss(e) && isCodeLookup(req, r)) await limiter.take('miss', ip);
     if (e instanceof HttpError) return sendProblem(res, e.status, e.code, e.message);
     if (e instanceof AccountError) return sendProblem(res, e.status, e.code, e.message);
     if (e instanceof Auth.AuthError) return sendProblem(res, 401, 'auth', e.message);

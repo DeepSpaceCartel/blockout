@@ -1,8 +1,8 @@
 // Rate limits: token buckets, one per (rule, key), where the key is a client
 // address or an account. A bucket holds up to `burst` tokens and refills at
-// `perMinute`; each counted request takes one. Pure apart from the clock, which
-// is injected. The buckets live in memory (one server); several servers will
-// share them in Redis.
+// `perMinute`; each counted request takes one. The buckets live in memory
+// (one server; the clock is injected for tests) or in Redis, where every
+// server shares them. Both answer the same, the Redis one asynchronously.
 //
 // A whole school usually reaches us from one address, so limits on addresses
 // are generous, and code guessing is limited by counting misses (wrong codes),
@@ -66,6 +66,38 @@ function createLimiter({ now = () => Date.now(), rules = RULES, maxBuckets = 100
   return { check, take, prune, size: () => buckets.size };
 }
 
+// The same buckets in Redis, one hash per bucket that expires once it would be
+// full again. check takes 0 tokens, take takes 1.
+const BUCKET = `
+local now = tonumber(ARGV[1])
+local per = tonumber(ARGV[2])
+local burst = tonumber(ARGV[3])
+local cost = tonumber(ARGV[4])
+local b = redis.call('HMGET', KEYS[1], 'tokens', 'at')
+local tokens = tonumber(b[1]) or burst
+local at = tonumber(b[2]) or now
+tokens = math.min(burst, tokens + (now - at) / 60000 * per)
+local ok = tokens >= 1
+if ok then tokens = tokens - cost end
+redis.call('HSET', KEYS[1], 'tokens', tostring(tokens), 'at', now)
+redis.call('PEXPIRE', KEYS[1], math.ceil((burst - tokens) / per * 60000) + 1000)
+if ok then return 0 end
+return math.max(1, math.ceil((1 - tokens) / per * 60))`;
+
+function createRedisLimiter(client, { prefix = '', now = () => Date.now(), rules = RULES } = {}) {
+  async function bucket(rule, key, cost) {
+    const spec = rules[rule];
+    if (!spec) throw new Error(`no rate rule ${rule}`);
+    const wait = await client.eval(BUCKET, { keys: [`${prefix}rate:${rule}|${key}`], arguments: [now(), spec.perMinute, spec.burst, cost].map(String) });
+    return wait === 0 ? { ok: true } : { ok: false, retryAfter: wait };
+  }
+  return {
+    check: (rule, key) => bucket(rule, key, 0),
+    take: (rule, key) => bucket(rule, key, 1),
+    prune: () => {}, // (buckets expire by themselves)
+  };
+}
+
 // The client's address. Behind `trustProxy` proxies (a gateway, a tunnel), it's the
 // address the nearest of them saw: that many entries from the end of
 // X-Forwarded-For. Anything further left could be made up by the client.
@@ -80,4 +112,4 @@ function clientIp(req, trustProxy = 0) {
   return hops[Math.max(0, hops.length - trustProxy)];
 }
 
-export { RULES, createLimiter, clientIp };
+export { RULES, createLimiter, createRedisLimiter, clientIp };

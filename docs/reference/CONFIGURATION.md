@@ -20,6 +20,9 @@ The server (`node apps/server/src/index.js`, or `npm start`) is configured with 
 | `PUBLIC_URL` | none | Same as `--public-url` |
 | `TRUST_PROXY` | `0` | How many proxies (a gateway, a tunnel) sit in front of the server. Rate limits then use the client address the nearest proxy saw in `X-Forwarded-For`; with `0` that header is ignored, because anyone can send it |
 | `BLOCKOUT_MONGO_URL` | none | The MongoDB for accounts, like `mongodb://user:password@host:27017/blockout?authSource=admin&replicaSet=rs0`. Needed in production |
+| `BLOCKOUT_REDIS_URL` | none | The Redis (Valkey) for live classes and rate limits, like `redis://:password@host:6379`, shared by every server. Needed in production |
+| `BLOCKOUT_ROOMS` | `redis` with `BLOCKOUT_REDIS_URL`, otherwise `memory` | Where live classes are kept: `redis`, or `memory` (this server only) |
+| `BLOCKOUT_REDIS_PREFIX` | none | A prefix for every Redis key, to keep several Blockouts (or test runs) apart in one Redis |
 | `BLOCKOUT_STORE` | `mongo` with `BLOCKOUT_MONGO_URL`, otherwise `sqlite` | Where accounts are kept: `mongo`, `sqlite` (the file below) or `memory` (nothing kept: tests and quick tries) |
 | `BLOCKOUT_DB` | `data/blockout.db` (repo root) | With `BLOCKOUT_STORE=sqlite`: the sqlite file; `:memory:` keeps nothing |
 | `BLOCKOUT_AUTH` | `dev` | Sign-in provider: `dev` or `keycloak` |

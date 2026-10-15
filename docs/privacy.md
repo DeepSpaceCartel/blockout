@@ -6,10 +6,10 @@ Blockout is used by 3rd graders, mostly under 13, starting at Cadence Park (Irvi
 
 ## Guests keep everything on their device
 - Playing as a guest (the default) stores nothing on our server. Progress, stats and settings stay in the browser's local storage.
-- A live class game keeps only the first name typed in, in memory, and forgets it when the class ends.
+- A live class game keeps only the first name typed in. On a server with Redis (Valkey) it's kept there, with the class's results, until 4 hours after the class's last change or until the teacher closes it, so the class survives a server restart ([ADR-0007](decisions/0007-live-classes-in-redis.md)); otherwise it's in the server's memory. Either way it's gone soon after the class ends.
 
 ## Signed-in accounts
-When a student, teacher or parent signs in, the server (`server/store.js`) keeps:
+When a student, teacher or parent signs in, the server (`apps/server/src/store/`) keeps:
 
 | What | Why |
 |---|---|
@@ -41,5 +41,5 @@ Nobody else sees it: not other students, other parents or other teachers.
 
 ## Security
 - Tokens are signed: HMAC in dev sign-in, RS256 from Keycloak.
-- The database is a local sqlite file (`data/`, not in git).
+- The database is MongoDB in the same cluster as Blockout, with a password (on a single computer without MongoDB, a local sqlite file in `data/`, not in git).
 - Deployments must use HTTPS.

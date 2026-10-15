@@ -41,6 +41,11 @@ function loadConfig(env = {}, argv = []) {
   if (!['mongo', 'sqlite', 'memory'].includes(storeKind)) problems.push(`BLOCKOUT_STORE must be mongo, sqlite or memory, not "${storeKind}"`);
   if (storeKind === 'mongo' && !env.BLOCKOUT_MONGO_URL) problems.push('BLOCKOUT_STORE=mongo needs BLOCKOUT_MONGO_URL (mongodb://…)');
 
+  // Where live classes are kept: Redis/Valkey (BLOCKOUT_REDIS_URL), shared by every server, or this server's memory
+  const roomsKind = env.BLOCKOUT_ROOMS || (env.BLOCKOUT_REDIS_URL ? 'redis' : 'memory');
+  if (!['redis', 'memory'].includes(roomsKind)) problems.push(`BLOCKOUT_ROOMS must be redis or memory, not "${roomsKind}"`);
+  if (roomsKind === 'redis' && !env.BLOCKOUT_REDIS_URL) problems.push('BLOCKOUT_ROOMS=redis needs BLOCKOUT_REDIS_URL (redis://…)');
+
   const logLevel = env.LOG_LEVEL || 'info';
   if (!['debug', 'info', 'warn', 'error', 'silent'].includes(logLevel)) problems.push(`LOG_LEVEL must be debug, info, warn, error or silent, not "${logLevel}"`);
   // JSON lines for a log stack in production; short text lines at a terminal
@@ -52,6 +57,7 @@ function loadConfig(env = {}, argv = []) {
     if (authKind !== 'keycloak') problems.push('NODE_ENV=production needs BLOCKOUT_AUTH=keycloak: dev sign-in lets anyone be a teacher');
     if (!publicUrl.startsWith('https://')) problems.push('NODE_ENV=production needs PUBLIC_URL to be an https:// address');
     if (storeKind !== 'mongo') problems.push('NODE_ENV=production needs BLOCKOUT_MONGO_URL: accounts must be kept in MongoDB');
+    if (roomsKind !== 'redis') problems.push('NODE_ENV=production needs BLOCKOUT_REDIS_URL: live classes must be shared by every server');
   }
 
   if (problems.length) throw new ConfigError(problems);
@@ -65,6 +71,7 @@ function loadConfig(env = {}, argv = []) {
     // Names are also checked with OpenAI's free moderation model when this is set (and only then are names sent to OpenAI)
     openaiKey: env.OPENAI_API_KEY || '',
     store: { kind: storeKind, file: env.BLOCKOUT_DB || undefined, url: env.BLOCKOUT_MONGO_URL || undefined },
+    rooms: { kind: roomsKind, url: env.BLOCKOUT_REDIS_URL || undefined, prefix: env.BLOCKOUT_REDIS_PREFIX || '' },
     auth: { kind: authKind, issuer: env.KEYCLOAK_ISSUER || null, clientId: env.KEYCLOAK_CLIENT_ID || null, secret: env.BLOCKOUT_AUTH_SECRET || null },
   };
 }
