@@ -22,6 +22,7 @@ function renderDie(die, value, sides = game ? game.sides : 6, skin = settings.co
   die.classList.add(`skin-${skin}`);
   die.classList.toggle('blank', !value);
   die.classList.toggle('numbered', Boolean(value) && sides > 6);
+  die.setAttribute('role', 'img');
   die.setAttribute('aria-label', value ? `Die showing ${value}` : 'Die not rolled');
   if (!value) return;
   if (sides > 6) {

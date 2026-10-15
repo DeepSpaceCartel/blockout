@@ -81,7 +81,7 @@
 .acct-table-wrap { overflow-x: auto; }
 .acct-roster td { vertical-align: middle; }
 .acct-roster td:first-child { white-space: nowrap; }
-.acct-link { font: inherit; font-weight: 800; background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; text-decoration: underline; }
+.acct-link { font: inherit; font-weight: 800; background: none; border: 0; padding: 0; color: var(--accent-text); cursor: pointer; text-decoration: underline; }
 .acct-remove { font: inherit; margin-left: 8px; border: 0; background: none; color: var(--muted); cursor: pointer; font-weight: 900; }
 .acct-remove:hover { color: var(--bad); }
 .acct-activity { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--line); font-size: 0.9rem; }

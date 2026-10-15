@@ -14,6 +14,9 @@
   --invert-bg: #2b2a33;
   --invert-ink: #ffffff;
   --accent: #e4572e;
+  /* (WCAG AA: white text on --accent-button, and --accent-text on paper, are 4.5:1 or more) */
+  --accent-button: #c4421c;
+  --accent-text: #c4421c;
   --accent-ink: #fff;
   --accent-soft: #fff1ec;
   --accent-ring: #ffd9cc;
@@ -62,6 +65,8 @@
     --invert-bg: #ece9f2;
     --invert-ink: #16151b;
     --accent: #ef6a44;
+    --accent-button: #c94a26;
+    --accent-text: #ef6a44;
     --accent-ink: #fff;
     --accent-soft: #3b2620;
     --accent-ring: #6a3526;
@@ -106,6 +111,8 @@
   --invert-bg: #ece9f2;
   --invert-ink: #16151b;
   --accent: #ef6a44;
+  --accent-button: #c94a26;
+  --accent-text: #ef6a44;
   --accent-ink: #fff;
   --accent-soft: #3b2620;
   --accent-ring: #6a3526;

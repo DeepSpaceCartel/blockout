@@ -32,6 +32,7 @@ Work towards 0.3.0 on the `v0.3.0` branch. Details and decisions: [the v0.3.0 wo
 - More games: addition, subtraction, division and four fraction games, reachable from the main menu. Each has Single player, Home (two players on one screen) and Practice, its own points, a shop (Medium, then Hard; 20-question rounds, then Expert practice; Home multiplayer), achievements and stats.
 
 ### Changed
+- Accessibility: buttons and small orange text use a slightly deeper orange so they're readable (WCAG AA contrast, light and dark), locked menu cards are no longer faded, and the dice and the admin page's fields have names for screen readers. An axe-core pass over the main screens finds nothing.
 - Roles are kept by Blockout, not taken from the sign-in provider: Keycloak's `student`, `teacher` and `parent` roles are ignored, and only `admin` counts.
 - Live classes can be kept in Redis (Valkey, `BLOCKOUT_REDIS_URL`), so several servers can run them together: a class carries on when a server restarts, crashes or is updated, and its rate limits are shared. A production server requires it.
 - Accounts can be kept in MongoDB (`BLOCKOUT_MONGO_URL`), which several servers can share; a production server requires it. Without it, accounts are kept in memory only (`data/blockout.db` is copied into MongoDB with `apps/server/scripts/sqlite-to-mongo.js`). `deploy/data/install.sh` installs MongoDB and Valkey in the cluster, and `npm run services` forwards them for development.

@@ -22,8 +22,8 @@
 
       <section id="tab-accounts" class="admin-panel">
         <form id="user-search" class="admin-row">
-          <input id="user-q" type="search" placeholder="First name" maxlength="40" autocomplete="off" />
-          <select id="user-role">
+          <input id="user-q" type="search" aria-label="First name" placeholder="First name" maxlength="40" autocomplete="off" />
+          <select id="user-role" aria-label="Role">
             <option value="">Everyone</option>
             <option value="student">Students</option>
             <option value="teacher">Teachers</option>
@@ -39,7 +39,7 @@
       <section id="tab-codes" class="admin-panel" hidden>
         <p class="admin-help">A teacher code makes one account a teacher: the person signs in on Blockout, then types the code (or opens its link). Each works once, for 7 days.</p>
         <form id="code-form" class="admin-row">
-          <select id="code-school"></select>
+          <select id="code-school" aria-label="School"></select>
           <button type="submit" class="btn btn-small btn-primary">Make a teacher code</button>
         </form>
         <div id="code-made"></div>
@@ -50,8 +50,8 @@
         <p class="admin-help">A school is matched by its students' email domain: only accounts from that domain can join its classes.</p>
         <div class="admin-table-wrap"><table class="admin-table" id="school-table"></table></div>
         <form id="school-form" class="admin-row">
-          <input id="school-name" type="text" placeholder="School name" maxlength="60" />
-          <input id="school-domain" type="text" placeholder="email domain, like iusd.org" maxlength="80" />
+          <input id="school-name" type="text" aria-label="School name" placeholder="School name" maxlength="60" />
+          <input id="school-domain" type="text" aria-label="Email domain" placeholder="email domain, like iusd.org" maxlength="80" />
           <button type="submit" class="btn btn-small btn-primary">Add school</button>
         </form>
       </section>

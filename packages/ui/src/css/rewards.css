@@ -12,7 +12,7 @@
 
 .locked { position: relative; color: var(--muted) !important; background: var(--soft) !important; }
 .lock-badge { display: block; font-size: 0.72rem; font-weight: 800; color: var(--gold-ink); }
-.mode-card.locked { opacity: 0.85; }
+.mode-card.locked { opacity: 1; } /* (fading the text made it unreadable: the grey icon and the lock say it's locked) */
 .mode-card.locked .mode-icon { filter: grayscale(1); opacity: 0.6; }
 .mode-card .lock-badge { margin-top: 2px; }
 

@@ -75,7 +75,7 @@
 }
 .wallet-line { flex: 1 1 auto; min-width: 0; font-weight: 800; font-size: 1.1rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .wallet-after { color: var(--muted); }
-.wallet-cost { color: var(--accent); }
+.wallet-cost { color: var(--accent-text); }
 .wallet-left { color: var(--ink); }
 .wallet-after.short { color: var(--bad); font-size: 0.95rem; }
 .view-toggle button { padding: 0.45rem 0.8rem; }
@@ -85,7 +85,7 @@
   .wallet-bar .view-toggle { flex: 1; }
 }
 .filter-note { text-align: center; font-size: 0.85rem; font-weight: 700; color: var(--muted); margin: 0 0 8px; }
-.link-btn { border: 0; background: none; padding: 0; color: var(--accent); font-weight: 800; text-decoration: underline; cursor: pointer; }
+.link-btn { border: 0; background: none; padding: 0; color: var(--accent-text); font-weight: 800; text-decoration: underline; cursor: pointer; }
 
 /* ---------- Sticker album ---------- */
 .sticker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 8px; }

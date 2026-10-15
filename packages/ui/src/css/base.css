@@ -22,9 +22,9 @@
 .btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 0 var(--edge-shadow); }
 .btn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--edge-shadow); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.btn-primary { background: var(--accent); color: var(--accent-ink); }
+.btn-primary { background: var(--accent-button); color: var(--accent-ink); }
 /* Can't be undone (deleting an account): red text, not a red button, so it's never the obvious one to press */
-.btn-danger { color: var(--danger); border-color: var(--danger); }
+.btn-danger { color: var(--bad); border-color: var(--bad); }
 .btn-big { width: 100%; padding: 0.85rem 1rem; font-size: 1.15rem; }
 
 .screen { padding: 16px; }

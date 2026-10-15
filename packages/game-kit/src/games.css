@@ -189,7 +189,7 @@
   padding: 18px;
 }
 .hub-card h2 { margin: 0; font-size: 1.3rem; display: flex; align-items: center; gap: 10px; }
-.hub-card .grade { margin: 0; font-size: 0.82rem; font-weight: 800; color: var(--accent); }
+.hub-card .grade { margin: 0; font-size: 0.82rem; font-weight: 800; color: var(--accent-text); }
 .hub-card .tag { margin: 0; font-weight: 800; }
 .hub-card .idea { margin: 0; color: var(--muted); font-size: 0.92rem; line-height: 1.45; flex: 1; }
 .hub-card .btn { align-self: flex-start; text-decoration: none; color: var(--accent-ink); margin-top: 6px; }
