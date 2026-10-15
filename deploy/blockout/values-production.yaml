@@ -1,0 +1,26 @@
+# The production cluster (M8 in the production-readiness plan): more servers,
+# autoscaling, an image pinned by digest. Hostnames and the gateway are
+# placeholders until that cluster exists.
+replicaCount: 3
+image:
+  # digest: sha256:… (set by the deploy, so a tag can't move under it)
+  pullPolicy: IfNotPresent
+publicUrl: https://blockout.example.org
+keycloak:
+  issuer: https://id.example.org/realms/blockout
+httpRoute:
+  hostnames: [blockout.example.org]
+  parentRefs:
+    - name: gateway
+      namespace: gateway
+resources:
+  requests: { cpu: 250m, memory: 256Mi }
+  limits: { memory: 768Mi }
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 12
+podDisruptionBudget:
+  minAvailable: 2
+networkPolicy:
+  enabled: true

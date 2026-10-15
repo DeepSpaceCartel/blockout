@@ -1,0 +1,7 @@
+Blockout {{ .Chart.AppVersion }} is on its way: {{ .Values.publicUrl }}
+
+  kubectl -n {{ .Release.Namespace }} rollout status deployment/{{ include "blockout.fullname" . }}
+  kubectl -n {{ .Release.Namespace }} logs deployment/{{ include "blockout.fullname" . }} | head
+
+Its MongoDB and Redis URLs come from the Secrets {{ .Values.secrets.mongo.name }} and {{ .Values.secrets.redis.name }}.
+The first admin: give your Keycloak account the realm role "admin" (docs/guides/set-up-keycloak.md).

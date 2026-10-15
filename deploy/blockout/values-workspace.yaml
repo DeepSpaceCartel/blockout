@@ -1,0 +1,17 @@
+# The workspace cluster: the shared Cilium gateway (gateway/rts-gateway) with a
+# listener and certificate per hostname, MongoDB and Valkey from deploy/data
+# (namespace blockout-data), Keycloak from deploy/keycloak.
+# (Hostnames to confirm: they follow the cluster's <name>.deepspacecartel.com.)
+publicUrl: https://blockout.deepspacecartel.com
+keycloak:
+  issuer: https://id.deepspacecartel.com/realms/blockout
+httpRoute:
+  hostnames: [blockout.deepspacecartel.com]
+  parentRefs:
+    - name: rts-gateway
+      namespace: gateway
+      sectionName: blockout-deepspacecartel-com
+networkPolicy:
+  enabled: true
+  cilium: true
+  dataNamespace: blockout-data

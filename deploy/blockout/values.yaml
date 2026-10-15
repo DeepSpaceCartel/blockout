@@ -1,0 +1,113 @@
+# Blockout's settings. Required: publicUrl and keycloak.issuer (the chart
+# refuses to render without them), and the Secrets named under secrets.
+# Every server is the same, so any number can run (live classes are shared in Redis).
+
+image:
+  repository: ghcr.io/alexanderilyin/blockout
+  # Defaults to the chart's appVersion. A digest (sha256:…) pins the exact image.
+  tag: ""
+  digest: ""
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+# The address people use, https only, e.g. https://blockout.example.org
+publicUrl: ""
+
+keycloak:
+  # The realm URL, e.g. https://id.example.org/realms/blockout
+  issuer: ""
+  clientId: blockout
+
+# How many proxies sit in front of the server (the gateway): their
+# X-Forwarded-For is trusted for rate limits
+trustProxy: 1
+
+log:
+  level: info
+  format: json
+
+# A prefix for every Redis key (to keep several Blockouts apart in one Redis)
+redisPrefix: ""
+
+# Secrets made outside the chart (deploy/data/install.sh, or a secrets operator).
+# The chart only refers to them by name.
+secrets:
+  mongo: { name: blockout-mongo, key: url }
+  redis: { name: blockout-redis, key: url }
+  # Optional: OpenAI's free moderation for guests' names. Leave name empty for none.
+  openai: { name: "", key: api-key }
+
+# More environment variables, as in a container spec
+extraEnv: []
+
+resources:
+  requests: { cpu: 100m, memory: 160Mi }
+  limits: { memory: 512Mi }
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  seccompProfile: { type: RuntimeDefault }
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: { drop: [ALL] }
+
+# Time to finish: streams are ended so browsers reconnect elsewhere, and
+# classes are handed over (the server needs a few seconds; the gateway a few more
+# to stop sending new requests)
+terminationGracePeriodSeconds: 30
+preStopSleepSeconds: 5
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+service:
+  port: 80
+
+# Gateway API: an HTTPRoute on a shared Gateway (the cluster's ingress)
+httpRoute:
+  enabled: true
+  hostnames: []
+  parentRefs: []
+  #  - name: rts-gateway
+  #    namespace: gateway
+  #    sectionName: blockout-example-org
+  # Live classes hold event streams open for hours: no request timeout
+  timeouts:
+    request: "0s"
+
+# Or a classic Ingress
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts: []
+  #  - host: blockout.example.org
+  tls: []
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+# Who may talk to Blockout, and whom it may talk to (Cilium: traffic from the
+# gateway is the "ingress" entity, which a plain NetworkPolicy can't name)
+networkPolicy:
+  enabled: false
+  # CiliumNetworkPolicy (true) or a Kubernetes NetworkPolicy (false)
+  cilium: true
+  # where MongoDB and Valkey run
+  dataNamespace: blockout-data
+  # Plain NetworkPolicy only: namespaces whose pods may connect (the ingress controller's)
+  ingressNamespaces: []

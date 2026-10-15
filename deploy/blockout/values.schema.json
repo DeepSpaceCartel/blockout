@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Blockout chart values",
+  "type": "object",
+  "required": ["image", "publicUrl", "keycloak", "secrets"],
+  "properties": {
+    "image": {
+      "type": "object",
+      "required": ["repository"],
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "tag": { "type": "string" },
+        "digest": { "type": "string", "pattern": "^(sha256:[0-9a-f]{64})?$" },
+        "pullPolicy": { "enum": ["Always", "IfNotPresent", "Never"] }
+      }
+    },
+    "replicaCount": { "type": "integer", "minimum": 1 },
+    "publicUrl": { "type": "string", "pattern": "^(https://.+)?$", "description": "https only; required to render" },
+    "keycloak": {
+      "type": "object",
+      "properties": {
+        "issuer": { "type": "string", "pattern": "^(https?://.+/realms/[^/]+)?$" },
+        "clientId": { "type": "string", "minLength": 1 }
+      }
+    },
+    "trustProxy": { "type": "integer", "minimum": 0 },
+    "log": {
+      "type": "object",
+      "properties": {
+        "level": { "enum": ["debug", "info", "warn", "error", "silent"] },
+        "format": { "enum": ["json", "text"] }
+      }
+    },
+    "redisPrefix": { "type": "string" },
+    "secrets": {
+      "type": "object",
+      "required": ["mongo", "redis"],
+      "properties": {
+        "mongo": { "$ref": "#/$defs/secretRef" },
+        "redis": { "$ref": "#/$defs/secretRef" },
+        "openai": { "$ref": "#/$defs/optionalSecretRef" }
+      }
+    },
+    "extraEnv": { "type": "array" },
+    "terminationGracePeriodSeconds": { "type": "integer", "minimum": 10 },
+    "preStopSleepSeconds": { "type": "integer", "minimum": 0 },
+    "httpRoute": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "hostnames": { "type": "array", "items": { "type": "string" } },
+        "parentRefs": { "type": "array", "items": { "type": "object", "required": ["name"] } }
+      }
+    },
+    "autoscaling": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "minReplicas": { "type": "integer", "minimum": 1 },
+        "maxReplicas": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "networkPolicy": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "cilium": { "type": "boolean" },
+        "dataNamespace": { "type": "string" },
+        "ingressNamespaces": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "$defs": {
+    "secretRef": {
+      "type": "object",
+      "required": ["name", "key"],
+      "properties": { "name": { "type": "string", "minLength": 1 }, "key": { "type": "string", "minLength": 1 } }
+    },
+    "optionalSecretRef": {
+      "type": "object",
+      "properties": { "name": { "type": "string" }, "key": { "type": "string" } }
+    }
+  }
+}

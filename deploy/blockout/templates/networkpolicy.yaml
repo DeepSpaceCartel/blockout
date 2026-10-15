@@ -1,0 +1,48 @@
+{{- if .Values.networkPolicy.enabled }}
+{{- if .Values.networkPolicy.cilium }}
+# In: only from the gateway. Out: DNS, MongoDB and Valkey, and HTTPS to the
+# world (Keycloak's public keys, OpenAI's moderation).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: {{ include "blockout.fullname" . }}
+  labels: {{- include "blockout.labels" . | nindent 4 }}
+spec:
+  endpointSelector:
+    matchLabels: {{- include "blockout.selectorLabels" . | nindent 6 }}
+  ingress:
+    - fromEntities: [ingress]
+      toPorts: [{ ports: [{ port: "8080", protocol: TCP }] }]
+  egress:
+    - toEndpoints:
+        - matchLabels: { k8s:io.kubernetes.pod.namespace: kube-system, k8s-app: kube-dns }
+      toPorts: [{ ports: [{ port: "53", protocol: ANY }] }]
+    - toEndpoints:
+        - matchLabels: { k8s:io.kubernetes.pod.namespace: {{ .Values.networkPolicy.dataNamespace }} }
+      toPorts: [{ ports: [{ port: "27017", protocol: TCP }, { port: "6379", protocol: TCP }] }]
+    - toEntities: [world]
+      toPorts: [{ ports: [{ port: "443", protocol: TCP }] }]
+{{- else }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "blockout.fullname" . }}
+  labels: {{- include "blockout.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{- include "blockout.selectorLabels" . | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        {{- range .Values.networkPolicy.ingressNamespaces }}
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: {{ . }} } }
+        {{- end }}
+      ports: [{ port: 8080, protocol: TCP }]
+  egress:
+    - ports: [{ port: 53, protocol: UDP }, { port: 53, protocol: TCP }]
+    - to:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: {{ .Values.networkPolicy.dataNamespace }} } }
+      ports: [{ port: 27017, protocol: TCP }, { port: 6379, protocol: TCP }]
+    - ports: [{ port: 443, protocol: TCP }]
+{{- end }}
+{{- end }}

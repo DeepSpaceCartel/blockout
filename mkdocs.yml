@@ -23,6 +23,7 @@ nav:
       - Share through a tunnel: guides/share-through-a-tunnel.md
       - Switch sign-in to Keycloak: guides/set-up-keycloak.md
       - Set up MongoDB and Valkey: guides/set-up-the-databases.md
+      - Deploy to a cluster: guides/deploy.md
       - Back up the database: guides/back-up-the-database.md
   - Application:
       - Architecture: concepts/architecture.md

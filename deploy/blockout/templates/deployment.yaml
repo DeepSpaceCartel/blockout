@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "blockout.fullname" . }}
+  labels: {{- include "blockout.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels: {{- include "blockout.selectorLabels" . | nindent 6 }}
+  # One new server at a time, and never fewer than asked for: classes move over as servers stop
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  template:
+    metadata:
+      labels: {{- include "blockout.selectorLabels" . | nindent 8 }}
+      annotations:
+        # a settings change restarts the servers
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "blockout.fullname" . }}
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      # spread over nodes, so one node going away doesn't take every server
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: {{- include "blockout.selectorLabels" . | nindent 14 }}
+      containers:
+        - name: blockout
+          image: {{ include "blockout.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext: {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - { name: http, containerPort: 8080 }
+          envFrom:
+            - configMapRef: { name: {{ include "blockout.fullname" . }} }
+          env:
+            - name: BLOCKOUT_MONGO_URL
+              valueFrom: { secretKeyRef: { name: {{ .Values.secrets.mongo.name }}, key: {{ .Values.secrets.mongo.key }} } }
+            - name: BLOCKOUT_REDIS_URL
+              valueFrom: { secretKeyRef: { name: {{ .Values.secrets.redis.name }}, key: {{ .Values.secrets.redis.key }} } }
+            {{- if .Values.secrets.openai.name }}
+            - name: OPENAI_API_KEY
+              valueFrom: { secretKeyRef: { name: {{ .Values.secrets.openai.name }}, key: {{ .Values.secrets.openai.key }} } }
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          # startup: migrations done and databases connected; live: the event
+          # loop turns (never the databases, so their outage restarts nothing);
+          # ready: can serve (not while shutting down)
+          startupProbe:
+            httpGet: { path: /health/startup, port: http }
+            periodSeconds: 2
+            failureThreshold: 60
+          livenessProbe:
+            httpGet: { path: /health/live, port: http }
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet: { path: /health/ready, port: http }
+            periodSeconds: 5
+            failureThreshold: 2
+          lifecycle:
+            # let the gateway stop sending new requests before the server starts finishing
+            preStop:
+              exec: { command: [sleep, "{{ .Values.preStopSleepSeconds }}"] }
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: tmp, emptyDir: { sizeLimit: 64Mi } }
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}

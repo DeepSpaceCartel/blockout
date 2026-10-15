@@ -1,5 +1,6 @@
-# Keeps the pinned action SHAs (with their version comments), npm packages and the
-# dev container current.
+# Keeps the pinned action SHAs (with their version comments), npm packages, the
+# dev container, and the images (the Dockerfile's Node, and the cluster's
+# MongoDB, Valkey and Postgres) current.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -18,5 +19,17 @@ updates:
   # .devcontainer/features, whose versions are bumped by hand.
   - package-ecosystem: devcontainers
     directory: /
+    schedule:
+      interval: weekly
+  # Image tags and digests: the Dockerfile, and the Kubernetes manifests in deploy/
+  - package-ecosystem: docker
+    directories: [/, /deploy/data, /deploy/keycloak]
+    schedule:
+      interval: weekly
+    groups:
+      images:
+        patterns: ['*']
+  - package-ecosystem: helm
+    directory: /deploy/blockout
     schedule:
       interval: weekly

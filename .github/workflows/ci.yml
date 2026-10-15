@@ -44,6 +44,50 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  # The container image builds, and has no known high or critical
+  # vulnerabilities that a fix exists for. Not pushed: release.yml does that.
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          load: true
+          tags: blockout:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      # Runs the image: without its settings it must refuse to start (and say why)
+      - name: Refuses to start without settings
+        run: |
+          if docker run --rm blockout:ci; then echo "started without settings" >&2; exit 1; fi
+      # (pinned by commit: see the March 2026 trivy-action advisory before bumping)
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: blockout:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+  # The Helm chart is well-formed and renders for every cluster's values
+  chart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+      - run: helm lint --strict deploy/blockout
+      - run: |
+          for values in deploy/blockout/values-*.yaml; do
+            helm template blockout deploy/blockout -f "$values" > /dev/null
+          done
+
   docs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
