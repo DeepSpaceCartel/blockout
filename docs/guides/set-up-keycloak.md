@@ -115,12 +115,34 @@ This deletes the Secrets and the database volume too, so every account. Reinstal
 
 ## On a public server
 
-For classrooms, Keycloak needs a public HTTPS hostname, and so does Blockout:
+For classrooms, Keycloak needs a public HTTPS address, and so does Blockout ([Deploy to a cluster](deploy.md)).
 
-- Set `KC_HOSTNAME` in `values.yaml` to Keycloak's public address, and expose it (in this cluster: a listener on the shared gateway, the certificate and a DNS record).
-- In `realm-blockout.json` and in the running realm, add Blockout's public address to the `blockout` client's redirect URIs and web origins.
-- In Google Cloud Console, add `https://<keycloak>/realms/blockout/broker/google/endpoint` as a redirect URI.
-- To let only school accounts in, set the Google provider's **Hosted domain** (for example `iusd.org`). That also stops parents with other Google accounts from signing in.
-- Start Blockout with `KEYCLOAK_ISSUER=https://<keycloak>/realms/blockout`.
+1. **The gateway and DNS:** a listener (with its certificate) on the cluster's shared Gateway for Keycloak's hostname, and a DNS record. In the workspace cluster that's `gateway/rts-gateway`, set up outside this repository.
+2. **Google Cloud Console:** add `https://<keycloak>/realms/blockout/broker/google/endpoint` to the OAuth client's redirect URIs.
+3. **Install with the public address:**
+   ```sh
+   KEYCLOAK_URL=https://id.example.org \
+   BLOCKOUT_URLS="https://blockout.example.org" \
+   GATEWAY=rts-gateway GATEWAY_NAMESPACE=gateway LISTENER=id-example-org \
+   deploy/keycloak/install.sh
+   ```
+   This sets Keycloak's hostname (the tokens' issuer becomes `https://id.example.org/realms/blockout`), publishes only sign-in on the gateway (`/realms/blockout` and `/resources`; the admin console stays behind `npm run keycloak`), and runs `realm.sh`.
+4. **Start Blockout** with `KEYCLOAK_ISSUER=https://<keycloak>/realms/blockout` (the chart's `keycloak.issuer`).
+
+`realm.sh` brings the realm in line, new or existing, and is safe to run again:
+
+- **The `blockout` client** accepts only Blockout's addresses (`BLOCKOUT_URLS`) to send people back to.
+- **The `admin` realm role** exists.
+- **Brute-force protection** is on, and passwords are at least 10 characters.
+- **Mail:** with a `keycloak-smtp` Secret (keys `host`, `port`, `from`, `user`, `password`), Keycloak checks new accounts' email addresses and lets people reset passwords. Without one, both are off, because nothing could send the mail.
+
+    ```sh
+    kubectl -n keycloak create secret generic keycloak-smtp --from-literal=host=smtp.example.org \
+      --from-literal=port=587 --from-literal=from=blockout@example.org --from-literal=user=… --from-literal=password=…
+    ```
+
+**Who can sign in:** with **User registration** on (the realm's `registrationAllowed`), anyone can make an account, and Google lets anyone with a Google account in. That's safe because a new account is only a student until a teacher's or a grown-up's code changes it ([ADR-0008](../decisions/0008-roles-in-blockout.md)). To let only school accounts in through Google, set the Google provider's **Hosted domain** (for example `iusd.org`); that also keeps out grown-ups with other Google accounts.
+
+**The Google client secret from 1Password:** with `OP_SERVICE_ACCOUNT_TOKEN` set, `GOOGLE_SECRET_REF=op://<vault>/<item>/<field> deploy/keycloak/install.sh` reads it with `op read` instead of asking.
 
 See [ADR-0002](../decisions/0002-swappable-sign-in.md) for how sign-in is built.

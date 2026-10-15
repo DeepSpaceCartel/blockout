@@ -1,13 +1,25 @@
-# Keycloak for Blockout sign-in (Helm chart codecentric/keycloakx), reached on
-# http://localhost:8180 through `npm run keycloak` (a kubectl port-forward), so
-# for development only: other devices can't reach it. Install or update it with
-# deploy/keycloak/install.sh; see docs/guides/set-up-keycloak.md.
+# Keycloak for Blockout sign-in (Helm chart codecentric/keycloakx). Reached on
+# http://localhost:8180 through `npm run keycloak` (a kubectl port-forward) for
+# development, or on a public address through the cluster's gateway
+# (KEYCLOAK_URL=https://… deploy/keycloak/install.sh). See
+# docs/guides/set-up-keycloak.md.
+
+# Blockout's own settings for this chart (used in extraEnv below)
+blockout:
+  # Every URL Keycloak hands out, and the tokens' issuer, use this address
+  hostname: http://localhost:8180
 image:
   tag: "26.7.4"
 
 # Production mode on plain HTTP; the blockout realm is imported on first start
 # (an existing realm is left alone)
 args: ["start", "--import-realm"]
+
+# Behind the gateway (Envoy): the client's address and https come from
+# X-Forwarded-* (only the gateway and port-forwards can reach the pod)
+proxy:
+  enabled: true
+  mode: xforwarded
 
 http:
   relativePath: "/"
@@ -23,9 +35,8 @@ database:
   existingSecretKey: password
 
 extraEnv: |
-  # Every URL Keycloak hands out (and the tokens' iss) uses the port-forward address
   - name: KC_HOSTNAME
-    value: http://localhost:8180
+    value: {{ .Values.blockout.hostname | quote }}
   - name: KC_BOOTSTRAP_ADMIN_USERNAME
     valueFrom: { secretKeyRef: { name: keycloak-admin, key: username } }
   - name: KC_BOOTSTRAP_ADMIN_PASSWORD

@@ -1,0 +1,21 @@
+# Keycloak's public address on the cluster's gateway (applied by install.sh when
+# KEYCLOAK_URL is https; HOST, GATEWAY, GATEWAY_NAMESPACE and LISTENER are
+# filled in). Only sign-in is public: the admin console (/admin) isn't routed;
+# admins use the port-forward (npm run keycloak).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: keycloak
+spec:
+  parentRefs:
+    - name: GATEWAY
+      namespace: GATEWAY_NAMESPACE
+      sectionName: LISTENER
+  hostnames: [HOST]
+  rules:
+    - matches:
+        - path: { type: PathPrefix, value: /realms/blockout }
+        - path: { type: PathPrefix, value: /resources }
+      backendRefs:
+        - name: keycloak-keycloakx-http
+          port: 80
