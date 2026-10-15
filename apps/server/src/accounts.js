@@ -24,8 +24,8 @@ const CODE_LETTERS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 function randomCode(length, taken) {
   for (;;) {
     let code = '';
-    const bytes = crypto.randomBytes(length);
-    for (let i = 0; i < length; i++) code += CODE_LETTERS[bytes[i] % CODE_LETTERS.length];
+    // randomInt, not a byte % 31: every letter equally likely
+    for (let i = 0; i < length; i++) code += CODE_LETTERS[crypto.randomInt(CODE_LETTERS.length)];
     if (!taken(code)) return code;
   }
 }

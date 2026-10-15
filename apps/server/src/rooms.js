@@ -35,8 +35,11 @@ class RoomError extends Error {
 }
 
 const token = () => crypto.randomBytes(12).toString('hex');
+// Like Math.random, but from the operating system's secure source: class codes
+// must not be predictable from earlier ones
+const secureRandom = () => crypto.randomInt(2 ** 48 - 1) / (2 ** 48 - 1); // (randomInt allows a range below 2^48)
 
-function newCode(taken, rng = Math.random) {
+function newCode(taken, rng = secureRandom) {
   for (;;) {
     let code = '';
     for (let i = 0; i < CODE_LENGTH; i++) code += CODE_LETTERS[Math.floor(rng() * CODE_LETTERS.length)];
@@ -77,7 +80,7 @@ function cleanSettings(s = {}) {
   };
 }
 
-function createRoom(settings = {}, { taken = new Set(), rng = Math.random, now = Date.now() } = {}) {
+function createRoom(settings = {}, { taken = new Set(), rng = secureRandom, now = Date.now() } = {}) {
   // Tournaments are many short games: 6 turns each by default
   if (settings.type === 'tournament' && settings.matchTurns === undefined) settings = { ...settings, matchTurns: 12 };
   return {
