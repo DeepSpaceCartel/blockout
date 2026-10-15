@@ -34,7 +34,7 @@ const DEFAULTS = {
   roundPauseMs: 5000, // tournaments: time to see your result before the next round
   cpuRollMs: 1500, // pairs: the CPU's turn, slow enough to watch
   cpuPlaceMs: 2200,
-  maxTries: 8,
+  maxTries: 25, // (a whole class answering in the same instant, on two servers)
 };
 const CPU_SPEED = { slow: 1.6, normal: 1, fast: 0.4 }; // the teacher's "CPU speed" setting
 
@@ -111,7 +111,8 @@ function createLive({ backend, log = silentLogger, replicaId = crypto.randomByte
         const answer = fn(room);
         room.version = got.v + 1;
         if (await backend.cas(code, got.v, strip(room), o.roomTtlMs)) return answer;
-        await new Promise((r) => setTimeout(r, 5 + Math.random() * 35 * (attempt + 1)));
+        // back off, longer each time and never in step with the other writers
+        await new Promise((r) => setTimeout(r, Math.random() * Math.min(250, 5 * 1.5 ** attempt)));
       }
       throw new Rooms.RoomError('busy', 'The class is busy. Try again.');
     };

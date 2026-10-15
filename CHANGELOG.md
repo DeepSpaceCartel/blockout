@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- A load test for live classes (`apps/server/scripts/loadtest.js`): 30 classes of 30 students on two servers get each roll to every student in under a second.
+
+### Fixed
+- When a whole class answers in the same instant, no answer is lost: the server tries longer to save each one, and the game sends an answer again if the class was busy.
+
 ## [0.4.0] - 2026-10-15
 
 The first release since 0.2.0 (0.3.0 wasn't released on its own): accounts and homework, more games, and everything needed to run Blockout as a public service. Details and decisions: [the v0.3.0 work log](https://github.com/DeepSpaceCartel/blockout/blob/v0.4.0/docs/v0.3.0-log.md) and the [decision records](https://github.com/DeepSpaceCartel/blockout/tree/v0.4.0/docs/decisions).

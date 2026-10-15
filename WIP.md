@@ -16,7 +16,7 @@ The full production-readiness plan (approved 2026-10-15) is at the end of this f
 | M5 | First public deployment in the workspace cluster | In-repo parts done (public Keycloak via `KEYCLOAK_URL`, `realm.sh`, `values-workspace.yaml`). MongoDB and Valkey are installed in `blockout-data`. Waiting on the items below |
 | M6 | Metrics, alert rules, nightly encrypted backups, restore drill, runbooks | Done; backup and restore drill tested in the cluster with a local remote. Real backups wait for object storage |
 | M7 | Retention (13 months), data export, privacy page, accessibility pass | Done |
-| M8 | Production cluster: operators, GitOps, load test, cutover | Not started |
+| M8 | Production cluster: operators, GitOps, load test, cutover | Load test done (`apps/server/scripts/loadtest.js`; results in `docs/project/testing.md`): 30×30 on two servers, p95 636 ms, no errors after fixing lost answers under contention. The rest waits for the production cluster |
 
 ## Done (all committed and pushed on `v0.3.0`; tag `v0.4.0` pushed)
 

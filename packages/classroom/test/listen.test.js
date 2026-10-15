@@ -80,3 +80,24 @@ test('a 404 means the class is gone', async () => {
   assert.deepEqual(gone, ['lost']);
   close();
 });
+
+test('an answer to a busy class is sent again, and lands', async () => {
+  const { sendResult } = await import('../src/client.js');
+  answers = [
+    [503, { error: 'busy', message: 'The class is busy. Try again.' }],
+    [503, { error: 'busy', message: 'The class is busy. Try again.' }],
+    [200, { ok: true, score: 12 }],
+  ];
+  polls = 0;
+  const r = await sendResult({ code: 'ABCD', id: 'p1', key: 'k' }, { round: 1, kind: 'timeout' });
+  assert.deepEqual(r, { ok: true, score: 12 });
+  assert.equal(polls, 3, 'three tries');
+});
+
+test('other errors are not retried', async () => {
+  const { sendResult } = await import('../src/client.js');
+  answers = [[409, { error: 'done', message: 'You already answered.' }]];
+  polls = 0;
+  await assert.rejects(sendResult({ code: 'ABCD', id: 'p1', key: 'k' }, { round: 1, kind: 'timeout' }), /already answered/);
+  assert.equal(polls, 1);
+});

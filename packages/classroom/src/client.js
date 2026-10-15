@@ -19,7 +19,11 @@ class ClassError extends Error {
 // The classroom needs the page to come from the classroom server.
 const served = () => location.protocol === 'http:' || location.protocol === 'https:';
 
-async function request(method, path, body) {
+const BUSY_TRIES = 4;
+
+// A busy class (503 busy: the change wasn't saved, others were writing at that
+// instant) is tried again a few times before giving up
+async function request(method, path, body, tries = BUSY_TRIES) {
   let res;
   try {
     // Signed in (js/auth.js): the server knows who's hosting or joining
@@ -37,6 +41,10 @@ async function request(method, path, body) {
     data = await res.json();
   } catch (e) {
     throw new ClassError('offline', 'The classroom server isn’t running here.');
+  }
+  if (res.status === 503 && data.error === 'busy' && tries > 1) {
+    await new Promise((r) => setTimeout(r, 100 + Math.random() * 200 * (BUSY_TRIES - tries + 1)));
+    return request(method, path, body, tries - 1);
   }
   if (!res.ok) throw new ClassError(data.error || 'server', data.message || 'Something went wrong.');
   return data;
