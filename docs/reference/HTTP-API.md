@@ -30,6 +30,19 @@ Everything under `/api` on the server. Requests and responses are JSON. The game
     Live updates (`/events`, `/poll`) answer `404` for a wrong teacher or player key, the same as for a class that doesn't exist. A class takes at most 200 open event streams, and an address at most 500; past that `/events` answers `429`.
 - **Bad requests:** an address with a broken `%` escape gets `400` (`bad-request`). A request body that's cut off gets `400` (`aborted`), and one that takes longer than 10 seconds to arrive gets `408` (`timeout`).
 
+## Health
+
+For Kubernetes probes and uptime checks. No sign-in, not rate-limited, `Cache-Control: no-store`.
+
+| Method and path | Answer |
+|---|---|
+| `GET /health/startup` | `200 { status: 'started' }` once the server is set up; `503` before |
+| `GET /health/live` | `200 { status: 'live' }` while the server keeps up; `503` if it has been stuck for 5 seconds or more. It doesn't check the database, so a database outage doesn't restart the server |
+| `GET /health/ready` | `200 { status: 'ready' }` when it can take requests; `503` (`starting`, `draining` or `database`) while it starts, shuts down, or can't reach the database |
+| `GET /api/health` | `{ ok, lan }`: the addresses students can use (only the public one on a production server) |
+
+On `SIGTERM` or `SIGINT` the server stops taking connections, reports `draining`, ends live-update streams (browsers reconnect) and answers held polls, then exits within 20 seconds.
+
 ## Sign-in
 
 | Method and path | Who | Body | Answer |

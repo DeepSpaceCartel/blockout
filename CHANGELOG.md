@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Work towards 0.3.0 on the `v0.3.0` branch. Details and decisions: [the v0.3.0 work log](https://github.com/alexanderilyin/blockout/blob/v0.3.0/docs/v0.3.0-log.md).
 
 ### Added
+- Health endpoints for Kubernetes probes: `/health/startup`, `/health/live` and `/health/ready`. On `SIGTERM` the server finishes cleanly: it stops taking connections, ends live-update streams so browsers reconnect, answers waiting polls and exits.
 - Accounts for students, teachers and parents, signed in with a practice "dev sign-in" for now and ready for Keycloak (and school Google accounts) later. Guests can still play everything except hosting a class.
 - Teachers: classes that students join with a code, a class stats page, homework and scheduled class or school tournaments whose lobby opens by itself.
 - Parents: link a child with a code, see their Times Table and homework, and set extra homework.

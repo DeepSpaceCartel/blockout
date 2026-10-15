@@ -487,7 +487,7 @@ function matchAccountRoute(method, pathname) {
 }
 
 // Scheduled tournaments: open each one's lobby when it's due
-setInterval(() => {
+const scheduleTimer = setInterval(() => {
   try {
     accounts.openDue(openRoom);
   } catch (e) {
@@ -666,6 +666,70 @@ function tooMany(res, retryAfter) {
   sendProblem(res, 429, 'rate', 'Too many tries. Wait a minute and try again.');
 }
 
+// ---------------------------------------------------------------- health and shutdown
+
+// One endpoint per Kubernetes probe. None of them sign anyone in, and none
+// count towards rate limits.
+//   startup: everything is set up (later: databases connected and migrated)
+//   live:    the event loop still turns; never checks other services, so an
+//            outage there doesn't get every server restarted
+//   ready:   send traffic here (not while shutting down, not without a database)
+const LAG_LIMIT_MS = 5000;
+let started = false;
+let draining = false;
+let lag = 0;
+let lastTick = performance.now();
+setInterval(() => {
+  const t = performance.now();
+  lag = Math.max(0, t - lastTick - 1000);
+  lastTick = t;
+}, 1000).unref();
+
+function storeOk() {
+  try {
+    store.getMeta('health');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const HEALTH = {
+  '/health/startup': () => (started ? [200, { status: 'started' }] : [503, { status: 'starting' }]),
+  '/health/live': () => (lag < LAG_LIMIT_MS ? [200, { status: 'live' }] : [503, { status: 'stuck', lagMs: Math.round(lag) }]),
+  '/health/ready': () => {
+    if (!started) return [503, { status: 'starting' }];
+    if (draining) return [503, { status: 'draining' }];
+    if (!storeOk()) return [503, { status: 'database' }];
+    return [200, { status: 'ready' }];
+  },
+};
+
+// Stop taking new work, let everyone's browser know, and finish. Live classes
+// are in this process's memory (for now), so they end here; streams are
+// closed so browsers reconnect to the next server.
+async function drain({ timeoutMs = 20000 } = {}) {
+  if (draining) return;
+  draining = true;
+  clearInterval(scheduleTimer);
+  const closed = new Promise((resolve) => server.close(resolve));
+  for (const set of streams.values()) {
+    for (const s of set) {
+      s.res.write('retry: 2000\n\n');
+      s.res.end();
+    }
+  }
+  for (const [code, set] of pollers) {
+    const room = rooms.get(code);
+    for (const w of set) room ? answerPoll(room, w) : send(w.res, 200, { closed: true });
+  }
+  server.closeIdleConnections();
+  const timeout = new Promise((resolve) => setTimeout(resolve, timeoutMs).unref());
+  await Promise.race([closed, timeout]);
+  server.closeAllConnections();
+  store.close();
+}
+
 function route(req) {
   const url = new URL(req.url, 'http://x');
   const parts = url.pathname.split('/').filter(Boolean); // api, rooms, CODE, action
@@ -679,6 +743,11 @@ function route(req) {
 }
 
 const server = http.createServer(async (req, res) => {
+  const health = HEALTH[req.url.split('?')[0]];
+  if (health) {
+    const [status, body] = health();
+    return send(res, status, body);
+  }
   const ip = clientIp(req, config.trustProxy);
   let r;
   try {
@@ -762,6 +831,14 @@ if (IS_MAIN) {
   };
   process.on('unhandledRejection', fatal('Unhandled rejection:'));
   process.on('uncaughtException', fatal('Uncaught exception:'));
+  // Kubernetes sends SIGTERM before stopping a pod; Ctrl+C is SIGINT
+  for (const signal of ['SIGTERM', 'SIGINT']) {
+    process.once(signal, async () => {
+      console.log(`${signal}: finishing up`);
+      await drain();
+      process.exit(0);
+    });
+  }
   server.listen(PORT, () => {
     console.log(`Blockout server on http://localhost:${PORT}/`);
     for (const url of lanUrls()) console.log(url === PUBLIC_URL ? `  Students join at: ${url}` : `  Chromebooks on this network: ${url}`);
@@ -770,4 +847,6 @@ if (IS_MAIN) {
   });
 }
 
-export { server, rooms, store, accounts };
+started = true;
+
+export { server, rooms, store, accounts, drain };

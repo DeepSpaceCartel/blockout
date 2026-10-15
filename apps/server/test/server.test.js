@@ -104,6 +104,15 @@ test('HTTP: a class holds at most 200 live streams', async () => {
   agent.destroy();
 });
 
+test('HTTP: one health endpoint per Kubernetes probe', async () => {
+  for (const [path, status] of [['/health/startup', 'started'], ['/health/live', 'live'], ['/health/ready', 'ready']]) {
+    const res = await fetch(base + path);
+    assert.equal(res.status, 200, path);
+    assert.equal((await res.json()).status, status);
+    assert.equal(res.headers.get('cache-control'), 'no-store');
+  }
+});
+
 // (last: it uses up this address's wrong-code allowance)
 test('HTTP: guessing codes gets 429 after a run of wrong ones; streams with a wrong key look like no class', async () => {
   const teacher = await signIn({ firstName: 'Mr', lastInitial: 'G', role: 'teacher', schoolId: 'cadence-park' });
