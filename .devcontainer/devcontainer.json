@@ -23,7 +23,7 @@
 		},
 		"./features/coder-cli": { "url": "https://coder.deepspacecartel.com" },
 		// op, for reading deploy secrets (deploy/keycloak) from 1Password
-		"./features/1password-cli": { "version": "2.40.0" }
+		"./features/1password-cli": { "version": "latest" }
 	},
 
 	// The Blockout server (npm start), the Vite dev server (npm run dev), the
