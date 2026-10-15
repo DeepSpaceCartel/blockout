@@ -30,12 +30,12 @@ test('config: production refuses dev sign-in and plain HTTP, listing every probl
   assert.equal(c.production, true);
   assert.equal(c.auth.issuer, KEYCLOAK.KEYCLOAK_ISSUER);
   assert.equal(c.trustProxy, 1);
-  assert.deepEqual(c.store, { kind: 'mongo', file: undefined, url: 'mongodb://db/blockout' });
+  assert.deepEqual(c.store, { kind: 'mongo', url: 'mongodb://db/blockout' });
   assert.deepEqual(c.rooms, { kind: 'redis', url: 'redis://cache:6379', prefix: '' });
 });
 
 test('config: bad values are caught at start-up', () => {
-  for (const env of [{ BLOCKOUT_ROOMS: 'redis' }, { BLOCKOUT_ROOMS: 'disk' }, { BLOCKOUT_STORE: 'mongo' }, { BLOCKOUT_STORE: 'excel' }, { BLOCKOUT_AUTH: 'magic' }, { BLOCKOUT_AUTH: 'keycloak' }, { TRUST_PROXY: 'yes' }, { PUBLIC_URL: 'blockout.org' }, { PORT: '99999' }]) {
+  for (const env of [{ BLOCKOUT_STORE: 'sqlite' }, { BLOCKOUT_ROOMS: 'redis' }, { BLOCKOUT_ROOMS: 'disk' }, { BLOCKOUT_STORE: 'mongo' }, { BLOCKOUT_STORE: 'excel' }, { BLOCKOUT_AUTH: 'magic' }, { BLOCKOUT_AUTH: 'keycloak' }, { TRUST_PROXY: 'yes' }, { PUBLIC_URL: 'blockout.org' }, { PORT: '99999' }]) {
     assert.throws(() => loadConfig(env, []), ConfigError, JSON.stringify(env));
   }
 });

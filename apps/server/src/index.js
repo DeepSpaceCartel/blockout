@@ -490,15 +490,14 @@ const HEALTH = {
   },
 };
 
-// Stop taking new work, let everyone's browser know, and finish. Live classes
-// are in this process's memory (for now), so they end here; streams are
-// closed so browsers reconnect to the next server.
+// Stop taking new work, hand classes over and send browsers on, and finish.
+// With Redis the classes carry on at another server; with memory they end here.
 async function drain({ timeoutMs = 20000 } = {}) {
   if (draining) return;
   draining = true;
   clearInterval(scheduleTimer);
   const closed = new Promise((resolve) => server.close(resolve));
-  await live.drain(); // (streams end, polls are answered, classes go to another server)
+  await live.drain(); // (streams end so browsers reconnect, polls are answered, classes go to another server)
   server.closeIdleConnections();
   const timeout = new Promise((resolve) => setTimeout(resolve, timeoutMs).unref());
   await Promise.race([closed, timeout]);
@@ -620,12 +619,15 @@ if (IS_MAIN) {
     });
   }
   server.listen(PORT, () => {
-    log.info('server.started', { 'server.port': PORT, 'auth.kind': auth.name, 'moderation.openai': Boolean(OPENAI_API_KEY), 'deployment.production': config.production });
+    log.info('server.started', { 'server.port': PORT, 'auth.kind': auth.name, 'store.kind': store.kind, 'rooms.kind': config.rooms.kind, 'moderation.openai': Boolean(OPENAI_API_KEY), 'deployment.production': config.production });
+    if (store.kind === 'memory') log.warn('store.memory', { 'store.kind': 'memory' }); // accounts aren't kept: set BLOCKOUT_MONGO_URL
     if (config.log.format === 'json') return;
     // a person at a terminal: where to go
     console.log(`Blockout server on http://localhost:${PORT}/`);
     for (const url of lanUrls()) console.log(url === PUBLIC_URL ? `  Students join at: ${url}` : `  Chromebooks on this network: ${url}`);
     console.log(`  Name check: word list${OPENAI_API_KEY ? ' + OpenAI moderation' : ' (set OPENAI_API_KEY to add OpenAI moderation)'}`);
+    console.log(`  Accounts: ${store.kind === 'mongo' ? 'MongoDB' : 'memory: nothing is kept after a restart (set BLOCKOUT_MONGO_URL, or run npm run services)'}`);
+    console.log(`  Live classes: ${config.rooms.kind === 'redis' ? 'Redis' : 'this server only (set BLOCKOUT_REDIS_URL to share them)'}`);
     console.log(`  Sign-in: ${auth.name === 'dev' ? 'dev sign-in (pick any name and role; set BLOCKOUT_AUTH=keycloak for Keycloak)' : `Keycloak at ${auth.config.issuer}`}`);
   });
 }

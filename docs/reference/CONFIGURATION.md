@@ -23,8 +23,7 @@ The server (`node apps/server/src/index.js`, or `npm start`) is configured with 
 | `BLOCKOUT_REDIS_URL` | none | The Redis (Valkey) for live classes and rate limits, like `redis://:password@host:6379`, shared by every server. Needed in production |
 | `BLOCKOUT_ROOMS` | `redis` with `BLOCKOUT_REDIS_URL`, otherwise `memory` | Where live classes are kept: `redis`, or `memory` (this server only) |
 | `BLOCKOUT_REDIS_PREFIX` | none | A prefix for every Redis key, to keep several Blockouts (or test runs) apart in one Redis |
-| `BLOCKOUT_STORE` | `mongo` with `BLOCKOUT_MONGO_URL`, otherwise `sqlite` | Where accounts are kept: `mongo`, `sqlite` (the file below) or `memory` (nothing kept: tests and quick tries) |
-| `BLOCKOUT_DB` | `data/blockout.db` (repo root) | With `BLOCKOUT_STORE=sqlite`: the sqlite file; `:memory:` keeps nothing |
+| `BLOCKOUT_STORE` | `mongo` with `BLOCKOUT_MONGO_URL`, otherwise `memory` | Where accounts are kept: `mongo`, or `memory` (nothing is kept after a restart: tests and quick tries). An old sqlite file is copied into MongoDB with `apps/server/scripts/sqlite-to-mongo.js` ([guide](../guides/set-up-the-databases.md)) |
 | `BLOCKOUT_AUTH` | `dev` | Sign-in provider: `dev` or `keycloak` |
 | `BLOCKOUT_AUTH_SECRET` | generated, kept in the database | Dev sign-in's token secret |
 | `KEYCLOAK_ISSUER` | none | With `BLOCKOUT_AUTH=keycloak`: the realm URL, for example `https://id.example.org/realms/blockout` |

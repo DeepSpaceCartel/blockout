@@ -5,7 +5,6 @@ import { openMemoryStore } from '../src/store/memory.js';
 import { openSqliteStore } from '../src/store/sqlite.js';
 
 runStoreContract('memory', () => openMemoryStore());
-runStoreContract('sqlite', () => openSqliteStore(':memory:'));
 
 // MongoDB: a database of its own for each test, dropped afterwards
 const MONGO_URL = process.env.BLOCKOUT_MONGO_URL;

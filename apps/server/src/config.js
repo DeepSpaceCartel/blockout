@@ -36,9 +36,10 @@ function loadConfig(env = {}, argv = []) {
   const trustProxy = Number(env.TRUST_PROXY || 0);
   if (!Number.isInteger(trustProxy) || trustProxy < 0) problems.push(`TRUST_PROXY must be a number of proxies (0 or more), not "${env.TRUST_PROXY}"`);
 
-  // Where accounts are kept: MongoDB (BLOCKOUT_MONGO_URL), the old sqlite file, or memory (nothing kept)
-  const storeKind = env.BLOCKOUT_STORE || (env.BLOCKOUT_MONGO_URL ? 'mongo' : 'sqlite');
-  if (!['mongo', 'sqlite', 'memory'].includes(storeKind)) problems.push(`BLOCKOUT_STORE must be mongo, sqlite or memory, not "${storeKind}"`);
+  // Where accounts are kept: MongoDB (BLOCKOUT_MONGO_URL), or memory (nothing kept: tests and quick tries).
+  // (The old sqlite file is only read by scripts/sqlite-to-mongo.js.)
+  const storeKind = env.BLOCKOUT_STORE || (env.BLOCKOUT_MONGO_URL ? 'mongo' : 'memory');
+  if (!['mongo', 'memory'].includes(storeKind)) problems.push(`BLOCKOUT_STORE must be mongo or memory, not "${storeKind}"${storeKind === 'sqlite' ? ' (copy the sqlite file into MongoDB with apps/server/scripts/sqlite-to-mongo.js)' : ''}`);
   if (storeKind === 'mongo' && !env.BLOCKOUT_MONGO_URL) problems.push('BLOCKOUT_STORE=mongo needs BLOCKOUT_MONGO_URL (mongodb://…)');
 
   // Where live classes are kept: Redis/Valkey (BLOCKOUT_REDIS_URL), shared by every server, or this server's memory
@@ -70,7 +71,7 @@ function loadConfig(env = {}, argv = []) {
     log: { level: logLevel, format: logFormat },
     // Names are also checked with OpenAI's free moderation model when this is set (and only then are names sent to OpenAI)
     openaiKey: env.OPENAI_API_KEY || '',
-    store: { kind: storeKind, file: env.BLOCKOUT_DB || undefined, url: env.BLOCKOUT_MONGO_URL || undefined },
+    store: { kind: storeKind, url: env.BLOCKOUT_MONGO_URL || undefined },
     rooms: { kind: roomsKind, url: env.BLOCKOUT_REDIS_URL || undefined, prefix: env.BLOCKOUT_REDIS_PREFIX || '' },
     auth: { kind: authKind, issuer: env.KEYCLOAK_ISSUER || null, clientId: env.KEYCLOAK_CLIENT_ID || null, secret: env.BLOCKOUT_AUTH_SECRET || null },
   };

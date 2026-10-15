@@ -4,7 +4,7 @@
 
 Blockout keeps accounts in MongoDB and live classes in Valkey, a Redis-compatible server ([ADR-0006](../decisions/0006-mongodb-and-redis.md)). This guide installs both in the cluster, for a deployment or for development.
 
-You don't need them to try Blockout on your own computer. Without `BLOCKOUT_MONGO_URL`, `npm start` keeps accounts in the sqlite file `data/blockout.db`, and `BLOCKOUT_STORE=memory` keeps nothing at all.
+You don't need them to try Blockout on your own computer: without `BLOCKOUT_MONGO_URL` and `BLOCKOUT_REDIS_URL`, `npm start` keeps accounts and live classes in memory, and forgets them when it stops.
 
 ## What gets installed
 
@@ -40,7 +40,7 @@ The tests use the same URLs: with `BLOCKOUT_MONGO_URL` set, `npm test` also runs
 
 ## Move accounts from the sqlite file
 
-A server that ran without MongoDB kept its accounts in `data/blockout.db`. To bring them along:
+Before MongoDB, Blockout kept accounts in the sqlite file `data/blockout.db`. To bring them along:
 
 ```sh
 node apps/server/scripts/sqlite-to-mongo.js --dry-run                 # count what's there
@@ -56,3 +56,4 @@ It copies every account, save, class, link, homework and schedule by its id, so 
 | `MongoDB didn't become ready` | Look at `kubectl -n <namespace> logs mongo-0`. On a first start MongoDB restarts once after creating the root user; the script waits for that. |
 | `MongoServerSelectionError` from your computer | `npm run services` isn't running, or the URL lacks `directConnection=true` (the replica set's member name only resolves inside the cluster). |
 | `BLOCKOUT_STORE=mongo needs BLOCKOUT_MONGO_URL` | Set the URL, or start without `BLOCKOUT_STORE`. |
+| Accounts are gone after a restart | The server ran without `BLOCKOUT_MONGO_URL` (it says `Accounts: memory` when it starts). |
