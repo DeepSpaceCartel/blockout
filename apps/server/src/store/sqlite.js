@@ -1,10 +1,10 @@
-// Blockout accounts storage: sqlite through Node's built-in node:sqlite (no
-// dependencies). One small module so the rest of the server never writes SQL.
+// Blockout accounts storage in sqlite, through Node's built-in node:sqlite: the
+// store before MongoDB, kept to read old databases (and as a reference the
+// other stores are tested against).
 //
 // Privacy: a user row holds a first name, a last initial, a role, the email
 // *domain* (to match a school, e.g. iusd.org) and the sign-in provider's opaque
 // subject id. Never the email address itself.
-import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { DatabaseSync } from 'node:sqlite';
@@ -70,13 +70,10 @@ CREATE TABLE IF NOT EXISTS schedules (
 );
 `;
 
-// The first school. More can be added with addSchool().
-const DEFAULT_SCHOOLS = [{ id: 'cadence-park', name: 'Cadence Park', domain: 'iusd.org' }];
-
-const newId = () => crypto.randomBytes(8).toString('hex');
+import { newId, DEFAULT_SCHOOLS } from './shared.js';
 
 // file: a path, or ':memory:' (tests). Defaults to data/blockout.db at the repo's root.
-function openStore(file = process.env.BLOCKOUT_DB || path.join(import.meta.dirname, '..', '..', '..', 'data', 'blockout.db')) {
+function openSqliteStore(file = process.env.BLOCKOUT_DB || path.join(import.meta.dirname, '..', '..', '..', '..', 'data', 'blockout.db')) {
   if (file !== ':memory:') fs.mkdirSync(path.dirname(file), { recursive: true });
   const db = new DatabaseSync(file);
   db.exec('PRAGMA foreign_keys = ON;');
@@ -122,9 +119,18 @@ function openStore(file = process.env.BLOCKOUT_DB || path.join(import.meta.dirna
       createdAt: r.created_at,
     };
 
-  return {
+  const table = (name) => all(`SELECT * FROM ${name}`).map(plain);
+
+  // node:sqlite answers at once; the other stores answer later. Every method
+  // returns a promise here too, so callers (and errors) behave the same.
+  const asyncMethods = (store) => Object.fromEntries(Object.entries(store).map(([k, v]) => [k, typeof v === 'function' ? async (...args) => v(...args) : v]));
+
+  return asyncMethods({
+    kind: 'sqlite',
     db,
+    migrate: () => {},
     close: () => db.close(),
+    ping: () => Boolean(one('SELECT 1 AS ok')),
 
     // ---- meta (e.g. the dev sign-in secret, so tokens survive a restart)
     getMeta: (key) => (one('SELECT value FROM meta WHERE key = ?', key) || {}).value || null,
@@ -228,8 +234,9 @@ function openStore(file = process.env.BLOCKOUT_DB || path.join(import.meta.dirna
     deleteSchedule: (id) => run('DELETE FROM schedules WHERE id = ?', id),
     schedulesOfTeacher: (teacherId) => all('SELECT * FROM schedules WHERE teacher_id = ? ORDER BY starts_at', teacherId).map(scheduleFromRow),
     dueSchedules: (now) => all('SELECT * FROM schedules WHERE opened_at IS NULL AND starts_at <= ?', now).map(scheduleFromRow),
+    // Only once: false if it was already opened
     markOpened: (id, roomCode, teacherKey, now = Date.now()) =>
-      run('UPDATE schedules SET room_code = ?, teacher_key = ?, opened_at = ? WHERE id = ?', roomCode, teacherKey, now, id),
+      run('UPDATE schedules SET room_code = ?, teacher_key = ?, opened_at = ? WHERE id = ? AND opened_at IS NULL', roomCode, teacherKey, now, id).changes === 1,
     // Open tournaments a student can join: their classes', or their school's
     openSchedulesForStudent: (user) =>
       all(
@@ -239,7 +246,24 @@ function openStore(file = process.env.BLOCKOUT_DB || path.join(import.meta.dirna
          ) ORDER BY starts_at`,
         user.id, user.schoolId || ''
       ).map(scheduleFromRow),
-  };
+
+    // Everything stored, in the other stores' shape (for checks and for moving to MongoDB)
+    exportAll: () => ({
+      meta: Object.fromEntries(table('meta').map((r) => [r.key, r.value])),
+      schools: table('schools'),
+      users: table('users').map((r) => {
+        const u = userFromRow(r);
+        delete u.name; // (derived, not stored)
+        return u;
+      }),
+      progress: table('progress').map((r) => ({ userId: r.user_id, data: JSON.parse(r.data), updatedAt: r.updated_at })),
+      classes: table('classes').map(classFromRow),
+      classMembers: table('class_members').map((r) => ({ classId: r.class_id, userId: r.user_id, joinedAt: r.joined_at })),
+      parentLinks: table('parent_links').map((r) => ({ parentId: r.parent_id, childId: r.child_id, createdAt: r.created_at })),
+      assignments: table('assignments').map(assignmentFromRow),
+      schedules: table('schedules').map(scheduleFromRow),
+    }),
+  });
 }
 
-export { openStore, newId, DEFAULT_SCHOOLS };
+export { openSqliteStore };

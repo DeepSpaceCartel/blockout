@@ -157,13 +157,13 @@ function identity(claims, { schoolByDomain = () => null } = {}) {
   };
 }
 
-function fromEnv(env, store) {
+async function fromEnv(env, store) {
   if (env.BLOCKOUT_AUTH === 'keycloak') return keycloakProvider({ issuer: env.KEYCLOAK_ISSUER, clientId: env.KEYCLOAK_CLIENT_ID });
   // The dev secret is kept in the database so sign-ins survive a restart
-  let secret = env.BLOCKOUT_AUTH_SECRET || store.getMeta('devSecret');
+  let secret = env.BLOCKOUT_AUTH_SECRET || (await store.getMeta('devSecret'));
   if (!secret) {
     secret = crypto.randomBytes(32).toString('hex');
-    store.setMeta('devSecret', secret);
+    await store.setMeta('devSecret', secret);
   }
   return devProvider({ secret });
 }

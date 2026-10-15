@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert';
 import crypto from 'crypto';
-import { openStore } from '../src/store.js';
+import { openMemoryStore } from '../src/store/memory.js';
 import * as Auth from '../src/auth.js';
 import { createLogger } from '../src/log.js';
 import { createAccounts } from '../src/accounts.js';
@@ -9,7 +9,7 @@ import * as P from '@blockout/progress';
 
 function setup() {
   let clock = Date.UTC(2026, 8, 23, 17, 0, 0);
-  const store = openStore(':memory:');
+  const store = openMemoryStore();
   const auth = Auth.devProvider({ secret: 'test-secret', now: () => clock });
   const accounts = createAccounts({ store, auth, now: () => clock });
   const signIn = async (person) => {
@@ -36,12 +36,13 @@ test('dev sign-in: tokens check out, the same person gets the same account, bad 
 test('privacy: only first name, last initial, role and email domain are stored', async () => {
   const { store, signIn } = setup();
   await signIn({ firstName: 'Olivia Grace', lastInitial: 'Martinez', role: 'student', email: 'olivia.martinez@iusd.org' });
-  const rows = store.db.prepare('SELECT * FROM users').all();
-  const text = JSON.stringify(rows);
+  const rows = (await store.exportAll()).users;
+  const text = JSON.stringify(await store.exportAll());
   assert.ok(!text.includes('olivia.martinez'), 'no email address');
   assert.ok(!text.includes('Martinez'), 'no last name');
-  assert.equal(rows[0].first_name, 'Olivia');
-  assert.equal(rows[0].last_initial, 'M');
+  assert.equal(rows[0].firstName, 'Olivia');
+  assert.equal(rows[0].lastInitial, 'M');
+  assert.deepEqual(Object.keys(rows[0]).sort(), ['createdAt', 'domain', 'firstName', 'id', 'lastInitial', 'lastSeen', 'parentCode', 'role', 'schoolId', 'sub']);
 });
 
 test('keycloak provider: checks RS256 signature, issuer and client; roles from realm_access', async () => {
@@ -219,7 +220,7 @@ test('scheduled tournaments open on time; students of the class (or school) see 
 
 test('audit log: account changes are logged by id, never by name or code', async () => {
   const lines = [];
-  const store = openStore(':memory:');
+  const store = openMemoryStore();
   const auth = Auth.devProvider({ secret: 'test-secret' });
   const accounts = createAccounts({ store, auth, log: createLogger({ write: (l) => lines.push(JSON.parse(l)) }) });
   const signIn = async (person) => accounts.authenticate((await accounts.devSignIn(person)).token);
@@ -251,5 +252,5 @@ test('sign-in: the account is written when the token changes, otherwise once a m
   tick(31 * 1000);
   await signIn({ firstName: 'Maya', lastInitial: 'K', role: 'student', email: 'maya@iusd.org' });
   assert.equal(writes.length, 2);
-  assert.equal(store.user(a.id).lastSeen, writes[1]);
+  assert.equal((await store.user(a.id)).lastSeen, writes[1]);
 });

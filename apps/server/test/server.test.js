@@ -1,5 +1,5 @@
 // The HTTP API end to end: a real server on a spare port with an in-memory database.
-process.env.BLOCKOUT_DB = ':memory:';
+process.env.BLOCKOUT_STORE = 'memory';
 process.env.LOG_LEVEL = 'silent';
 process.env.BLOCKOUT_AUTH_SECRET = 'test-secret';
 import test from 'node:test';

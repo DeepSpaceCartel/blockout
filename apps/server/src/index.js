@@ -17,7 +17,7 @@ import path from 'path';
 import * as Rooms from './rooms.js';
 import * as Moderation from './moderation.js';
 import * as Auth from './auth.js';
-import { openStore } from './store.js';
+import { openStore } from './store/index.js';
 import { createAccounts, AccountError } from './accounts.js';
 import { loadConfig, ConfigError } from './config.js';
 import { createLimiter, clientIp } from './ratelimit.js';
@@ -436,8 +436,9 @@ function lanUrls() {
 // (server/store.js). Sign-in is swappable (server/auth.js): dev sign-in for now,
 // Keycloak later. Guests keep playing without any of this.
 
-const store = openStore();
-const auth = Auth.fromEnv(process.env, store);
+const store = await openStore(config.store);
+await store.migrate();
+const auth = await Auth.fromEnv(process.env, store);
 const accounts = createAccounts({ store, auth, log });
 
 // The signed-in user for a request, or null (a guest)
@@ -684,10 +685,9 @@ setInterval(() => {
   lastTick = t;
 }, 1000).unref();
 
-function storeOk() {
+async function storeOk() {
   try {
-    store.getMeta('health');
-    return true;
+    return Boolean(await store.ping());
   } catch {
     return false;
   }
@@ -696,10 +696,10 @@ function storeOk() {
 const HEALTH = {
   '/health/startup': () => (started ? [200, { status: 'started' }] : [503, { status: 'starting' }]),
   '/health/live': () => (lag < LAG_LIMIT_MS ? [200, { status: 'live' }] : [503, { status: 'stuck', lagMs: Math.round(lag) }]),
-  '/health/ready': () => {
+  '/health/ready': async () => {
     if (!started) return [503, { status: 'starting' }];
     if (draining) return [503, { status: 'draining' }];
-    if (!storeOk()) return [503, { status: 'database' }];
+    if (!(await storeOk())) return [503, { status: 'database' }];
     return [200, { status: 'ready' }];
   },
 };
@@ -726,7 +726,7 @@ async function drain({ timeoutMs = 20000 } = {}) {
   const timeout = new Promise((resolve) => setTimeout(resolve, timeoutMs).unref());
   await Promise.race([closed, timeout]);
   server.closeAllConnections();
-  store.close();
+  await store.close();
 }
 
 function route(req) {
@@ -748,7 +748,7 @@ function route(req) {
 const server = http.createServer(async (req, res) => {
   const health = HEALTH[req.url.split('?')[0]];
   if (health) {
-    const [status, body] = health();
+    const [status, body] = await health();
     return send(res, status, body);
   }
   const ip = clientIp(req, config.trustProxy);
