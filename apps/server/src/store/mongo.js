@@ -100,6 +100,8 @@ async function openMongoStore(url, { dbName } = {}) {
       const [list, total] = await Promise.all([users.find(filter).sort({ lastSeen: -1 }).skip(offset).limit(limit).toArray(), users.countDocuments(filter)]);
       return { users: list.map(userOut), total };
     },
+    staleUsers: async (before, limit = 100) =>
+      (await users.find({ lastSeen: { $lt: before } }, { projection: { _id: 1 } }).sort({ lastSeen: 1 }).limit(limit).toArray()).map((u) => u._id),
     // Everything that belongs to a user goes with them (see memory.js)
     async deleteUser(id) {
       const taught = (await classes.find({ teacherId: id }, { projection: { _id: 1 } }).toArray()).map((c) => c._id);

@@ -77,6 +77,15 @@ function runStoreContract(name, open) {
     assert.equal((await store.listUsers({ q: '.*' })).total, 0, 'the search is text, not a pattern');
   });
 
+  withStore('stale accounts: not seen since a time, oldest first', async (store) => {
+    const a = await store.upsertUser(maya, 100);
+    const b = await store.upsertUser(ben, 50);
+    await store.upsertUser(msR, 300);
+    assert.deepEqual(await store.staleUsers(200), [b.id, a.id]);
+    assert.deepEqual(await store.staleUsers(200, 1), [b.id]);
+    assert.deepEqual(await store.staleUsers(10), []);
+  });
+
   withStore('invites: one use each, until they expire', async (store) => {
     const t = await store.upsertUser(msR);
     const a = await store.upsertUser(maya);

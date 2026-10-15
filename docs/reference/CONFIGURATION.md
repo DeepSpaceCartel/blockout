@@ -28,6 +28,7 @@ The server (`node apps/server/src/index.js`, or `npm start`) is configured with 
 | `BLOCKOUT_AUTH_SECRET` | generated, kept in the database | Dev sign-in's token secret |
 | `KEYCLOAK_ISSUER` | none | With `BLOCKOUT_AUTH=keycloak`: the realm URL, for example `https://id.example.org/realms/blockout` |
 | `KEYCLOAK_CLIENT_ID` | none | With `BLOCKOUT_AUTH=keycloak`: the public client's ID |
+| `BLOCKOUT_RETENTION_DAYS` | `395` | Accounts nobody has signed in to for this many days are deleted, with everything in them (a daily job, on one server). `0` keeps them |
 | `METRICS_PORT` | none | Serves Prometheus metrics at `/metrics` on this port (the chart uses `9464`). It's a port of its own, so the public route never reaches it |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` or `silent` |
 | `LOG_FORMAT` | `json` in production, otherwise `text` | `json`: one JSON object per line with OpenTelemetry field names (`timestamp`, `severity_text`, `event.name`, `http.route`, …) for a log stack. `text`: short lines for a terminal; request lines only at `LOG_LEVEL=debug` |

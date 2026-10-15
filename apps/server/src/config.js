@@ -53,6 +53,10 @@ function loadConfig(env = {}, argv = []) {
   const logFormat = env.LOG_FORMAT || (production ? 'json' : 'text');
   if (!['json', 'text'].includes(logFormat)) problems.push(`LOG_FORMAT must be json or text, not "${logFormat}"`);
 
+  // Accounts nobody signs in to for this many days are deleted (0: kept for ever)
+  const retentionDays = Number(env.BLOCKOUT_RETENTION_DAYS ?? 395);
+  if (!Number.isInteger(retentionDays) || retentionDays < 0) problems.push(`BLOCKOUT_RETENTION_DAYS must be a number of days (0 to keep accounts), not "${env.BLOCKOUT_RETENTION_DAYS}"`);
+
   // Prometheus metrics on a port of their own (never the public one): 0 for none
   const metricsPort = Number(env.METRICS_PORT || 0);
   if (!Number.isInteger(metricsPort) || metricsPort < 0 || metricsPort > 65535) problems.push(`METRICS_PORT must be a port number, not "${env.METRICS_PORT}"`);
@@ -73,6 +77,7 @@ function loadConfig(env = {}, argv = []) {
     https: publicUrl.startsWith('https://'),
     trustProxy,
     metricsPort,
+    retentionDays,
     log: { level: logLevel, format: logFormat },
     // Names are also checked with OpenAI's free moderation model when this is set (and only then are names sent to OpenAI)
     openaiKey: env.OPENAI_API_KEY || '',

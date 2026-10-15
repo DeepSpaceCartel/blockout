@@ -103,6 +103,16 @@ async function redeem(code) {
   setTimeout(() => location.reload(), 1200); // (the menu changes with the role)
 }
 
+// Everything Blockout keeps about an account, as a file to keep
+async function downloadData(path, name) {
+  const data = await Auth.api('GET', path);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+  a.download = `blockout-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
+
 // Deleting an account: typed, because it can't be undone
 async function confirmDelete(what, typed) {
   const answer = prompt(`${what} This can’t be undone. Type ${typed} to go ahead.`);
@@ -338,6 +348,7 @@ async function openAccount() {
     account.body.append(grownUps);
   }
   if (u.isAdmin) account.actions.append(button('Admin', 'btn', () => location.assign('/admin/')));
+  if (u.role !== 'student') account.actions.append(button('Download my data', 'btn', () => downloadData('/api/me/export', u.name).catch((err) => alert(err.message))));
   if (u.role === 'teacher' || u.role === 'parent') {
     account.actions.append(
       button('Delete my account', 'btn btn-danger', async () => {
@@ -1010,6 +1021,7 @@ async function openStudent(id, d, back) {
     })
   );
   if (me.role === 'parent') {
+    d.actions.prepend(button(`Download ${s.name}’s data`, 'btn', () => downloadData(`/api/students/${s.id}/export`, s.name).catch((err) => alert(err.message))));
     d.actions.prepend(
       button(`Delete ${s.name}’s account`, 'btn btn-danger', async () => {
         if (!(await confirmDelete(`Delete ${s.name}’s Blockout account, with their progress, classes and homework?`, s.name.split(' ')[0]))) return;

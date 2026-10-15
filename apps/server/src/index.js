@@ -296,6 +296,7 @@ const accountRoutes = [
   ['DELETE', '/api/me/invites/:id', (user, p) => accounts.deleteMyInvite(user, p.id)],
   ['POST', '/api/invites/redeem', async (user, p, req) => accounts.redeemInvite(user, await readJson(req))],
   ['DELETE', '/api/me', (user) => accounts.deleteMe(user)],
+  ['GET', '/api/me/export', (user) => accounts.exportMe(user)],
   ['GET', '/api/me/live', (user) => accounts.live(user)],
   ['GET', '/api/classes', (user) => accounts.listClasses(user)],
   ['POST', '/api/classes', async (user, p, req) => accounts.createClass(user, await readJson(req))],
@@ -303,6 +304,7 @@ const accountRoutes = [
   ['DELETE', '/api/classes/:id/students/:student', (user, p) => accounts.removeStudent(user, p.id, p.student)],
   ['GET', '/api/students/:id', (user, p) => accounts.childDetail(user, p.id)],
   ['DELETE', '/api/students/:id', (user, p) => accounts.deleteStudent(user, p.id)],
+  ['GET', '/api/students/:id/export', (user, p) => accounts.exportStudent(user, p.id)],
   ['POST', '/api/students/:id/parent-invites', (user, p) => accounts.parentInvite(user, p.id)],
   ['GET', '/api/students/:id/parents', (user, p) => accounts.studentParents(user, p.id)],
   ['DELETE', '/api/students/:id/parents/:parent', (user, p) => accounts.removeStudentParent(user, p.id, p.parent)],
@@ -343,6 +345,16 @@ const scheduleTimer = setInterval(async () => {
   if (!(await live.lead('schedules', SCHEDULE_TICK_MS * 3))) return;
   accounts.openDue(openRoom, (code) => live.closeRoom(code)).catch((e) => log.error('schedule.error', exception(e)));
 }, SCHEDULE_TICK_MS).unref();
+
+// Accounts nobody has used for a long time go, with everything in them (one
+// server at a time, checked every hour)
+const retentionTimer = setInterval(async () => {
+  if (!(await live.lead('retention', 2 * 60 * 60 * 1000))) return;
+  accounts
+    .deleteStale(config.retentionDays)
+    .then((n) => n && log.info('retention.deleted', { 'user.count': n, 'retention.days': config.retentionDays }))
+    .catch((e) => log.error('retention.error', exception(e)));
+}, 60 * 60 * 1000).unref();
 
 const routes = {
   'GET /api/health': () => ({ ok: true, lan: lanUrls() }),
@@ -527,6 +539,7 @@ async function drain({ timeoutMs = 20000 } = {}) {
   if (draining) return;
   draining = true;
   clearInterval(scheduleTimer);
+  clearInterval(retentionTimer);
   const closed = new Promise((resolve) => server.close(resolve));
   await live.drain(); // (streams end so browsers reconnect, polls are answered, classes go to another server)
   if (metricsServer) metricsServer.close();

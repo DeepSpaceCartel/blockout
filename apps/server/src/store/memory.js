@@ -75,6 +75,13 @@ function openMemoryStore() {
         .sort((a, b) => b.lastSeen - a.lastSeen);
       return { users: list.slice(offset, offset + limit).map(user), total: list.length };
     },
+    // Accounts nobody has signed in to since `before` (oldest first), for the retention job
+    staleUsers: async (before, limit = 100) =>
+      [...users.values()]
+        .filter((u) => u.lastSeen < before)
+        .sort((a, b) => a.lastSeen - b.lastSeen)
+        .slice(0, limit)
+        .map((u) => u.id),
     // Everything that belongs to a user goes with them: their save, memberships,
     // links, the classes they teach (with those classes' rosters, homework and
     // tournaments), the homework and tournaments they set, and their invites.

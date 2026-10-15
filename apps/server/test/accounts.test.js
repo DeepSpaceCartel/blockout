@@ -411,3 +411,25 @@ test('deleting: a grown-up removes their child\'s account; teachers and grown-up
   await accounts.deleteMe(parent);
   assert.equal(await store.user(mom.id), null);
 });
+
+test('your data: download everything kept about you (or your child); unused accounts expire', async () => {
+  const { accounts, signIn, store, tick } = keycloakSetup();
+  const kid = await signIn({ sub: 'kc:kid', firstName: 'Maya', email: 'maya@iusd.org' });
+  await accounts.putProgress(kid, { coins: 7 });
+  const mom = await signIn({ sub: 'kc:mom', firstName: 'Ana' });
+  await accounts.redeemInvite(mom, { code: (await accounts.parentInvite(kid)).code });
+  const mine = await accounts.exportMe(kid);
+  assert.deepEqual([mine.account.firstName, mine.account.emailDomain, mine.progress.data.coins, mine.grownUps.map((g) => g.name)], ['Maya', 'iusd.org', 7, ['Ana X.']]);
+  assert.ok(!JSON.stringify(mine).includes('maya@'), 'never an email address (none is kept)');
+  const parent = await signIn({ sub: 'kc:mom', firstName: 'Ana' });
+  assert.equal((await accounts.exportStudent(parent, kid.id)).account.id, kid.id);
+  await assert.rejects(accounts.exportStudent(await signIn({ sub: 'kc:x' }), kid.id), /Only parents and admins|can’t see/);
+  // a year and a month without signing in: gone
+  assert.equal(await accounts.deleteStale(395), 0);
+  tick(396 * 24 * 3600 * 1000);
+  await signIn({ sub: 'kc:mom', firstName: 'Ana' }); // (the grown-up came back; the child didn't)
+  assert.equal(await accounts.deleteStale(395), 2, 'the child, and the stranger who tried to look');
+  assert.equal(await store.user(kid.id), null);
+  assert.ok(await store.user(mom.id));
+  assert.equal(await accounts.deleteStale(0), 0, '0: keep forever');
+});

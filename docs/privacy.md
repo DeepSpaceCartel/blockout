@@ -35,15 +35,39 @@ Nobody else sees it: not other students, other parents or other teachers.
 - There's no advertising and no analytics, and no student data is sold or shared.
 - Signed-in students' names are not checked with OpenAI.
 - The optional OpenAI name check (only when the server has `OPENAI_API_KEY`) only ever sees the first name a *guest* types to join a live class game.
-- Sign-in will go through the school's own identity provider: Keycloak, brokering Google sign-in for `@iusd.org`. Only that provider sees email addresses.
+- Sign-in goes through Blockout's own Keycloak, which can broker Google sign-in. Keycloak holds the email address (and, for a Keycloak password, the password's hash); Blockout's servers never see either, only a first name, last initial and email domain from it.
+
+## Where it's kept
+| Where | What | For how long |
+|---|---|---|
+| MongoDB, in the cluster Blockout runs in | Accounts and everything in the table above | Until the account is deleted, or it hasn't been used for 13 months (below) |
+| Valkey (Redis), the same cluster | Live class games: first names and that game's results | 4 hours after the game's last change, or until the teacher closes it |
+| Keycloak (and its Postgres), the same cluster | Sign-in: email address, name, a password hash or the Google link | Until the account is removed in Keycloak |
+| Encrypted backups, in object storage | Copies of MongoDB and Keycloak's Postgres | 31 days (daily copies), 1 year (monthly copies) |
+| Server logs (the cluster's Loki) | Each request's route, status and time, and who changed what, by account id; never names, codes or tokens | As long as the cluster keeps logs |
+
+All of it is run by Blockout's own operators; there's no other company in between.
+
+## Unused accounts
+An account nobody has signed in to for **13 months** (395 days: a school year and a summer) is deleted with everything in it, by a daily job. A server can change the period with `BLOCKOUT_RETENTION_DAYS`.
+
+## Getting a copy
+- **A grown-up can download everything Blockout keeps about their child** (one JSON file) from the child's page under **👪 My kids** › **Download Maya's data**.
+- **Teachers and grown-ups** download their own from their account page (**Download my data**).
+- **For a school's request,** an admin can download any account's the same way (`GET /api/students/:id/export`).
 
 ## Deleting data
 - **A grown-up can delete their child's account,** with everything in it, from the child's page under **👪 My kids**. Teachers and grown-ups can delete their own accounts from their account page.
 - **On request from a school or a family,** an admin deletes any account the same way ([Admins](guides/admins.md)).
-- Deleting removes the account's progress, class memberships, links, homework, codes, and the classes it teaches (with their rosters, homework and tournaments). It can't be undone.
+- Deleting removes the account's progress, class memberships, links, homework, codes, and the classes it teaches (with their rosters, homework and tournaments). It can't be undone. Backups keep a copy until they age out (31 days, or a year for a monthly copy).
+- The person's sign-in (email address) is in Keycloak: an admin removes it there too (Users › the person › Delete).
+
+## Asking us
+A school or a family asks the school's Blockout contact for a copy or a deletion. They pass it to an admin, who does it from the admin page and confirms when it's done. (The contact's name and address go here before the first school starts.)
 - Guests can clear their data from Stats → Reset stats, or by clearing the browser's site data.
 
 ## Security
 - Tokens are signed: HMAC in dev sign-in, RS256 from Keycloak.
-- The database is MongoDB in the same cluster as Blockout, with a password (on a single computer without MongoDB, a local sqlite file in `data/`, not in git).
+- The databases are only reachable inside the cluster, with passwords; network policies keep everything else out.
+- Codes for teachers and grown-ups are stored only as a scrambled copy (a hash), and work once.
 - Deployments must use HTTPS.

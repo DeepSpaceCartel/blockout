@@ -52,6 +52,7 @@ On `SIGTERM` or `SIGINT` the server stops taking connections, reports `draining`
 | `POST /api/auth/dev` | anyone, dev sign-in only | `{ role, firstName, lastInitial, email?, schoolId?, admin? }` | `{ token, user }`. `role` is the account's role when it's new. |
 | `GET /api/me` | signed in | | `{ user: { id, role, isAdmin, name, firstName, lastInitial, school } }` |
 | `DELETE /api/me` | teacher (without classes or tournaments), parent | | `{ ok }`: the account and everything in it are deleted |
+| `GET /api/me/export` | signed in | | everything kept about this account: `{ exportedAt, account, progress, classes, classesTaught, children, grownUps, homework, codesMade }` |
 
 ## A student's own data
 
@@ -100,6 +101,7 @@ One-time codes that change an account: 8 characters, kept only as a hash, shown 
 | `POST /api/children` | `{ code }` | `{ user, child }`: `POST /api/invites/redeem` for grown-ups' codes only |
 | `DELETE /api/children/:id` | | `{ ok }` |
 | `DELETE /api/students/:id` | | `{ ok }`: deletes a linked child's account and everything in it (admins: any student) |
+| `GET /api/students/:id/export` | | everything kept about a linked child, as `GET /api/me/export` (admins: any student) |
 
 ## Teachers and parents
 

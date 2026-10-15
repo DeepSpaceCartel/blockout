@@ -600,6 +600,62 @@ function createAccounts({ store, auth, now = () => Date.now(), log = silentLogge
     return { school: await store.schoolByDomain(domain) };
   }
 
+  // ---- what's kept, and for how long
+
+  // Everything Blockout keeps about an account, as one JSON document: for the
+  // person (or a child's grown-up) to download
+  async function exportOf(id) {
+    const u = await store.user(id);
+    if (!u) throw new AccountError('user', 'No such account.', 404);
+    const [saved, classesIn, classesTaught, children, parents, homeworkFor, invitesMade] = await Promise.all([
+      store.getProgress(id),
+      store.classesOfStudent(id),
+      store.classesOfTeacher(id),
+      store.childrenOf(id),
+      store.parentsOf(id),
+      store.assignmentsForStudent(id),
+      store.invitesBy(id),
+    ]);
+    const school = u.schoolId ? await store.school(u.schoolId) : null;
+    return {
+      exportedAt: new Date(now()).toISOString(),
+      account: { id: u.id, signInId: u.sub, role: u.role, firstName: u.firstName, lastInitial: u.lastInitial, emailDomain: u.domain, school: school ? school.name : null, invitedBy: u.invitedBy, createdAt: u.createdAt, lastSeen: u.lastSeen },
+      progress: saved ? { savedAt: saved.updatedAt, data: saved.data } : null,
+      classes: classesIn.map((c) => ({ name: c.name })),
+      classesTaught: classesTaught.map((c) => ({ name: c.name, code: c.code, createdAt: c.createdAt })),
+      children: children.map((c) => ({ name: c.name })),
+      grownUps: parents.map((p) => ({ name: p.name })),
+      homework: homeworkFor.map((a) => ({ goal: a.goal, due: a.due, createdAt: a.createdAt })),
+      codesMade: invitesMade.map((i) => ({ kind: i.kind, createdAt: i.createdAt, expiresAt: i.expiresAt, used: Boolean(i.usedAt) })),
+    };
+  }
+
+  async function exportMe(user) {
+    need(user);
+    audit('user.exported', user, { 'target.id': user.id });
+    return exportOf(user.id);
+  }
+
+  async function exportStudent(user, studentId) {
+    need(user, 'parent', 'admin');
+    if (!user.isAdmin && !(await store.isParentOf(user.id, studentId))) throw new AccountError('student', 'You can’t see that student.', 404);
+    audit('user.exported', user, { 'target.id': studentId });
+    return exportOf(studentId);
+  }
+
+  // Accounts unused for retentionDays are deleted, with everything in them
+  // (a daily job on one server). Returns how many went.
+  async function deleteStale(retentionDays) {
+    if (!retentionDays) return 0;
+    const ids = await store.staleUsers(now() - retentionDays * DAY_MS, 500);
+    for (const id of ids) {
+      await store.deleteUser(id);
+      log.info('user.expired', { 'target.id': id, 'retention.days': retentionDays });
+    }
+    if (ids.length) recent.clear();
+    return ids.length;
+  }
+
   // Tournaments open right now for a student (their classes' and their school's)
   async function live(user) {
     if (!user || user.role !== 'student') return { live: [] };
@@ -633,6 +689,9 @@ function createAccounts({ store, auth, now = () => Date.now(), log = silentLogge
     deleteMe,
     deleteStudent,
     adminInvites,
+    exportMe,
+    exportStudent,
+    deleteStale,
     listSchools,
     addSchool,
     linkChild,
