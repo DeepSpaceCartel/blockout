@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- One Helm chart installs everything a deployment needs: the servers, MongoDB, Valkey, Keycloak with its Postgres, nightly backups and a monthly restore check. Passwords are made by the chart and kept; the Google client secret, image credentials, mail and backup storage are values. `deploy/data` and `deploy/keycloak` are gone ([ADR-0009](docs/decisions/0009-one-chart.md)).
+- Development signs in with the workspace's Keycloak at `https://id.deepspacecartel.com`, and `npm run services` forwards the chart's development release (`values-dev.yaml`).
+
 ## [0.4.1] - 2026-10-16
 
 ### Added

@@ -4,3 +4,7 @@ dist/
 .turbo/
 .venv/
 site/
+# the chart's dependencies (helm dependency build; Chart.lock pins them)
+deploy/blockout/charts/
+# values with secrets, passed at install time
+secrets*.yaml

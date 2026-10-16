@@ -1,22 +1,25 @@
 # The workspace cluster: the shared Cilium gateway (gateway/rts-gateway) with a
-# listener and certificate per hostname, MongoDB and Valkey from deploy/data
-# (namespace blockout-data), Keycloak from deploy/keycloak.
-# (Hostnames to confirm: they follow the cluster's <name>.deepspacecartel.com.)
+# listener and certificate per hostname (rts-terraform, platform/blockout.tf).
+# Secrets are passed at install time (docs/guides/deploy.md), never kept here.
 publicUrl: https://blockout.deepspacecartel.com
-# The image is internal to the DeepSpaceCartel org (docs/guides/deploy.md)
-imagePullSecrets: [{ name: ghcr-pull }]
-keycloak:
-  issuer: https://id.deepspacecartel.com/realms/blockout
 httpRoute:
   hostnames: [blockout.deepspacecartel.com]
   parentRefs:
     - name: rts-gateway
       namespace: gateway
       sectionName: blockout-deepspacecartel-com
+keycloak:
+  url: https://id.deepspacecartel.com
+  # Development servers sign in here too
+  extraRedirectUrls: [http://localhost:8080, http://localhost:5173]
+  httpRoute:
+    parentRefs:
+      - name: rts-gateway
+        namespace: gateway
+        sectionName: id-deepspacecartel-com
 networkPolicy:
   enabled: true
   cilium: true
-  dataNamespace: blockout-data
 metrics:
   serviceMonitor:
     enabled: true

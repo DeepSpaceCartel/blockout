@@ -1,0 +1,6 @@
+dependencies:
+- name: keycloakx
+  repository: https://codecentric.github.io/helm-charts
+  version: 7.3.2
+digest: sha256:62096a975fbe20dddc08fc8f7b939226ea43d2c1e4d63671556a908b4c9cdc83
+generated: "2026-10-16T21:45:23.660715612Z"

@@ -1,7 +1,19 @@
+{{- if .Values.server.enabled }}
 Blockout {{ .Chart.AppVersion }} is on its way: {{ .Values.publicUrl }}
 
   kubectl -n {{ .Release.Namespace }} rollout status deployment/{{ include "blockout.fullname" . }}
   kubectl -n {{ .Release.Namespace }} logs deployment/{{ include "blockout.fullname" . }} | head
+{{- end }}
+{{- if .Values.keycloak.enabled }}
 
-Its MongoDB and Redis URLs come from the Secrets {{ .Values.secrets.mongo.name }} and {{ .Values.secrets.redis.name }}.
-The first admin: give your Keycloak account the realm role "admin" (docs/guides/set-up-keycloak.md).
+Keycloak: {{ .Values.keycloak.url }} (sign-in only). Its admin console isn't public:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ .Release.Name }}-keycloakx-http 8180:80
+  then http://localhost:8180/admin, user admin, password:
+  kubectl -n {{ .Release.Namespace }} get secret {{ .Release.Name }}-keycloak-admin -o jsonpath='{.data.password}' | base64 -d
+
+The first admin: give your account the realm role "admin" (docs/guides/set-up-keycloak.md).
+{{- end }}
+{{- if not .Values.backup.enabled }}
+
+No backups: set backup.enabled and backup.rclone (docs/guides/operate.md).
+{{- end }}

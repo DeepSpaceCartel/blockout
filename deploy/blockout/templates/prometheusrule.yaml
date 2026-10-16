@@ -1,3 +1,4 @@
+{{- if .Values.server.enabled }}
 {{- if .Values.metrics.rules.enabled }}
 {{- $deploy := include "blockout.fullname" . }}
 {{- $ns := .Release.Namespace }}
@@ -45,15 +46,16 @@ spec:
           labels: { severity: warning }
           annotations:
             summary: One Blockout request in 20 takes more than a second
-        {{- with .Values.metrics.rules.backupCronJob }}
+        {{- if .Values.backup.enabled }}{{ with printf "%s-backup-mongo" .Release.Name }}
         - alert: BlockoutBackupMissing
           expr: |
-            time() - max(kube_cronjob_status_last_successful_time{namespace="{{ $.Values.metrics.rules.backupNamespace }}", cronjob="{{ . }}"}) > 26 * 3600
-              or absent(kube_cronjob_status_last_successful_time{namespace="{{ $.Values.metrics.rules.backupNamespace }}", cronjob="{{ . }}"})
+            time() - max(kube_cronjob_status_last_successful_time{namespace="{{ $ns }}", cronjob="{{ . }}"}) > 26 * 3600
+              or absent(kube_cronjob_status_last_successful_time{namespace="{{ $ns }}", cronjob="{{ . }}"})
           for: 30m
           labels: { severity: warning }
           annotations:
             summary: No Blockout database backup for over a day
-            description: kubectl -n {{ $.Values.metrics.rules.backupNamespace }} get jobs; docs/guides/operate.md
-        {{- end }}
+            description: kubectl -n {{ $ns }} get jobs; docs/guides/operate.md
+        {{- end }}{{ end }}
+{{- end }}
 {{- end }}

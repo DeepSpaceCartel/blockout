@@ -81,6 +81,8 @@ jobs:
           CHARTS: ${{ steps.names.outputs.charts }}
         run: |
           echo "$GH_TOKEN" | helm registry login ghcr.io --username "$ACTOR" --password-stdin
+          helm repo add codecentric https://codecentric.github.io/helm-charts
+          helm dependency build deploy/blockout
           helm package deploy/blockout --version "$CHART_VERSION" --app-version "$CHART_VERSION" -d /tmp/chart
           helm push /tmp/chart/blockout-*.tgz "$CHARTS"
       - name: GitHub release

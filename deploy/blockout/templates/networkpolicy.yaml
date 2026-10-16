@@ -1,7 +1,8 @@
+{{- if .Values.server.enabled }}
 {{- if .Values.networkPolicy.enabled }}
 {{- if .Values.networkPolicy.cilium }}
 # In: only from the gateway. Out: DNS, MongoDB and Valkey, and HTTPS to the
-# world (Keycloak's public keys, OpenAI's moderation).
+# world (Keycloak's public keys at its public address, OpenAI's moderation).
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -23,7 +24,7 @@ spec:
         - matchLabels: { k8s:io.kubernetes.pod.namespace: kube-system, k8s-app: kube-dns }
       toPorts: [{ ports: [{ port: "53", protocol: ANY }] }]
     - toEndpoints:
-        - matchLabels: { k8s:io.kubernetes.pod.namespace: {{ .Values.networkPolicy.dataNamespace }} }
+        - matchLabels: { k8s:io.kubernetes.pod.namespace: {{ .Values.networkPolicy.dataNamespace | default .Release.Namespace }} }
       toPorts: [{ ports: [{ port: "27017", protocol: TCP }, { port: "6379", protocol: TCP }] }]
     - toEntities: [world]
       toPorts: [{ ports: [{ port: "443", protocol: TCP }] }]
@@ -49,8 +50,9 @@ spec:
   egress:
     - ports: [{ port: 53, protocol: UDP }, { port: 53, protocol: TCP }]
     - to:
-        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: {{ .Values.networkPolicy.dataNamespace }} } }
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: {{ .Values.networkPolicy.dataNamespace | default .Release.Namespace }} } }
       ports: [{ port: 27017, protocol: TCP }, { port: 6379, protocol: TCP }]
     - ports: [{ port: 443, protocol: TCP }]
+{{- end }}
 {{- end }}
 {{- end }}

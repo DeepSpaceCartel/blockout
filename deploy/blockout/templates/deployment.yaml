@@ -1,3 +1,4 @@
+{{- if .Values.server.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -25,9 +26,7 @@ spec:
     spec:
       serviceAccountName: {{ include "blockout.fullname" . }}
       automountServiceAccountToken: false
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets: {{- toYaml . | nindent 8 }}
-      {{- end }}
+      {{- include "blockout.imagePullSecrets" . | nindent 6 }}
       terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
       securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
       # spread over nodes, so one node going away doesn't take every server
@@ -49,12 +48,12 @@ spec:
             - configMapRef: { name: {{ include "blockout.fullname" . }} }
           env:
             - name: BLOCKOUT_MONGO_URL
-              valueFrom: { secretKeyRef: { name: {{ .Values.secrets.mongo.name }}, key: {{ .Values.secrets.mongo.key }} } }
+              valueFrom: { secretKeyRef: { name: {{ include "blockout.mongoSecret" . }}, key: {{ include "blockout.mongoKey" . }} } }
             - name: BLOCKOUT_REDIS_URL
-              valueFrom: { secretKeyRef: { name: {{ .Values.secrets.redis.name }}, key: {{ .Values.secrets.redis.key }} } }
-            {{- if .Values.secrets.openai.name }}
+              valueFrom: { secretKeyRef: { name: {{ include "blockout.redisSecret" . }}, key: {{ include "blockout.redisKey" . }} } }
+            {{- if or .Values.openai.apiKey .Values.openai.existingSecret }}
             - name: OPENAI_API_KEY
-              valueFrom: { secretKeyRef: { name: {{ .Values.secrets.openai.name }}, key: {{ .Values.secrets.openai.key }} } }
+              valueFrom: { secretKeyRef: { name: {{ .Values.openai.existingSecret | default (printf "%s-openai" (include "blockout.fullname" .)) }}, key: api-key } }
             {{- end }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
@@ -92,3 +91,4 @@ spec:
       {{- with .Values.affinity }}
       affinity: {{- toYaml . | nindent 8 }}
       {{- end }}
+{{- end }}

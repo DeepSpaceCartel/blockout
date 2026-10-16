@@ -17,8 +17,8 @@ mongodump --uri "$BLOCKOUT_MONGO_URL" --gzip --archive="backups/blockout-$(date 
 Or in the cluster, without anything installed locally:
 
 ```sh
-pw="$(kubectl -n blockout-data get secret blockout-mongo -o jsonpath='{.data.root-password}' | base64 -d)"
-kubectl -n blockout-data exec mongo-0 -c mongo -- \
+pw="$(kubectl -n blockout get secret blockout-mongo -o jsonpath='{.data.root-password}' | base64 -d)"
+kubectl -n blockout exec blockout-mongo-0 -c mongo -- \
   mongodump -u root -p "$pw" --authenticationDatabase admin --db blockout --gzip --archive > "blockout-$(date +%F).archive.gz"
 ```
 

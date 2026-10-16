@@ -21,9 +21,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
-  # Image tags and digests: the Dockerfile, and the Kubernetes manifests in deploy/
+  # Image tags and digests in the Dockerfile (the chart's images: the helm entry below)
   - package-ecosystem: docker
-    directories: [/, /deploy/data, /deploy/keycloak]
+    directories: [/]
     schedule:
       interval: weekly
     groups:

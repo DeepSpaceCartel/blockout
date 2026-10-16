@@ -2,36 +2,39 @@
 
 # Set up MongoDB and Valkey
 
-Blockout keeps accounts in MongoDB and live classes in Valkey, a Redis-compatible server ([ADR-0006](../decisions/0006-mongodb-and-redis.md)). This guide installs both in the cluster, for a deployment or for development.
+Blockout keeps accounts in MongoDB and live classes in Valkey, a Redis-compatible server ([ADR-0006](../decisions/0006-mongodb-and-redis.md)). In a deployment, the `blockout` chart runs both next to the servers ([Deploy to a cluster](deploy.md)). This guide is about the ones for development.
 
 You don't need them to try Blockout on your own computer: without `BLOCKOUT_MONGO_URL` and `BLOCKOUT_REDIS_URL`, `npm start` keeps accounts and live classes in memory, and forgets them when it stops.
 
 ## What gets installed
 
+The same chart with `values-dev.yaml`: only MongoDB and Valkey, no servers and no Keycloak.
+
 | Piece | What |
 |---|---|
-| `mongo` StatefulSet | MongoDB 8.0, a replica set of one member (`rs0`), with a password and a 10 GB volume |
-| `valkey` StatefulSet | Valkey 8.1 with a password, no volume (live classes only last hours) |
-| Secret `blockout-mongo` | the root password, the members' shared key and `url`, the connection string inside the cluster |
-| Secret `blockout-redis` | the password and `url` |
+| StatefulSet `blockout-dev-mongo` | MongoDB 8.0, a replica set of one member (`rs0`), with a password and a 10 GB volume |
+| StatefulSet `blockout-dev-valkey` | Valkey 8.1 with a password, no volume (live classes only last hours) |
+| Secret `blockout-dev-mongo` | the root password, the members' shared key and `url`, the connection string inside the cluster |
+| Secret `blockout-dev-redis` | the password and `url` |
 
-The passwords are random, made once by the install script, and never stored in the repository.
+The passwords are random, made once by the chart, and never stored in the repository.
 
 ## Install
 
-You need `kubectl` with access to the cluster.
+You need `helm` with access to the cluster.
 
 ```sh
-deploy/data/install.sh                            # namespace blockout-data
-NAMESPACE=blockout-dev deploy/data/install.sh     # development
+helm repo add codecentric https://codecentric.github.io/helm-charts && helm dependency build deploy/blockout
+helm upgrade --install blockout-dev deploy/blockout -n blockout-dev --create-namespace \
+  -f deploy/blockout/values-dev.yaml --wait
 ```
 
-It's safe to run again: it keeps the Secrets and the data, and only applies what changed.
+It's safe to run again: it keeps the Secrets and the data.
 
 ## Use them from your computer
 
 ```sh
-npm run services          # NAMESPACE=blockout-dev by default
+npm run services          # release blockout-dev by default (RELEASE=…, NAMESPACE=…)
 ```
 
 This forwards MongoDB to `localhost:27017` and Valkey to `localhost:6379`, and prints the two URLs to start Blockout with. Keep it running; Ctrl+C stops it. The URLs hold the passwords, so don't paste them anywhere public.
@@ -53,7 +56,7 @@ It copies every account, save, class, link, homework and schedule by its id, so 
 
 | Problem | What to do |
 |---|---|
-| `MongoDB didn't become ready` | Look at `kubectl -n <namespace> logs mongo-0`. On a first start MongoDB restarts once after creating the root user; the script waits for that. |
+| MongoDB isn't ready | `kubectl -n <namespace> logs <release>-mongo-0 -c replica-set` says when the replica set is up. On a first start MongoDB restarts once after creating the root user; that's fine. |
 | `MongoServerSelectionError` from your computer | `npm run services` isn't running, or the URL lacks `directConnection=true` (the replica set's member name only resolves inside the cluster). |
 | `BLOCKOUT_STORE=mongo needs BLOCKOUT_MONGO_URL` | Set the URL, or start without `BLOCKOUT_STORE`. |
 | Accounts are gone after a restart | The server ran without `BLOCKOUT_MONGO_URL` (it says `Accounts: memory` when it starts). |

@@ -82,10 +82,15 @@ jobs:
         with:
           persist-credentials: false
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
-      - run: helm lint --strict deploy/blockout
       - run: |
+          helm repo add codecentric https://codecentric.github.io/helm-charts
+          helm dependency build deploy/blockout
+      # (placeholders for the values only a deploy has)
+      - run: |
+          secrets=(--set keycloak.google.clientSecret=ci --set backup.rclone.RCLONE_CONFIG_STORE_TYPE=local)
+          helm lint --strict deploy/blockout -f deploy/blockout/values-workspace.yaml "${secrets[@]}"
           for values in deploy/blockout/values-*.yaml; do
-            helm template blockout deploy/blockout -f "$values" > /dev/null
+            helm template blockout deploy/blockout -f "$values" "${secrets[@]}" > /dev/null
           done
 
   docs:

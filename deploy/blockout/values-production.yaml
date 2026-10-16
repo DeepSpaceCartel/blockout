@@ -6,13 +6,22 @@ image:
   # digest: sha256:… (set by the deploy, so a tag can't move under it)
   pullPolicy: IfNotPresent
 publicUrl: https://blockout.example.org
-keycloak:
-  issuer: https://id.example.org/realms/blockout
 httpRoute:
   hostnames: [blockout.example.org]
   parentRefs:
     - name: gateway
       namespace: gateway
+keycloak:
+  url: https://id.example.org
+  httpRoute:
+    parentRefs:
+      - name: gateway
+        namespace: gateway
+mongo:
+  storage: 20Gi
+backup:
+  enabled: true
+  # backup.rclone (or existingSecret) at install time
 resources:
   requests: { cpu: 250m, memory: 256Mi }
   limits: { memory: 768Mi }

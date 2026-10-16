@@ -10,7 +10,7 @@
 |---|---|
 | **check** | `npm ci`, `node .devcontainer/check.mjs` (the dev container's Playwright matches the lock file), `npm run lint`, `npm test`, `npm run build`. MongoDB and Valkey run beside it, so the store and live-class tests also run against the real thing. |
 | **image** | Builds the container image (`Dockerfile`), checks it refuses to start without its settings, and scans it with Trivy: a high or critical vulnerability that has a fix fails the job. |
-| **chart** | `helm lint --strict deploy/blockout`, and renders the chart with each cluster's values. |
+| **chart** | Fetches the chart's dependency (`keycloakx`), runs `helm lint --strict`, and renders the chart with each cluster's values (with placeholder secrets). |
 | **docs** | Builds this site with `mkdocs build --strict`, so a broken link or a page missing from the nav fails it. |
 
 `.github/workflows/devcontainer.yml` builds the dev container when its files change, and weekly.

@@ -1,3 +1,4 @@
+{{- if .Values.server.enabled }}
 # The server's settings that aren't secret (reference: docs/reference/CONFIGURATION.md)
 {{- $publicUrl := required "publicUrl is required (https://…)" .Values.publicUrl }}
 {{- if not (hasPrefix "https://" $publicUrl) }}{{ fail "publicUrl must start with https://" }}{{ end }}
@@ -9,10 +10,11 @@ metadata:
 data:
   PUBLIC_URL: {{ $publicUrl | quote }}
   BLOCKOUT_AUTH: keycloak
-  KEYCLOAK_ISSUER: {{ required "keycloak.issuer is required (https://…/realms/blockout)" .Values.keycloak.issuer | quote }}
+  KEYCLOAK_ISSUER: {{ include "blockout.issuer" . | quote }}
   KEYCLOAK_CLIENT_ID: {{ .Values.keycloak.clientId | quote }}
   TRUST_PROXY: {{ .Values.trustProxy | quote }}
   LOG_LEVEL: {{ .Values.log.level | quote }}
   LOG_FORMAT: {{ .Values.log.format | quote }}
   BLOCKOUT_REDIS_PREFIX: {{ .Values.redisPrefix | quote }}
   METRICS_PORT: {{ .Values.metrics.port | quote }}
+{{- end }}
