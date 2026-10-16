@@ -264,6 +264,16 @@ keycloakx:
   resources:
     requests: { cpu: 250m, memory: 768Mi }
     limits: { memory: 1Gi }
+  # The restricted Pod Security profile (Keycloak writes under /opt/keycloak/data,
+  # so the root filesystem stays writable)
+  podSecurityContext:
+    fsGroup: 1000
+    seccompProfile: { type: RuntimeDefault }
+  securityContext:
+    runAsUser: 1000
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    capabilities: { drop: [ALL] }
 
 # Nightly backups of MongoDB and Keycloak's Postgres: dumped, encrypted by
 # rclone's crypt remote before they leave the cluster, and copied to object

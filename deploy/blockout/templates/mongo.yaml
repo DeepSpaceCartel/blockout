@@ -9,6 +9,9 @@ metadata:
   labels: {{- include "blockout.part.labels" (list $ "mongo") | nindent 4 }}
 spec:
   clusterIP: None # each member by name: <release>-mongo-0.<release>-mongo.<namespace>.svc
+  # Names resolve before the member is ready: the replica set is started (and
+  # the servers find it) by that name
+  publishNotReadyAddresses: true
   selector: {{- $sel | nindent 4 }}
   ports: [{ name: mongo, port: 27017 }]
 ---
