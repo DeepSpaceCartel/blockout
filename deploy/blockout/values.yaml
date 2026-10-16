@@ -9,6 +9,9 @@ image:
   digest: ""
   pullPolicy: IfNotPresent
 
+# Secrets (kubernetes.io/dockerconfigjson) for a private image, e.g. [{ name: ghcr-pull }]
+imagePullSecrets: []
+
 replicaCount: 2
 
 # The address people use, https only, e.g. https://blockout.example.org

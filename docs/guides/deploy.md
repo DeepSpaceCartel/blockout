@@ -9,7 +9,13 @@ Blockout runs in Kubernetes as two or more identical servers (the `blockout` Hel
 1. **MongoDB and Valkey:** `deploy/data/install.sh` ([Set up MongoDB and Valkey](set-up-the-databases.md)).
 2. **Keycloak on a public address,** with Blockout's address in the `blockout` client's redirect URIs and web origins ([Switch sign-in to Keycloak](set-up-keycloak.md)).
 3. **The gateway:** a listener (and certificate) for Blockout's hostname on the cluster's shared Gateway. In the workspace cluster, that's `gateway/rts-gateway`, set up outside this repository; the chart attaches to the listener named in `values-workspace.yaml`.
-4. **A released image:** tagging `v…` publishes `ghcr.io/<owner>/blockout` ([CI](../project/ci.md#releases)). Make the package public on GitHub, or give the cluster a pull secret.
+4. **A released image:** tagging `v…` publishes `ghcr.io/<owner>/blockout` ([CI](../project/ci.md#releases)). If the package isn't public, give the cluster a pull secret and name it in `imagePullSecrets`. In the workspace cluster the package is internal to the org, and `values-workspace.yaml` uses `ghcr-pull`, made from a token that can read packages:
+
+    ```sh
+    kubectl create namespace blockout
+    kubectl -n blockout create secret docker-registry ghcr-pull \
+      --docker-server=ghcr.io --docker-username=<user> --docker-password=<token with read:packages>
+    ```
 
 ## Deploy, update, roll back
 

@@ -25,6 +25,9 @@ spec:
     spec:
       serviceAccountName: {{ include "blockout.fullname" . }}
       automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
       terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
       securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
       # spread over nodes, so one node going away doesn't take every server

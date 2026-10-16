@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.1] - 2026-10-16
 
 ### Added
+- The Helm chart can pull a private image (`imagePullSecrets`).
 - A load test for live classes (`apps/server/scripts/loadtest.js`): 30 classes of 30 students on two servers get each roll to every student in under a second.
 
 ### Fixed

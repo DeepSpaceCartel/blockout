@@ -3,6 +3,8 @@
 # (namespace blockout-data), Keycloak from deploy/keycloak.
 # (Hostnames to confirm: they follow the cluster's <name>.deepspacecartel.com.)
 publicUrl: https://blockout.deepspacecartel.com
+# The image is internal to the DeepSpaceCartel org (docs/guides/deploy.md)
+imagePullSecrets: [{ name: ghcr-pull }]
 keycloak:
   issuer: https://id.deepspacecartel.com/realms/blockout
 httpRoute:
