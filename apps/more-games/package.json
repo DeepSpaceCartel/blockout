@@ -1,6 +1,6 @@
 {
   "name": "@blockout/more-games",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "type": "module",
   "description": "Blockout: the More games page, a list of the games for other operations.",

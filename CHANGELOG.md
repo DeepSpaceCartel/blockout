@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-16
+
 ### Added
 - A load test for live classes (`apps/server/scripts/loadtest.js`): 30 classes of 30 students on two servers get each roll to every student in under a second.
 
@@ -82,7 +84,8 @@ The first release since 0.2.0 (0.3.0 wasn't released on its own): accounts and h
 - The first playable Blockout: roll two dice, draw the rectangle, answer the multiplication, against the CPU.
 
 <!-- No release tags yet: the links point at the release commits (tag them v0.1.0 and v0.2.0 to switch to compare/v0.1.0...v0.2.0). -->
-[Unreleased]: https://github.com/DeepSpaceCartel/blockout/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/DeepSpaceCartel/blockout/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/DeepSpaceCartel/blockout/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/DeepSpaceCartel/blockout/compare/4921120...v0.4.0
 [0.2.0]: https://github.com/DeepSpaceCartel/blockout/compare/382b38c...4921120
 [0.1.0]: https://github.com/DeepSpaceCartel/blockout/tree/382b38c

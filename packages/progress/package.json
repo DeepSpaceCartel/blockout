@@ -1,6 +1,6 @@
 {
   "name": "@blockout/progress",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "description": "Wallet, shop (skill-tree unlocks), achievements, fact stats, bonuses, homework goals, cheats; and the Wardrobe (cosmetics).",
   "type": "module",
