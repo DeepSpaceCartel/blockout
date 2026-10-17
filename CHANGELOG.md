@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-17
+
 ### Added
 - The Journey: single player now climbs one level at a time, from a 1×1 board with a 1-sided die to 12×12 with a 12-sided die, then challenge levels (16×16, Tricky, 20×20, Master, Legend, 24×24). Beat the CPU with 4 out of 5 answers right first try to move up; each level up earns points, and reaching Level 6, Level 12 and the end earn achievements. The menu shows one card and "Play Level N"; Free play (pick a difficulty and board) opens at Level 6. In the web game and the phone app ([ADR-0010](https://github.com/DeepSpaceCartel/blockout/blob/main/docs/decisions/0010-journey-progression.md)).
 - In the phone app, bonuses, achievements and stickers no longer pop up during a game or practice round: they're listed on its results, the same kind stacked into one ("⚡ Speedy ×3 · +9 bonus points"). Pop-ups elsewhere stack repeats too.
@@ -114,7 +116,8 @@ The first release since 0.2.0 (0.3.0 wasn't released on its own): accounts and h
 - The first playable Blockout: roll two dice, draw the rectangle, answer the multiplication, against the CPU.
 
 <!-- No release tags yet: the links point at the release commits (tag them v0.1.0 and v0.2.0 to switch to compare/v0.1.0...v0.2.0). -->
-[Unreleased]: https://github.com/DeepSpaceCartel/blockout/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/DeepSpaceCartel/blockout/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/DeepSpaceCartel/blockout/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/DeepSpaceCartel/blockout/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/DeepSpaceCartel/blockout/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/DeepSpaceCartel/blockout/compare/4921120...v0.4.0

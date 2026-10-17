@@ -1,6 +1,6 @@
 {
   "name": "@blockout/fraction-multiply",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "description": "Blockout: multiplying fractions, one of the games under More games (built on @blockout/game-kit).",
