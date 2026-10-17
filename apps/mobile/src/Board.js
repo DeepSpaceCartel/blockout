@@ -1,11 +1,13 @@
 // The board: squares, the rectangles so far in their players' colours, and
 // whatever is happening on it now (a rectangle being drawn, the CPU's growing
 // one, skip-counting). Drawing is a drag from corner to corner.
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, Platform, View } from 'react-native';
 import Svg, { G, Line, Rect, Text as SvgText } from 'react-native-svg';
 import { boardLayout, cellAt, dragRect } from './boardMath';
-import { PLAYER_COLORS, useTheme } from './theme';
+import { useTheme } from './theme';
+import { BoardDecor, PatternDefs, hasPattern, patternFill, useBoardSkin, useLooks, usePlayerColors } from './looks';
+import { useReducedMotion } from './effects';
 
 // (the web build: the system's sans-serif, and no text selection while dragging)
 const FONT = Platform.OS === 'web' ? 'system-ui, sans-serif' : undefined;
@@ -41,6 +43,9 @@ function Outline({ x, y, w, h, cell, color }) {
 // for the square tapped, and tapped (the rectangle shown there, with valid).
 export default function Board({ match, width, drag, preview, hide, counting, canDraw, onDrag, onDraw, canTap = false, onTap, tapped = null }) {
   const t = useTheme();
+  const PLAYER_COLORS = usePlayerColors(); // (the Wardrobe's looks)
+  const skin = useBoardSkin();
+  const pattern = useLooks().pattern; // (on your own rectangles)
   const { size, board } = match;
   const { cell, side } = boardLayout(width, size);
   const start = useRef(null);
@@ -84,17 +89,21 @@ export default function Board({ match, width, drag, preview, hide, counting, can
     []
   );
 
+  const fx = usePlaceEffect(match, useLooks().place);
+
   const box = (r, key, props) => <Rect key={key} x={r.x * cell} y={r.y * cell} width={r.w * cell} height={r.h * cell} {...props} />;
   const drawing = drag ? dragRect(drag) : null;
 
   return (
     <View style={[{ width: side, height: side, alignSelf: 'center' }, NO_SELECT]} {...responder.panHandlers} accessibilityLabel={`Board, ${size} by ${size}`}>
       <Svg width={side} height={side} pointerEvents="none">
-        <Rect x={0} y={0} width={side} height={side} fill={t.boardBg} />
+        <PatternDefs kind={pattern} />
+        <Rect x={0} y={0} width={side} height={side} fill={skin.bg} />
+        <BoardDecor kind={skin.decor} side={side} cell={cell} />
         {Array.from({ length: size + 1 }, (_, i) => (
           <G key={i}>
-            <Line x1={i * cell} y1={0} x2={i * cell} y2={side} stroke={t.boardGrid} strokeWidth={1} />
-            <Line x1={0} y1={i * cell} x2={side} y2={i * cell} stroke={t.boardGrid} strokeWidth={1} />
+            <Line x1={i * cell} y1={0} x2={i * cell} y2={side} stroke={skin.grid} strokeWidth={1} />
+            <Line x1={0} y1={i * cell} x2={side} y2={i * cell} stroke={skin.grid} strokeWidth={1} />
           </G>
         ))}
         {board.rects.map((r, i) => {
@@ -104,6 +113,7 @@ export default function Board({ match, width, drag, preview, hide, counting, can
           return (
             <G key={`r${i}`}>
               {box(r, 'fill', { fill: color, fillOpacity: r.solved ? 0.85 : 0.5 })}
+              {hasPattern(pattern) && match.players[r.player] && !match.players[r.player].cpu ? box(r, 'pattern', { fill: patternFill(pattern) }) : null}
               <SquareLines {...r} cell={cell} />
               <Outline {...r} cell={cell} color={color} />
               {label && r.solved ? (
@@ -114,22 +124,75 @@ export default function Board({ match, width, drag, preview, hide, counting, can
             </G>
           );
         })}
+        {fx ? <PlaceEffect {...fx} cell={cell} color={PLAYER_COLORS[fx.rect.player % PLAYER_COLORS.length]} gold={t.gold} /> : null}
         {counting ? <CountingOverlay counting={counting} cell={cell} t={t} /> : null}
-        {preview ? box(preview, 'cpu', { fill: PLAYER_COLORS[match.current % PLAYER_COLORS.length], fillOpacity: 0.35, stroke: t.boardEdge, strokeWidth: 2, strokeDasharray: '6 4' }) : null}
-        {tapped ? <Drawing rect={tapped} verdict={{ ok: tapped.valid, fits: tapped.valid, rightSize: true, corner: true }} color={PLAYER_COLORS[match.current % PLAYER_COLORS.length]} cell={cell} side={side} t={t} /> : null}
-        {drawing ? <Drawing rect={drawing} verdict={drag.verdict} color={PLAYER_COLORS[match.current % PLAYER_COLORS.length]} cell={cell} side={side} t={t} /> : null}
-        <Rect x={1} y={1} width={side - 2} height={side - 2} fill="none" stroke={t.boardEdge} strokeWidth={2} />
+        {preview ? box(preview, 'cpu', { fill: PLAYER_COLORS[match.current % PLAYER_COLORS.length], fillOpacity: 0.35, stroke: skin.edge, strokeWidth: 2, strokeDasharray: '6 4' }) : null}
+        {tapped ? <Drawing rect={tapped} verdict={{ ok: tapped.valid, fits: tapped.valid, rightSize: true, corner: true }} color={PLAYER_COLORS[match.current % PLAYER_COLORS.length]} cell={cell} side={side} t={t} skin={skin} /> : null}
+        {drawing ? <Drawing rect={drawing} verdict={drag.verdict} color={PLAYER_COLORS[match.current % PLAYER_COLORS.length]} cell={cell} side={side} t={t} skin={skin} /> : null}
+        <Rect x={1} y={1} width={side - 2} height={side - 2} fill="none" stroke={skin.edge} strokeWidth={2} />
       </Svg>
     </View>
   );
+}
+
+// The Wardrobe's placing effect: for a moment after one of your rectangles
+// lands, { kind, rect, p } with p going from 0 to 1
+const PLACE_FX_MS = 650;
+function usePlaceEffect(match, kind) {
+  const reduced = useReducedMotion();
+  const [fx, setFx] = useState(null);
+  const count = useRef(match.board.rects.length);
+  const rects = match.board.rects;
+  useEffect(() => {
+    const before = count.current;
+    count.current = rects.length;
+    const rect = rects[rects.length - 1];
+    const owner = rect && match.players[rect.player];
+    if (rects.length !== before + 1 || kind === 'none' || reduced || !owner || owner.cpu) return undefined;
+    const start = Date.now();
+    let frame = null;
+    const step = () => {
+      const p = Math.min(1, (Date.now() - start) / PLACE_FX_MS);
+      setFx(p < 1 ? { kind, rect, p } : null);
+      if (p < 1) frame = requestAnimationFrame(step);
+    };
+    step();
+    return () => {
+      cancelAnimationFrame(frame);
+      setFx(null);
+    };
+  }, [rects.length]);
+  return fx;
+}
+
+function PlaceEffect({ kind, rect, p, cell, color, gold }) {
+  const x = rect.x * cell;
+  const y = rect.y * cell;
+  const w = rect.w * cell;
+  const h = rect.h * cell;
+  if (kind === 'pop') {
+    // a flash that shrinks onto the rectangle
+    const grow = (1 - p) * cell * 0.4;
+    return <Rect x={x - grow} y={y - grow} width={w + grow * 2} height={h + grow * 2} fill="#fff" fillOpacity={(1 - p) * 0.6} stroke={color} strokeOpacity={1 - p} strokeWidth={3} />;
+  }
+  if (kind === 'ripple') {
+    // two rings spreading out from its edge
+    return [0, 0.25].map((lag) => {
+      const q = Math.max(0, Math.min(1, (p - lag) / (1 - lag)));
+      const out = q * cell * 1.6;
+      return <Rect key={lag} x={x - out} y={y - out} width={w + out * 2} height={h + out * 2} rx={out / 2} fill="none" stroke={color} strokeOpacity={(1 - q) * 0.9} strokeWidth={3} />;
+    });
+  }
+  // glow: a golden edge that brightens and fades
+  return <Rect x={x} y={y} width={w} height={h} fill={gold} fillOpacity={Math.sin(p * Math.PI) * 0.35} stroke={gold} strokeOpacity={Math.sin(p * Math.PI)} strokeWidth={6} />;
 }
 
 // The rectangle being drawn, labelled with its size, as on the web: the
 // player's colour when it's right and fits, grey when the size is wrong, red
 // when it bumps into another. The label sits above it (the finger is on it),
 // or inside its top when there's no room above.
-function Drawing({ rect, verdict, color, cell, side, t }) {
-  const tint = !verdict.fits ? t.bad : verdict.ok ? color : t.boardWrong;
+function Drawing({ rect, verdict, color, cell, side, t, skin }) {
+  const tint = !verdict.fits ? t.bad : verdict.ok ? color : skin.wrong;
   const x = rect.x * cell;
   const y = rect.y * cell;
   const w = rect.w * cell;
@@ -145,7 +208,7 @@ function Drawing({ rect, verdict, color, cell, side, t }) {
       <Rect x={x} y={y} width={w} height={h} fill={tint} fillOpacity={verdict.ok ? 0.55 : 0.3} />
       <Rect x={x + 1.5} y={y + 1.5} width={w - 3} height={h - 3} fill="none" stroke={tint} strokeWidth={3} />
       <Rect x={tx} y={ty} width={tw} height={th} rx={6} fill={t.ink} />
-      <SvgText x={tx + tw / 2} y={ty + th / 2 + size * 0.35} fill={t.boardBg} fontFamily={FONT} fontSize={size} fontWeight="900" textAnchor="middle">
+      <SvgText x={tx + tw / 2} y={ty + th / 2 + size * 0.35} fill={t.surface} fontFamily={FONT} fontSize={size} fontWeight="900" textAnchor="middle">
         {label}
       </SvgText>
     </G>
@@ -199,6 +262,7 @@ function CountingOverlay({ counting, cell, t, everySquare = false }) {
 // count" lighting up its rows. counting: { byRows, group, shown }.
 export function RectPicture({ rect, color, counting, maxWidth, maxHeight }) {
   const t = useTheme();
+  const pattern = useLooks().pattern;
   const cell = Math.max(8, Math.floor(Math.min(maxWidth / rect.w, maxHeight / rect.h, 56)));
   const width = cell * rect.w;
   const height = cell * rect.h;
@@ -206,7 +270,9 @@ export function RectPicture({ rect, color, counting, maxWidth, maxHeight }) {
   return (
     <View style={[{ width, height, alignSelf: 'center' }, NO_SELECT]} accessibilityLabel={`Your rectangle: ${rect.w} squares across and ${rect.h} down`}>
       <Svg width={width} height={height} pointerEvents="none">
+        <PatternDefs kind={pattern} />
         <Rect x={0} y={0} width={width} height={height} fill={color} fillOpacity={0.85} />
+        {hasPattern(pattern) ? <Rect x={0} y={0} width={width} height={height} fill={patternFill(pattern)} /> : null}
         {counting ? <CountingOverlay counting={{ ...counting, rect: at }} cell={cell} t={t} everySquare /> : null}
         <SquareLines x={0} y={0} w={rect.w} h={rect.h} cell={cell} width={1.5} opacity={0.55} />
         <Outline x={0} y={0} w={rect.w} h={rect.h} cell={cell} color={color} />

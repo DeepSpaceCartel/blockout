@@ -20,10 +20,11 @@ const LEVELS = [
 ];
 
 // onLocked(itemId): a locked choice was tapped (offer it); onShop(): open the Shop
-export default function Home({ progress, user, choice, onChoose, onPlay, onSignIn, onSignOut, signingIn, accountError, onLocked, onShop, onAchievements, onStats, onStickers, onSettings }) {
+export default function Home({ progress, user, choice, onChoose, onPlay, onSignIn, onSignOut, signingIn, accountError, onLocked, onShop, onWardrobe, onAchievements, onStats, onStickers, onSettings }) {
   const t = useTheme();
   const newUnlocks = Shop.affordableCount(progress);
   const stickerNews = Shop.newStickers(progress) + Shop.spareStickers(progress);
+  const wardrobeNews = Shop.newWardrobe(progress) + Shop.affordableLooks(progress);
   const anyLocked = DIFFICULTIES.some((d) => !difficultyOpen(progress, d.id)) || BOARDS.some((n) => !boardOpen(progress, n));
   const d = choice.difficulty;
   const level = Setup.gameLevel(progress, d, choice); // (what's unlocked on this difficulty)
@@ -72,6 +73,7 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onSignI
         {accountError ? <Text style={[styles.error, { color: t.bad }]}>{accountError}</Text> : null}
 
         <View style={styles.more}>
+          <MenuButton testID="wardrobe" label="👕 Looks" badge={wardrobeNews} onPress={onWardrobe} />
           <MenuButton testID="stats" label="📊 Stats" onPress={onStats} />
           <MenuButton testID="achievements" label="🏆 Awards" onPress={onAchievements} />
           <MenuButton testID="stickers" label="🎁 Stickers" badge={stickerNews} onPress={onStickers} />
@@ -250,8 +252,10 @@ function MenuButton({ label, badge = 0, onPress, testID }) {
       onPress={onPress}
       style={({ pressed }) => [styles.menuBtn, { backgroundColor: t.surface, borderColor: t.line, transform: [{ scale: pressed ? 0.97 : 1 }] }]}
     >
-      <Text style={[styles.smallText, { color: t.ink }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-        {label}
+      {/* the icon over its word, so four fit side by side on a small phone */}
+      <Text style={styles.menuIcon}>{label.split(' ')[0]}</Text>
+      <Text style={[styles.menuText, { color: t.ink }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+        {label.replace(/^\S+ /, '')}
       </Text>
       {badge ? (
         <View style={[styles.badge, styles.cornerBadge, { backgroundColor: t.bad }]}>
@@ -311,7 +315,9 @@ const styles = StyleSheet.create({
   note: { fontSize: 13, textAlign: 'center' },
   bottom: { padding: 16, paddingTop: 8 },
   more: { flexDirection: 'row', gap: 8 },
-  menuBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 40, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth * 2 },
+  menuBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', height: 52, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth * 2 },
+  menuIcon: { fontSize: 18, lineHeight: 22 },
+  menuText: { fontSize: 13, fontWeight: '700' },
   small: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth * 2 },
   smallText: { fontSize: 15, fontWeight: '700' },
 });

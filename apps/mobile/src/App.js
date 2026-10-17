@@ -1,13 +1,14 @@
 // Blockout on a phone: the menu and the game, the save, and signing in.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Progress from '@blockout/progress';
 import * as Shop from '@blockout/progress/shop';
 import * as Views from '@blockout/progress/views';
 import * as Settings from '@blockout/progress/settings';
+import * as Wardrobe from '@blockout/progress/wardrobe';
 import * as Account from './account';
 import Game from './Game';
 import Home from './Home';
@@ -19,6 +20,8 @@ import StatsScreen from './StatsScreen';
 import PracticeScreen from './PracticeScreen';
 import * as Practice from '@blockout/progress/practice';
 import SettingsScreen from './SettingsScreen';
+import WardrobeScreen from './Wardrobe';
+import { DEFAULT_LOOKS, Looks } from './looks';
 import { ThemeSetting, useTheme } from './theme';
 
 const CHOICE_KEY = 'blockout.mobile.choice';
@@ -27,13 +30,15 @@ const DEFAULT_CHOICE = { mode: 'single', difficulty: 'easy', size: 6, level: 'le
 
 // The game to start from the menu's choice (falling back to what's unlocked).
 // Single player has its Level (Expert: no help, bonus ×2) and Expert's timer;
-// Home multiplayer has the Settings' answer timer, as on the web.
-function setupFor(choice, progress, settings) {
+// Home multiplayer has the Settings' answer timer, as on the web. The players
+// wear the Wardrobe's looks: the CPU's character, your avatar and title.
+function setupFor(choice, progress, settings, looks) {
   const difficulty = difficultyOpen(progress, choice.difficulty) ? choice.difficulty : 'easy';
   const size = boardOpen(progress, choice.size) ? choice.size : 6;
   const mode = modeOpen(progress, choice.mode) ? choice.mode : 'single';
   const count = mode === 'multi' && playersOpen(progress, choice.players) ? choice.players : 2;
-  const players = mode === 'multi' ? Array.from({ length: count }, (_, i) => ({ name: `Player ${i + 1}` })) : [{ name: 'You' }, { name: 'CPU', cpu: true }];
+  const people = mode === 'multi' ? Array.from({ length: count }, (_, i) => ({ name: `Player ${i + 1}` })) : [{ name: 'You' }, { name: 'CPU', cpu: true }];
+  const players = people.map((p) => ({ ...p, statsName: p.name, ...Wardrobe.playerLook(looks, p, mode) }));
   const { level, timer } = mode === 'single' ? Setup.gameLevel(progress, difficulty, choice) : { level: 'learn', timer: Number(settings.answerTime) || 0 };
   return {
     mode,
@@ -67,12 +72,16 @@ function Main({ onTheme }) {
   const [choice, setChoice] = useState(DEFAULT_CHOICE);
   const [settings, setSettings] = useState(Settings.DEFAULT_SETTINGS);
   const [game, setGame] = useState(null); // { key, setup }
-  const [screen, setScreen] = useState('menu'); // 'menu' | 'shop' | 'stats' | 'achievements' | 'stickers' (a game is on top)
+  const [screen, setScreen] = useState('menu'); // 'menu' | 'shop' | 'wardrobe' | 'stats' | 'achievements' | 'stickers' | 'settings' (a game is on top)
+  const [wardrobeNew, setWardrobeNew] = useState([]); // (the looks new when the Wardrobe opened)
   const [offer, setOffer] = useState(null); // the unlock sheet: Shop.unlockOffer's answer
   const [signingIn, setSigningIn] = useState(false);
   const [accountError, setAccountError] = useState(null);
   const [, setTick] = useState(0);
   const toasts = useToasts();
+  // The looks worn: the ones chosen (Settings › cosmetics), if they're owned
+  const unlocked = progress ? progress.unlocks.length : 0; // (buying changes what can be worn)
+  const looks = useMemo(() => (progress ? Wardrobe.chosenLooks(settings.cosmetics, progress) : DEFAULT_LOOKS), [settings.cosmetics, progress, unlocked]);
 
   // At start: the last account, its save (synced when online), the last choice
   useEffect(() => {
@@ -116,10 +125,23 @@ function Main({ onTheme }) {
   };
 
   const setSetting = (key, value) => {
-    const next = { ...settings, [key]: value };
-    setSettings(next);
-    AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+    setSettings((now) => {
+      const next = { ...now, [key]: value };
+      AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+      return next;
+    });
     if (key === 'theme') onTheme(value);
+  };
+
+  // Put a look on (or a title)
+  const wear = (categoryId, optionId) => setSetting('cosmetics', { ...looks, [categoryId]: optionId });
+
+  const openWardrobe = () => {
+    const keys = Shop.wardrobeKeys(progress);
+    setWardrobeNew(keys.filter((k) => !Shop.seenList(progress, 'wardrobe').includes(k)));
+    Shop.markSeen(progress, 'wardrobe', keys);
+    save();
+    setScreen('wardrobe');
   };
 
   // New achievements: a banner each, and the sticker each big one drops (as on the web)
@@ -146,6 +168,11 @@ function Main({ onTheme }) {
     if (BOARDS.includes(on.size)) part.size = on.size;
     if (Object.keys(part).length) choose(part);
     if (on.setting) setSetting(on.setting[0], on.setting[1] === 'true' ? true : on.setting[1]);
+    const item = Progress.shopItem(itemId);
+    if (item.cosmetic) {
+      wear(...item.cosmetic); // put it on
+      Shop.markSeen(progress, 'wardrobe', [item.cosmetic.join(':')]);
+    }
   }
 
   async function signIn() {
@@ -191,10 +218,11 @@ function Main({ onTheme }) {
       const tables = Practice.roundTables(progress, d, (choice.practice && choice.practice.tables) || []);
       return setGame({ key: Date.now(), practice: { difficulty: d, count: pr.count, tables, level: pr.level, timer: pr.timer } });
     }
-    setGame({ key: Date.now(), setup: setupFor(choice, progress, settings) });
+    setGame({ key: Date.now(), setup: setupFor(choice, progress, settings, looks) });
   };
 
   return (
+    <Looks.Provider value={looks}>
     <SafeAreaView style={[styles.fill, { backgroundColor: t.bg }]}>
       <StatusBar style="auto" />
       {game && game.practice ? (
@@ -203,6 +231,8 @@ function Main({ onTheme }) {
         <Game key={game.key} setup={game.setup} settings={settings} progress={progress} onSave={save} toast={toasts.show} onEarned={celebrate} onExit={() => setGame(null)} onAgain={play} />
       ) : screen === 'shop' ? (
         <ShopScreen progress={progress} onAsk={ask} onClose={() => setScreen('menu')} />
+      ) : screen === 'wardrobe' ? (
+        <WardrobeScreen progress={progress} newKeys={wardrobeNew} onWear={wear} onAsk={ask} onClose={() => setScreen('menu')} />
       ) : screen === 'stats' ? (
         <StatsScreen progress={progress} settings={settings} onClose={() => setScreen('menu')} />
       ) : screen === 'settings' ? (
@@ -237,6 +267,7 @@ function Main({ onTheme }) {
           accountError={accountError}
           onLocked={ask}
           onShop={() => setScreen('shop')}
+          onWardrobe={openWardrobe}
           onAchievements={() => setScreen('achievements')}
           onStats={() => setScreen('stats')}
           onSettings={() => setScreen('settings')}
@@ -246,6 +277,7 @@ function Main({ onTheme }) {
       <UnlockSheet offer={offer} onBuy={buy} onClose={() => setOffer(null)} />
       <toasts.View />
     </SafeAreaView>
+    </Looks.Provider>
   );
 }
 

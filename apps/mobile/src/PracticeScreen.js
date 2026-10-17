@@ -10,7 +10,9 @@ import * as Stats from '@blockout/progress/stats';
 import * as Views from '@blockout/progress/views';
 import { RectPicture } from './Board';
 import { addToHistory } from './history';
-import { PLAYER_COLORS, useTheme } from './theme';
+import { useTheme } from './theme';
+import { usePlayerColors } from './looks';
+import { Streak } from './effects';
 import { Button, Keypad } from './ui';
 
 const testing = Platform.OS === 'web' && typeof window !== 'undefined';
@@ -27,6 +29,7 @@ const STATUS = { mastered: '#2a9d5c', learning: '#f2c94c', practice: '#d64533', 
 // place (onSave after each change); toast and onEarned as in the game.
 export default function PracticeScreen({ options, progress, settings = Settings.DEFAULT_SETTINGS, onSave, toast, onEarned, onExit, onAgain }) {
   const t = useTheme();
+  const PLAYER_COLORS = usePlayerColors(); // (the Wardrobe's colours)
   const r = useRef(null);
   if (!r.current) r.current = Practice.createRound(progress, options);
   const round = r.current;
@@ -228,7 +231,7 @@ export default function PracticeScreen({ options, progress, settings = Settings.
             <View style={{ width: `${progressShare * 100}%`, height: '100%', backgroundColor: t.good, borderRadius: 4 }} />
           </View>
         </View>
-        {round.streak >= 2 && view !== 'done' ? <Text style={[styles.streak, { color: t.goldInk }]}>🔥 {round.streak}</Text> : null}
+        {view !== 'done' ? <Streak n={round.streak} color={t.goldInk} /> : null}
       </View>
       <View style={styles.fill} onLayout={(e) => setArea(e.nativeEvent.layout)}>
         {!area ? null : view === 'done' && end ? (
@@ -345,7 +348,6 @@ const styles = StyleSheet.create({
   headerMid: { flex: 1, gap: 6 },
   counter: { fontSize: 15, fontWeight: '700' },
   bar: { height: 8, borderRadius: 4, overflow: 'hidden' },
-  streak: { fontSize: 17, fontWeight: '800' },
   question: { flex: 1, justifyContent: 'center', gap: 14, paddingHorizontal: 16, paddingBottom: 16 },
   timer: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   timerText: { fontSize: 18, fontWeight: '800', minWidth: 70 },

@@ -20,7 +20,9 @@ import Board, { RectPicture } from './Board';
 import { dragRect, drawnMessage } from './boardMath';
 import * as Rewards from './rewards';
 import { recordGame } from './history';
-import { PLAYER_COLORS, useTheme } from './theme';
+import { useTheme } from './theme';
+import { usePlayerColors } from './looks';
+import { Celebration, Rolling, Streak } from './effects';
 import { Button, Die, Keypad } from './ui';
 
 // For automated checks of the web build: BLOCKOUT_FAST (set before the page
@@ -47,6 +49,7 @@ const article = (n) => (/^(8|11|18)$/.test(String(n)) || /^8\d$/.test(String(n))
 // settings: the Settings (read once: they don't change mid-game, as on the web).
 export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, progress, onSave, toast, onEarned, onExit, onAgain }) {
   const t = useTheme();
+  const PLAYER_COLORS = usePlayerColors(); // (the Wardrobe's colours)
   const [, setTick] = useState(0);
   const redraw = () => setTick((n) => n + 1);
   const alive = useRef(true);
@@ -65,6 +68,7 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
   const [msg, setMsg] = useState('');
   const [oops, setOops] = useState(false);
   const [dice, setDice] = useState([null, null]);
+  const [rolling, setRolling] = useState(false); // (the dice are spinning, in the Wardrobe's roll look)
   const [rolled, setRolled] = useState(false); // the roll is in: "Draw it ›"
   const [drag, setDrag] = useState(null);
   const [preview, setPreview] = useState(null);
@@ -154,10 +158,12 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
 
   async function rollAnimation() {
     const face = (list) => list[Math.floor(Math.random() * list.length)];
+    setRolling(true);
     for (let i = 0; i < 10; i++) {
       setDice([face(match.faces.a), face(match.faces.b)]);
       await wait(60 * Math.max(pace, 0.5));
     }
+    setRolling(false);
   }
 
   function startTurn() {
@@ -434,7 +440,7 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
       await afterCpu(PASS_MS);
       return nextTurn();
     }
-    setMsg(`${p.name} rolled ${a} and ${b}.`);
+    setMsg(`${p.hello ? `${p.hello} ` : ''}${p.name} rolled ${a} and ${b}.`); // (with the CPU character's greeting)
     setHide(rect);
     await wait(CPU_STEP_MS * 1.2);
     setMsg('');
@@ -523,9 +529,13 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
         {!area ? null : view === 'roll' ? (
           <View style={styles.rollScreen}>
             <View style={styles.bigDice}>
-              <Die value={realDice && match.phase === 'roll' ? picked[0] : dice[0]} size={Math.min(realDice ? 90 : 130, area.width * 0.32)} />
+              <Rolling rolling={rolling}>
+                <Die value={realDice && match.phase === 'roll' ? picked[0] : dice[0]} size={Math.min(realDice ? 90 : 130, area.width * 0.32)} />
+              </Rolling>
               <Text style={[styles.bigTimes, { color: t.muted }]}>×</Text>
-              <Die value={realDice && match.phase === 'roll' ? picked[1] : dice[1]} size={Math.min(realDice ? 90 : 130, area.width * 0.32)} />
+              <Rolling rolling={rolling}>
+                <Die value={realDice && match.phase === 'roll' ? picked[1] : dice[1]} size={Math.min(realDice ? 90 : 130, area.width * 0.32)} />
+              </Rolling>
             </View>
             <Text testID="turn-msg" style={[styles.rollMsg, { color: t.ink }]}>
               {msg || ' '}
@@ -607,12 +617,14 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
             entry={entry}
             feedback={feedback}
             busy={busy}
+            streak={Match.currentPlayer(match).streak}
             help={!match.pending || match.expert ? null : match.pending.helped ? 'again' : 'first'}
             onKey={onKey}
             onHelp={() => helpCount(null, Boolean(match.pending && match.pending.helped))}
           />
         )}
       </View>
+      {over && over.results.winners.length === 1 && !over.results.winners[0].cpu ? <Celebration /> : null}
     </View>
   );
 }
@@ -635,6 +647,7 @@ function HelpScreen({ area, rect, color, counting, text, done, onBack }) {
 // Scores, and ✕ back to the menu; with Settings › Board progress, how full the board is
 function Header({ match, who, over, onExit, showProgress }) {
   const t = useTheme();
+  const PLAYER_COLORS = usePlayerColors(); // (the Wardrobe's colours)
   const total = match.size * match.size;
   const filled = total - Core.emptyCount(match.board);
   return (
@@ -646,9 +659,17 @@ function Header({ match, who, over, onExit, showProgress }) {
       {match.players.map((p, i) => (
         <View key={i} style={[styles.score, { borderColor: i === match.current && !over ? PLAYER_COLORS[i] : t.line, backgroundColor: t.surface }]}>
           <View style={[styles.swatch, { backgroundColor: PLAYER_COLORS[i] }]} />
-          <Text style={[styles.scoreName, { color: t.ink }]} numberOfLines={1} accessibilityLabel={who(p)}>
-            {match.players.length > 2 ? who(p).replace(/^Player /, 'P') : who(p)}
-          </Text>
+          <View style={styles.scoreWho}>
+            <Text style={[styles.scoreName, { color: t.ink }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} accessibilityLabel={who(p)}>
+              {p.avatar ? `${p.avatar} ` : ''}
+              {match.players.length > 2 ? who(p).replace(/^Player /, 'P') : who(p)}
+            </Text>
+            {p.title ? (
+              <Text testID="player-title" style={[styles.scoreTitle, { color: t.muted }]} numberOfLines={1}>
+                {p.title}
+              </Text>
+            ) : null}
+          </View>
           <Text style={[styles.scorePts, { color: t.ink }]}>{p.score}</Text>
         </View>
       ))}
@@ -670,7 +691,7 @@ function Header({ match, who, over, onExit, showProgress }) {
 // The question and the keypad
 // help: 'first' ("Help me count"), 'again' ("Count again") or null (Expert)
 // timeLeft / timeTotal (ms): the answer timer, when there is one
-function AnswerScreen({ rect, entry, feedback, busy, help, onKey, onHelp, timeLeft = null, timeTotal = 0 }) {
+function AnswerScreen({ rect, entry, feedback, busy, help, onKey, onHelp, streak = 0, timeLeft = null, timeTotal = 0 }) {
   const t = useTheme();
   if (!rect) return null;
   const low = timeLeft !== null && timeLeft <= 5000;
@@ -686,6 +707,7 @@ function AnswerScreen({ rect, entry, feedback, busy, help, onKey, onHelp, timeLe
           </View>
         </View>
       ) : null}
+      <Streak n={streak} color={t.goldInk} />
       <View style={styles.questionRow}>
         <Text style={[styles.question, { color: t.ink }]}>
           {rect.a} × {rect.b} =
@@ -705,6 +727,7 @@ function AnswerScreen({ rect, entry, feedback, busy, help, onKey, onHelp, timeLe
 
 function Results({ over, match, who, onAgain, onExit }) {
   const t = useTheme();
+  const PLAYER_COLORS = usePlayerColors(); // (the Wardrobe's colours)
   const { results } = over;
   const winner = results.winners[0];
   const title = results.tie ? "It's a tie!" : match.mode === 'single' ? (winner.cpu ? `${winner.name} wins!` : 'You win! 🎉') : `${winner.name} wins! 🎉`;
@@ -744,7 +767,9 @@ const styles = StyleSheet.create({
   progressBar: { flex: 1, height: 8, borderRadius: 4, overflow: 'hidden' },
   score: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 12, borderWidth: 3 },
   swatch: { width: 12, height: 12, borderRadius: 6 },
-  scoreName: { flex: 1, fontSize: 15, fontWeight: '600' },
+  scoreWho: { flex: 1 },
+  scoreName: { fontSize: 15, fontWeight: '600' },
+  scoreTitle: { fontSize: 11, fontWeight: '700' },
   scorePts: { fontSize: 18, fontWeight: '800' },
   diceRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   times: { fontSize: 24, fontWeight: '800' },

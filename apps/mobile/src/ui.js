@@ -1,7 +1,8 @@
 // Small shared pieces: buttons, dice and the answer keypad.
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import Svg, { Circle, Rect } from 'react-native-svg';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import Svg, { Circle, Defs, LinearGradient, Rect, Stop, Text as SvgText } from 'react-native-svg';
 import { useTheme } from './theme';
+import { useDiceSkin, useKeypadSkin } from './looks';
 
 // primary: the one thing to do next (solid, with a soft shadow); secondary:
 // everything else (a light fill and a thin edge)
@@ -56,18 +57,37 @@ const PIPS = {
   6: [[0, 0], [2, 0], [0, 1], [2, 1], [0, 2], [2, 2]],
 };
 
-export function Die({ value, size = 56 }) {
-  const t = useTheme();
+// A die, in the Wardrobe's dice and dots (skin: another look, for previews)
+export function Die({ value, size = 56, skin }) {
+  const worn = useDiceSkin();
+  const k = skin || worn;
   const pips = PIPS[value];
+  const grad = `die-${k.id}`;
   return (
     <View style={{ width: size, height: size }} accessibilityLabel={value ? `Die: ${value}` : 'Die'}>
       <Svg width={size} height={size}>
-        <Rect x={2} y={2} width={size - 4} height={size - 4} rx={size * 0.18} fill={t.surface} stroke={t.edge} strokeWidth={2} />
-        {pips ? pips.map(([c, r], i) => <Circle key={i} cx={size * (0.27 + c * 0.23)} cy={size * (0.27 + r * 0.23)} r={size * 0.08} fill={t.ink} />) : null}
+        <Defs>
+          <LinearGradient id={grad} x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0" stopColor={k.face[0]} />
+            <Stop offset="1" stopColor={k.face[1]} />
+          </LinearGradient>
+        </Defs>
+        <Rect x={2} y={2} width={size - 4} height={size - 4} rx={size * 0.18} fill={`url(#${grad})`} stroke={k.edge} strokeWidth={2} />
+        {pips
+          ? pips.map(([c, r], i) =>
+              k.glyph ? (
+                <SvgText key={i} x={size * (0.27 + c * 0.23)} y={size * (0.27 + r * 0.23) + size * 0.065} fontSize={size * 0.18} textAnchor="middle">
+                  {k.glyph}
+                </SvgText>
+              ) : (
+                <Circle key={i} cx={size * (0.27 + c * 0.23)} cy={size * (0.27 + r * 0.23)} r={size * 0.08} fill={k.pip} />
+              )
+            )
+          : null}
       </Svg>
       {value && !pips ? (
         <View style={StyleSheet.absoluteFill}>
-          <Text style={[styles.dieNumber, { color: t.ink, lineHeight: size, fontSize: size * 0.45 }]}>{value}</Text>
+          <Text style={[styles.dieNumber, { color: k.num, lineHeight: size, fontSize: size * 0.45 }]}>{value}</Text>
         </View>
       ) : null}
     </View>
@@ -77,26 +97,27 @@ export function Die({ value, size = 56 }) {
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'back', '0', 'check'];
 const LABELS = { back: '⌫', check: '✓' };
 
+// The answer keypad, in the Wardrobe's keypad
 export function Keypad({ onKey, disabled }) {
-  const t = useTheme();
+  const k = useKeypadSkin();
   return (
     <View style={styles.keypad}>
-      {KEYS.map((k) => (
-        <Pressable
-          key={k}
-          testID={`key-${k}`}
-          accessibilityRole="button"
-          accessibilityLabel={k === 'back' ? 'Delete' : k === 'check' ? 'Check' : k}
-          disabled={disabled}
-          onPress={() => onKey(k)}
-          style={({ pressed }) => [
-            styles.key,
-            { backgroundColor: k === 'check' ? t.good : t.surface, borderColor: t.line, opacity: disabled ? 0.45 : pressed ? 0.7 : 1 },
-          ]}
-        >
-          <Text style={[styles.keyText, { color: k === 'check' ? '#fff' : t.ink }]}>{LABELS[k] || k}</Text>
-        </Pressable>
-      ))}
+      {KEYS.map((key) => {
+        const c = k[key] || k.key;
+        return (
+          <Pressable
+            key={key}
+            testID={`key-${key}`}
+            accessibilityRole="button"
+            accessibilityLabel={key === 'back' ? 'Delete' : key === 'check' ? 'Check' : key}
+            disabled={disabled}
+            onPress={() => onKey(key)}
+            style={({ pressed }) => [styles.key, { backgroundColor: c.bg, borderColor: c.edge, borderRadius: k.radius, opacity: disabled ? 0.45 : pressed ? 0.7 : 1 }]}
+          >
+            <Text style={[styles.keyText, { color: c.ink }, k.mono ? styles.mono : null]}>{LABELS[key] || key}</Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -113,4 +134,5 @@ const styles = StyleSheet.create({
   keypad: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
   key: { width: '30%', paddingVertical: 12, borderRadius: 12, borderWidth: 2, alignItems: 'center' },
   keyText: { fontSize: 24, fontWeight: '700' },
+  mono: { fontFamily: Platform.select({ ios: 'Courier New', android: 'monospace', default: 'ui-monospace, monospace' }) },
 });

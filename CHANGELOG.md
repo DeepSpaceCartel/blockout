@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Blockout for phones and tablets (`apps/mobile`): a React Native app, built with Expo, that runs in Expo Go. You against the CPU or two players on one phone, Easy to Hard, drawing by dragging, a keypad, "Help me count", points and achievements, and signing in with Google, with the save synced with the web game.
+- The Wardrobe in the phone app (menu › Looks): every look from the web game, worn in its games and practice, from dice, keypads and boards to the CPU's character and the win celebration.
 - The rules of a game, turn by turn, without a screen (`@blockout/engine/match`), shared by the phone app and ready for the web game.
 - A Keycloak client for the app, `blockout-mobile` (`keycloak.mobile.redirectUrls`), whose tokens the server accepts like the web game's.
 - Keycloak's admin console can be public (`keycloak.httpRoute.adminConsole`; on in the workspace cluster, at `https://id.deepspacecartel.com/admin`). Its `master` realm gets brute-force protection either way.

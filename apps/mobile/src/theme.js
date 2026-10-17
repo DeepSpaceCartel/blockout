@@ -56,9 +56,6 @@ const dark = {
   boardWrong: '#8f8a99',
 };
 
-// Players' colours: the Wardrobe's Classic set
-export const PLAYER_COLORS = ['#e4572e', '#2e86de', '#2a9d5c', '#8e5bd6'];
-
 // The Theme setting: 'auto' follows the device, 'light' or 'dark' forces one
 export const ThemeSetting = createContext('auto');
 
