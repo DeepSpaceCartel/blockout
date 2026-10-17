@@ -22,7 +22,8 @@ export function Button({ title, onPress, kind = 'primary', disabled = false, sty
         style,
       ]}
     >
-      <Text numberOfLines={1} style={[styles.buttonText, { color: primary ? t.accentInk : t.ink }]}>
+      {/* (one line: a label that doesn't fit gets smaller rather than cut off, e.g. with larger text) */}
+      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} style={[styles.buttonText, { color: primary ? t.accentInk : t.ink }]}>
         {title}
       </Text>
     </Pressable>
@@ -85,7 +86,7 @@ export function Keypad({ onKey, disabled }) {
 }
 
 const styles = StyleSheet.create({
-  button: { height: 52, paddingHorizontal: 20, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  button: { height: 52, paddingHorizontal: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   primary: { shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
   buttonText: { fontSize: 17, fontWeight: '700', letterSpacing: 0.2 },
   dieNumber: { textAlign: 'center', fontWeight: '800' },
