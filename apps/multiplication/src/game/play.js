@@ -3,6 +3,7 @@
 import * as Core from '@blockout/engine';
 import * as Cosmetics from '@blockout/progress/cosmetics';
 import * as Progress from '@blockout/progress';
+import * as Views from '@blockout/progress/views';
 import { AUTO_PLACE_MS, AUTO_ROLL_MS, COUNT_STEP, PASS_DELAY, TRY_AGAIN, el, seededRandom, setup } from './base.js';
 import { BONUS_TOASTS, capitalize, celebrate, celebrateWin, grantStickers, progress, queueAchievements, saveProgress, toast } from './wallet.js';
 import { cpuStep, settings } from './settings.js';
@@ -956,11 +957,7 @@ function renderPractice(name, color, groups, noneText) {
 // ---- lifetime times-table grid
 
 // Biggest times table the player can reach: 6 (Easy), 8 (Medium) or 12 (Hard).
-function unlockedTableSize() {
-  if (Progress.isUnlocked(progress, 'difficulty.hard')) return 12;
-  if (Progress.isUnlocked(progress, 'difficulty.medium')) return 8;
-  return 6;
-}
+const unlockedTableSize = () => Views.tableSize(progress);
 
 // "2.1s", or "12s" once it's 10 seconds or more, to fit in a grid cell.
 function shortTime(ms) {

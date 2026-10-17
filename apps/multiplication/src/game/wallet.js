@@ -4,6 +4,7 @@ import * as Auth from '@blockout/auth';
 import * as Cosmetics from '@blockout/progress/cosmetics';
 import * as Progress from '@blockout/progress';
 import * as Shop from '@blockout/progress/shop';
+import * as Views from '@blockout/progress/views';
 import { PROGRESS_KEY, el } from './base.js';
 import { settings } from './settings.js';
 import { look } from './wardrobe.js';
@@ -79,14 +80,12 @@ const formatPoints = Shop.formatPoints;
 // Show newly earned achievements as toasts; returns them for the caller.
 // Every big (non-minor) achievement drops one random sticker.
 function grantStickers(earned) {
-  return earned.filter((a) => !a.minor).map(() => Cosmetics.dropSticker(progress));
+  return Views.grantStickers(progress, earned);
 }
 
 function celebrate(earned) {
   queueAchievements(earned);
-  for (const { sticker, isNew } of grantStickers(earned)) {
-    toast(`🎁 ${isNew ? 'New sticker' : 'Sticker'}: ${sticker.emoji}`, isNew ? `${sticker.rarity} · added to your album` : `a spare you can swap for points`);
-  }
+  for (const drop of grantStickers(earned)) toast(...drop.toast);
   // one full-screen celebration (bigger for several), not for minor ones like fact speed
   const major = earned.filter((a) => !a.minor).length;
   if (major) confettiFullScreen(major);

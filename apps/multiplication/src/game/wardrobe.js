@@ -3,6 +3,7 @@
 import * as Core from '@blockout/engine';
 import * as Cosmetics from '@blockout/progress/cosmetics';
 import * as Progress from '@blockout/progress';
+import * as Views from '@blockout/progress/views';
 import { BOARD_UNLOCK, DEFAULT_NAMES, DEFAULT_SETTINGS, el, setup } from './base.js';
 import { formatPoints, progress, saveProgress, toast, updateMenuBadges } from './wallet.js';
 import { saveSettings, settings } from './settings.js';
@@ -164,40 +165,34 @@ let stickersFilter = null; // Set of sticker ids (new or with spares when opened
 function renderStickers() {
   const body = el.stickersBody;
   body.innerHTML = '';
-  const have = progress.stickers || {};
-  const got = Cosmetics.STICKERS.filter((st) => have[st.id]).length;
-  body.append(make('p', 'stats-summary', `${got} of ${Cosmetics.STICKERS.length} collected`));
+  const album = Views.stickerAlbum(progress, stickersFilter);
+  body.append(make('p', 'stats-summary', `${album.got} of ${album.total} collected`));
   if (stickersFilter) {
     body.append(filterNote('Showing your new stickers and spares', () => {
       stickersFilter = null;
       renderStickers();
     }));
   }
-  for (const rarity of ['common', 'rare', 'epic']) {
-    const list = Cosmetics.STICKERS.filter((x) => x.rarity === rarity && (!stickersFilter || stickersFilter.has(x.id)));
-    if (!list.length) continue;
-    body.append(make('h3', 'stats-heading', { common: 'Common', rare: 'Rare', epic: 'Epic' }[rarity]));
+  for (const section of album.sections) {
+    body.append(make('h3', 'stats-heading', section.name));
     const grid = make('div', 'sticker-grid');
-    for (const st of list) {
-      const n = have[st.id] || 0;
-      const slot = make('div', `sticker ${rarity}${n ? '' : ' missing'}`);
-      slot.append(make('span', 'sticker-emoji', n ? st.emoji : '?'));
-      if (n > 1) slot.append(make('span', 'sticker-count', `×${n}`));
-      slot.title = n ? `${st.id} (${rarity})` : 'Not found yet';
+    for (const st of section.slots) {
+      const slot = make('div', `sticker ${section.rarity}${st.count ? '' : ' missing'}`);
+      slot.append(make('span', 'sticker-emoji', st.emoji || '?'));
+      if (st.count > 1) slot.append(make('span', 'sticker-count', `×${st.count}`));
+      slot.title = st.count ? `${st.id} (${section.rarity})` : 'Not found yet';
       grid.append(slot);
     }
     body.append(grid);
   }
-  const value = Cosmetics.duplicateValue(progress);
-  el.stickersTrade.disabled = value === 0;
-  el.stickersTrade.textContent = value ? `Swap spares for 🪙 ${formatPoints(value)}` : 'No spares to swap';
+  el.stickersTrade.disabled = album.spareValue === 0;
+  el.stickersTrade.textContent = album.spareValue ? `Swap spares for 🪙 ${formatPoints(album.spareValue)}` : 'No spares to swap';
 }
 
 // onlyNew: from a results screen, show just the new stickers and the ones with spares
 function openStickers(onlyNew = false) {
   const have = progress.stickers || {};
-  stickersFilter =
-    onlyNew === true ? new Set(Object.keys(have).filter((id) => !seenList('stickers').includes(id) || have[id] > 1)) : null;
+  stickersFilter = onlyNew === true ? Views.newOrSpareStickers(progress) : null;
   renderStickers();
   markSeen('stickers', Object.keys(have));
   el.stickersDialog.hidden = false;
@@ -544,9 +539,9 @@ export function run() {
   });
 
   el.stickersTrade.addEventListener('click', () => {
-    const points = Cosmetics.tradeDuplicates(progress);
-    if (!points) return;
-    toast('🔁 Spares swapped', `+${formatPoints(points)} points`);
+    const swap = Views.swapSpares(progress, formatPoints);
+    if (!swap.points) return;
+    toast(...swap.toast);
     saveProgress();
     renderStickers();
   });

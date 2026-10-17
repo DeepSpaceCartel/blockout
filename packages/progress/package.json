@@ -7,7 +7,8 @@
   "exports": {
     ".": "./src/progress.js",
     "./cosmetics": "./src/cosmetics.js",
-    "./shop": "./src/shop.js"
+    "./shop": "./src/shop.js",
+    "./views": "./src/views.js"
   },
   "dependencies": {
     "@blockout/engine": "*"
