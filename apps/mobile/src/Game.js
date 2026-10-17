@@ -11,7 +11,7 @@
 // The screen animates between the match's steps; a game left half-way just
 // stops (every wait checks it's still the same game).
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Match from '@blockout/engine/match';
 import * as Progress from '@blockout/progress';
 import Board, { RectPicture } from './Board';
@@ -312,6 +312,21 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
     return nextTurn();
   }
 
+  // ✕ in the middle of a game asks first: the game's points only count once it's finished
+  function leave() {
+    if (over) return onExit();
+    const title = 'Leave this game?';
+    const text = "The points from this game won't count. (Your answers and achievements are kept.)";
+    if (Platform.OS === 'web') {
+      if (window.confirm(`${title}\n\n${text}`)) onExit();
+      return;
+    }
+    Alert.alert(title, text, [
+      { text: 'Keep playing', style: 'cancel' },
+      { text: 'Leave', style: 'destructive', onPress: onExit },
+    ]);
+  }
+
   // ---- the end
 
   function finish(results) {
@@ -335,7 +350,7 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
 
   return (
     <View style={[styles.fill, { backgroundColor: t.bg }]}>
-      <Header match={match} who={who} over={over} onExit={onExit} />
+      <Header match={match} who={who} over={over} onExit={leave} />
       <View style={styles.fill} onLayout={(e) => setArea(e.nativeEvent.layout)}>
         {!area ? null : view === 'roll' ? (
           <View style={styles.rollScreen}>
