@@ -35,7 +35,7 @@ The owner chose: phases 1–6 and 8 (not the other games), and **extract shared 
 6. **Live classes as a student:** `@blockout/classroom` gets platform adapters (storage, no `EventSource`: long polling, absolute server URL).
 8. **Grown-ups' screens:** teacher's My classes and hosting, parent's My kids, admin.
 
-Working notes: the container has 7.7 GB; run Turborepo with `--concurrency=2` while Metro or Playwright run (a full parallel test and build got the session OOM-killed). The Expo dev server: `npm run tunnel --workspace @blockout/mobile` (needs `npx expo login`).
+Working notes: the workspace container is limited to **4 GiB** (`free` shows the node's 7.7 GB). On 2026-10-17 it was OOM-killed: the editor's servers had crept to ~3 GiB, then a full parallel `turbo` test and build (Rolldown workers) filled the rest. Run Turborepo with `--concurrency=2`, builds one at a time, Playwright only when nothing else heavy runs. `devcontainer.json` gives every Node process at most 1.5 GiB of heap (`NODE_OPTIONS`, after a rebuild). Raising the limit to 6 GiB (request ~3 GiB) is a change in rts-terraform's Coder template. The Expo dev server: `npm run tunnel --workspace @blockout/mobile` (needs `npx expo login`).
 
 ## What's open
 

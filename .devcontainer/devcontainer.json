@@ -22,18 +22,28 @@
 			"ref": "5642bd7c6c82a1fdc5f36ddadadf02723951f296"
 		},
 		"./features/coder-cli": { "url": "https://coder.deepspacecartel.com" },
-		// op, for reading deploy secrets (deploy/keycloak) from 1Password
+		// op, for reading deploy secrets from 1Password (deploy/blockout/.env.1password)
 		"./features/1password-cli": { "version": "latest" }
 	},
 
+	// The workspace has 4 GiB, shared by the editor, its servers and everything
+	// run here. Each Node process gets at most 1.5 GiB of heap, so a runaway build
+	// or dev server fails on its own instead of taking the whole container (every
+	// terminal and session) down with it. Processes that set their own limit (VS
+	// Code's servers) keep theirs; native memory (bundler workers) isn't covered.
+	"containerEnv": {
+		"NODE_OPTIONS": "--max-old-space-size=1536"
+	},
+
 	// The Blockout server (npm start), the Vite dev server (npm run dev), the
-	// docs site (mkdocs serve) and Keycloak (npm run keycloak, see deploy/keycloak)
-	"forwardPorts": [8080, 5173, 8000, 8180],
+	// docs site (mkdocs serve) and Metro for the phone app (npm run tunnel
+	// --workspace @blockout/mobile)
+	"forwardPorts": [8080, 5173, 8000, 8081],
 	"portsAttributes": {
 		"8080": { "label": "Blockout server" },
 		"5173": { "label": "Vite (multiplication)" },
 		"8000": { "label": "Docs (mkdocs serve)" },
-		"8180": { "label": "Keycloak (npm run keycloak)" },
+		"8081": { "label": "Metro (phone app)" },
 		// Throwaway servers that Playwright test scripts start
 		"8134-8199": { "onAutoForward": "ignore" }
 	},
