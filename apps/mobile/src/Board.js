@@ -11,7 +11,7 @@ import { PLAYER_COLORS, useTheme } from './theme';
 const FONT = Platform.OS === 'web' ? 'system-ui, sans-serif' : undefined;
 const NO_SELECT = Platform.OS === 'web' ? { userSelect: 'none' } : null;
 
-// drag: { c0, r0, c1, r1, ok } while drawing; preview: the CPU's rectangle so
+// drag: { c0, r0, c1, r1, verdict } while drawing (verdict: match.judge's); preview: the CPU's rectangle so
 // far (hide: the placed one it grows into); counting: { rect, byRows, shown };
 // onDraw(rect) when a drag ends.
 export default function Board({ match, width, drag, preview, hide, counting, canDraw, onDrag, onDraw }) {
@@ -87,10 +87,38 @@ export default function Board({ match, width, drag, preview, hide, counting, can
         })}
         {counting ? <CountingOverlay counting={counting} cell={cell} t={t} /> : null}
         {preview ? box(preview, 'cpu', { fill: PLAYER_COLORS[match.current % PLAYER_COLORS.length], fillOpacity: 0.35, stroke: t.boardEdge, strokeWidth: 2, strokeDasharray: '6 4' }) : null}
-        {drawing ? box(drawing, 'drag', { fill: drag.ok ? t.good : t.boardWrong, fillOpacity: 0.35, stroke: drag.ok ? t.good : t.boardWrong, strokeWidth: 3 }) : null}
+        {drawing ? <Drawing rect={drawing} verdict={drag.verdict} color={PLAYER_COLORS[match.current % PLAYER_COLORS.length]} cell={cell} side={side} t={t} /> : null}
         <Rect x={1} y={1} width={side - 2} height={side - 2} fill="none" stroke={t.boardEdge} strokeWidth={2} />
       </Svg>
     </View>
+  );
+}
+
+// The rectangle being drawn, labelled with its size, as on the web: the
+// player's colour when it's right and fits, grey when the size is wrong, red
+// when it bumps into another. The label sits above it (the finger is on it),
+// or inside its top when there's no room above.
+function Drawing({ rect, verdict, color, cell, side, t }) {
+  const tint = !verdict.fits ? t.bad : verdict.ok ? color : t.boardWrong;
+  const x = rect.x * cell;
+  const y = rect.y * cell;
+  const w = rect.w * cell;
+  const h = rect.h * cell;
+  const label = `${rect.w} × ${rect.h}${verdict.ok ? ' ✓' : ''}`;
+  const size = Math.max(14, Math.min(cell * 0.6, 24));
+  const tw = label.length * size * 0.62 + 14;
+  const th = size + 10;
+  const tx = Math.max(2, Math.min(x + w / 2 - tw / 2, side - tw - 2));
+  const ty = y - th - 4 >= 0 ? y - th - 4 : y + 4;
+  return (
+    <G>
+      <Rect x={x} y={y} width={w} height={h} fill={tint} fillOpacity={verdict.ok ? 0.55 : 0.3} />
+      <Rect x={x + 1.5} y={y + 1.5} width={w - 3} height={h - 3} fill="none" stroke={tint} strokeWidth={3} />
+      <Rect x={tx} y={ty} width={tw} height={th} rx={6} fill={t.ink} />
+      <SvgText x={tx + tw / 2} y={ty + th / 2 + size * 0.35} fill={t.boardBg} fontFamily={FONT} fontSize={size} fontWeight="900" textAnchor="middle">
+        {label}
+      </SvgText>
+    </G>
   );
 }
 

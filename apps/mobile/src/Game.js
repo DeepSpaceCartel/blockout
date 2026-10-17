@@ -118,7 +118,7 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
 
   function onDrag(d) {
     if (!d || match.phase !== 'place') return setDrag(null);
-    setDrag({ ...d, ok: Match.judge(match, dragRect(d)).ok });
+    setDrag({ ...d, verdict: Match.judge(match, dragRect(d)) });
   }
 
   function onDraw(rect) {
