@@ -1,0 +1,208 @@
+/* ---------- Wallet, shop, achievements, toasts ---------- */
+.wallet {
+  display: inline-block;
+  margin-bottom: 10px;
+  padding: 4px 12px;
+  border: 2px solid var(--gold-line);
+  border-radius: 999px;
+  background: var(--gold-bg);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.locked { position: relative; color: var(--muted) !important; background: var(--soft) !important; }
+.lock-badge { display: block; font-size: 0.72rem; font-weight: 800; color: var(--gold-ink); }
+.mode-card.locked { opacity: 1; } /* (fading the text made it unreadable: the grey icon and the lock say it's locked) */
+.mode-card.locked .mode-icon { filter: grayscale(1); opacity: 0.6; }
+.mode-card .lock-badge { margin-top: 2px; }
+
+.shop-dialog, .achievements-dialog { max-width: 520px; max-height: calc(100vh - 32px); overflow-y: auto; text-align: left; }
+.shop-dialog h2, .achievements-dialog h2 { text-align: center; margin-bottom: 0.5rem; }
+.shop-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 2px 10px;
+  padding: 8px 10px;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  margin-bottom: 6px;
+}
+.shop-item.highlight { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+.shop-item.owned { background: var(--good-bg); border-color: var(--good-line); }
+.shop-name { font-weight: 800; }
+.shop-owned { font-weight: 800; color: var(--good-ink); }
+.shop-why { grid-column: 1 / -1; font-size: 0.8rem; color: var(--muted); text-align: right; }
+.shop-dialog .dialog-actions, .achievements-dialog .dialog-actions { margin-top: 16px; }
+
+.achievement-list { display: flex; flex-direction: column; gap: 6px; }
+.achievement {
+  display: grid;
+  grid-template-columns: 2rem 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: var(--soft-2);
+  color: var(--muted);
+}
+.achievement.earned { background: var(--surface); color: var(--ink); border-color: var(--gold-line); }
+.achievement-icon { font-size: 1.4rem; text-align: center; }
+.achievement-text { display: flex; flex-direction: column; font-size: 0.85rem; }
+.achievement-text strong { font-size: 0.95rem; }
+.achievement-reward { font-weight: 800; font-size: 0.85rem; white-space: nowrap; }
+
+.rewards { margin: 0 0 12px; display: flex; flex-direction: column; gap: 6px; }
+.rewards:empty { display: none; }
+.reward-points { font-weight: 900; color: var(--gold-ink); background: var(--gold-bg); border: 2px solid var(--gold-line); border-radius: 10px; padding: 6px 10px; }
+.reward-achievement { display: flex; align-items: center; gap: 8px; font-weight: 800; background: var(--surface); border: 2px solid var(--gold-line); border-radius: 10px; padding: 4px 10px; text-align: left; }
+.reward-achievement .achievement-reward { margin-left: auto; }
+
+/* Achievement confetti: above everything, never catches clicks */
+.confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 40; }
+
+/* Bottom-left, newest at the bottom */
+.toasts { position: fixed; bottom: 16px; left: 16px; right: 16px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; z-index: 30; pointer-events: none; }
+.toast {
+  max-width: 340px;
+  background: var(--invert-bg);
+  color: var(--invert-ink);
+  border-radius: 12px;
+  padding: 10px 14px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  animation: toast-in 0.25s ease-out;
+  transition: opacity 0.4s, transform 0.4s;
+}
+.toast span { font-size: 0.85rem; opacity: 0.85; }
+.toast.leaving { opacity: 0; transform: translateY(8px); }
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Practice mode */
+.table-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.table-chips button {
+  min-width: 3em;
+  padding: 0.4rem 0.5rem;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.table-chips button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.practice-preview { margin: 0; font-size: 0.88rem; color: var(--muted); font-weight: 700; }
+.practice-card {
+  max-width: 520px;
+  margin: 0 auto;
+  background: var(--paper);
+  border: 2px solid var(--edge);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 0 var(--edge-shadow);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.practice-top { width: 100%; display: flex; justify-content: space-between; font-weight: 800; color: var(--muted); }
+.practice-bar { width: 100%; height: 8px; border-radius: 4px; background: var(--soft-2); overflow: hidden; }
+.practice-bar span { display: block; height: 100%; background: var(--accent); border-radius: 4px; transition: width 0.3s; }
+.pr-array {
+  display: grid;
+  gap: 2px;
+  justify-content: center;
+  align-items: center;
+  --cell: min(26px, calc((min(100vw, 520px) - 110px) / var(--cols)));
+  --totals: 2.6em; /* column for the running totals on the right */
+  grid-template-columns: repeat(var(--cols), var(--cell)) var(--totals);
+  /* matching space on the left so the squares line up with the keypad's centre */
+  padding-left: calc(var(--totals) + 2px);
+}
+.pr-array .cell { width: var(--cell); height: var(--cell); border-radius: 3px; background: var(--accent); opacity: 0.85; }
+.pr-array.counting .cell { opacity: 0.3; }
+.pr-array .cell.counted { opacity: 1; box-shadow: inset 0 0 0 2px var(--edge-shadow); }
+.pr-array .row-total { font-weight: 900; font-size: 0.85rem; font-variant-numeric: tabular-nums; text-align: left; padding-left: 6px; visibility: hidden; }
+.pr-array .row-total.shown { visibility: visible; }
+.practice-change { display: flex; justify-content: space-between; gap: 10px; padding: 5px 10px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); margin-bottom: 5px; font-size: 0.9rem; }
+.practice-change .up { color: var(--good-ink); font-weight: 800; }
+.practice-change .down { color: var(--bad); font-weight: 800; }
+
+/* Invites */
+.invite-dialog { max-width: 520px; max-height: calc(100vh - 32px); overflow-y: auto; text-align: left; }
+.invite-dialog h2 { text-align: center; margin-bottom: 1rem; }
+.invite-dialog .field { margin-bottom: 10px; }
+.invite-dialog .field > span { font-weight: 800; font-size: 0.9rem; }
+.invite-dialog input[type="text"], .invite-dialog input[type="number"], .invite-dialog select, .invite-dialog textarea {
+  font: inherit;
+  width: 100%;
+  min-width: 0;
+  padding: 0.45rem 0.6rem;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.invite-dialog textarea { resize: vertical; }
+.invite-dialog :is(input, select, textarea):focus { outline: none; border-color: var(--accent); }
+.invite-row { display: flex; gap: 8px; }
+.invite-row input { flex: 1; }
+.invite-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.invite-players { margin: 0; font-weight: 800; }
+.invite-dialog > .setting-help { margin: 0 0 12px; }
+.invite-error { color: var(--bad); font-weight: 800; font-size: 0.88rem; margin: 6px 0 0; }
+.check-row { display: flex; align-items: center; gap: 8px; margin: 4px 0 12px; font-weight: 700; font-size: 0.9rem; }
+.invite-result { margin-top: 14px; padding-top: 12px; border-top: 2px dashed var(--line); }
+.invite-qr { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin: 12px 0; }
+.invite-qr canvas { width: 240px; height: 240px; max-width: 100%; image-rendering: pixelated; border: 2px solid var(--line); border-radius: 10px; background: var(--surface); }
+.invite-qr-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; flex: 1; min-width: 160px; }
+.invite-qr-actions .setting-help { margin: 0; }
+.invite-note { background: var(--gold-bg); border: 2px solid var(--gold-line); border-radius: 10px; padding: 10px 12px; font-weight: 800; font-size: 1.05rem; }
+.invite-summary { padding-left: 1.2rem; line-height: 1.6; }
+@media (max-width: 420px) {
+  .invite-grid { grid-template-columns: 1fr; }
+}
+
+/* Numbered dice for 8 and 12 sides */
+.die.numbered { display: flex; align-items: center; justify-content: center; }
+.die-num { font-size: 1.6rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+.die.mini .die-num { font-size: 0.95rem; }
+.die.mini.selected .die-num { color: #fff; }
+
+/* Lifetime times-table grid (status: icon + color + legend) */
+.fact-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.8rem; color: var(--muted); margin-bottom: 8px; }
+.fact-legend-item { display: inline-flex; align-items: center; gap: 5px; }
+.fact-legend .fact-cell { width: 18px; height: 18px; flex: none; line-height: 1; }
+.fact-grid-wrap { margin-bottom: 10px; }
+.stats-heading.centered { text-align: center; }
+/* practice summary and Stats: heading, legend and grid centred */
+#pd-body .fact-legend, #history-body .fact-legend { justify-content: center; }
+#pd-body .fact-grid, #history-body .fact-grid { margin: 0 auto; }
+#history-body .fact-grid-wrap > .practice-name { text-align: center; }
+.fact-grid { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 2px; max-width: 420px; }
+.fact-head { font-size: 0.7rem; font-weight: 800; color: var(--muted); text-align: center; align-self: center; }
+.fact-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 900;
+  cursor: default;
+}
+.fact-cell.unseen { background: var(--soft-2); }
+.fact-cell.mastered { background: var(--good); color: #fff; }
+.fact-cell.timed { font-size: min(0.62rem, 2.5vw); letter-spacing: -0.02em; }
+.setting-sub { font-size: 0.82rem; font-weight: 700; color: var(--muted); margin: 8px 0 4px; }
+.fact-cell.learning { background: var(--learning); color: var(--learning-ink); }
+/* Fact speed tiers (Achievements): metallic bronze, silver and gold */
+.fact-cell.speed-10 { background: linear-gradient(135deg, #f0b98a 0%, #cd7f32 45%, #8c5320 100%); color: #fff; text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45); box-shadow: inset 0 0 0 1px #7a4618; }
+.fact-cell.speed-5 { background: linear-gradient(135deg, #ffffff 0%, #c0c7cf 45%, #8a939c 100%); color: #2a3038; box-shadow: inset 0 0 0 1px #7d868f; }
+.fact-cell.speed-1 { background: linear-gradient(135deg, #fff3b0 0%, #f6c945 40%, #c9950c 100%); color: #4a3200; box-shadow: inset 0 0 0 1px #9a6a0c; }
+.fact-cell.practice { background: var(--danger); color: #fff; }

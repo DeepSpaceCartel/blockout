@@ -1,0 +1,35 @@
+// The multiplication game: every part's load-time work, in the original order.
+import { run as base } from './base.js';
+import { run as wallet } from './wallet.js';
+import { run as settings } from './settings.js';
+import { run as wardrobe } from './wardrobe.js';
+import { run as journey } from './journey.js';
+import './play.js';
+import { run as stats } from './stats.js';
+import { run as shop } from './shop.js';
+import { run as achievements } from './achievements.js';
+import { run as practice } from './practice.js';
+import { run as invites } from './invites.js';
+import { run as classroom } from './classroom.js';
+import { run as cheats } from './cheats.js';
+import { run as checkin } from './checkin.js';
+import { run as daily } from './daily.js';
+import { run as input } from './input.js';
+import { run as render } from './render.js';
+
+base();
+wallet();
+settings();
+wardrobe();
+journey();
+stats();
+shop();
+achievements();
+practice();
+invites();
+classroom();
+cheats();
+checkin();
+daily();
+input();
+render();

@@ -1,0 +1,139 @@
+{{- if .Values.keycloak.enabled }}
+{{- $smtp := .Values.keycloak.smtp.existingSecret | default (ternary (printf "%s-keycloak-smtp" .Release.Name) "" (ne .Values.keycloak.smtp.host "")) }}
+{{- $urls := prepend .Values.keycloak.extraRedirectUrls .Values.publicUrl | compact | uniq }}
+# Brings the blockout realm in line after every install and upgrade: the realm
+# file is only imported into an empty Keycloak, so changes to an existing realm
+# go through Keycloak's admin CLI. Safe to run any number of times.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-keycloak-realm-job
+  labels: {{- include "blockout.part.labels" (list $ "keycloak") | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "-1"
+    helm.sh/hook-delete-policy: before-hook-creation
+data:
+  realm.sh: |
+    set -euo pipefail
+    set -f # (the addresses hold * wildcards: no file name expansion)
+    REALM=blockout
+    kc() { /opt/keycloak/bin/kcadm.sh "$@" --config /tmp/kcadm.config; }
+
+    for i in $(seq 1 60); do
+      kc config credentials --server "$KEYCLOAK" --realm master --user "$ADMIN_USER" --password "$ADMIN_PASSWORD" >/dev/null 2>&1 && break
+      [ "$i" = 60 ] && { echo "Keycloak didn't answer at $KEYCLOAK" >&2; exit 1; }
+      sleep 5
+    done
+
+    # The client: Blockout's addresses only (no wildcards beyond each address's own paths)
+    redirects=$(printf '"%s/*",' $URLS); origins=$(printf '"%s",' $URLS)
+    logout=$(printf '%s/*##' $URLS)
+    id=$(kc get clients -r "$REALM" -q clientId={{ .Values.keycloak.clientId }} --fields id --format csv --noquotes)
+    kc update "clients/$id" -r "$REALM" \
+      -s "redirectUris=[${redirects%,}]" -s "webOrigins=[${origins%,}]" \
+      -s "attributes.\"post.logout.redirect.uris\"=${logout%##}"
+    echo "client {{ .Values.keycloak.clientId }}: $URLS"
+
+    # Keycloak's own admin signs in on the master realm: guessing is slowed down there too
+    kc update realms/master -s bruteForceProtected=true -s failureFactor=5 -s waitIncrementSeconds=60 -s maxFailureWaitSeconds=3600
+    echo "master realm: brute-force protection"
+
+    # The phone app's client: public, with PKCE; its tokens name "blockout" as
+    # their audience, so the server takes them like the web game's
+    if [ -n "$MOBILE_URLS" ]; then
+      mid=$(kc get clients -r "$REALM" -q clientId=blockout-mobile --fields id --format csv --noquotes)
+      [ -n "$mid" ] || kc create clients -r "$REALM" -f /job/mobile-client.json
+      mid=$(kc get clients -r "$REALM" -q clientId=blockout-mobile --fields id --format csv --noquotes)
+      mredirects=$(printf '"%s",' $MOBILE_URLS)
+      kc update "clients/$mid" -r "$REALM" -s "redirectUris=[${mredirects%,}]" -s 'webOrigins=["+"]'
+      for mapper in audience identity-provider; do
+        name=$(sed -n 's/.*"name": *"\([^"]*\)".*/\1/p' "/job/mapper-$mapper.json" | head -1)
+        kc get "clients/$mid/protocol-mappers/models" -r "$REALM" --fields name --format csv --noquotes | grep -qx "$name" ||
+          kc create "clients/$mid/protocol-mappers/models" -r "$REALM" -f "/job/mapper-$mapper.json"
+      done
+      echo "client blockout-mobile: $MOBILE_URLS"
+    fi
+
+    # Admins are the only role Keycloak keeps for Blockout (ADR-0008)
+    kc get "roles/admin" -r "$REALM" >/dev/null 2>&1 || kc create roles -r "$REALM" -s name=admin -s 'description=Blockout admin: accounts and roles, teacher codes, schools.'
+    echo "realm role admin"
+
+    # Guessing passwords is slowed down; passwords are at least 10 characters
+    kc update "realms/$REALM" -s bruteForceProtected=true -s failureFactor=10 -s waitIncrementSeconds=60 -s maxFailureWaitSeconds=900 -s 'passwordPolicy=length(10)'
+    echo "brute-force protection, passwords of 10 or more"
+
+    # Mail: check addresses and reset passwords only when Keycloak can send mail
+    if [ -n "${SMTP_HOST:-}" ]; then
+      kc update "realms/$REALM" -s verifyEmail=true -s resetPasswordAllowed=true \
+        -s "smtpServer.host=$SMTP_HOST" -s "smtpServer.port=$SMTP_PORT" -s "smtpServer.from=$SMTP_FROM" \
+        -s "smtpServer.auth=true" -s "smtpServer.user=$SMTP_USER" -s "smtpServer.password=$SMTP_PASSWORD" \
+        -s "smtpServer.starttls=true" -s "smtpServer.fromDisplayName=Blockout"
+      echo "mail through $SMTP_HOST: addresses are checked, passwords can be reset"
+    else
+      kc update "realms/$REALM" -s verifyEmail=false -s resetPasswordAllowed=false
+      echo "no mail: no address checks or password resets (nothing could send the mail)"
+    fi
+  mobile-client.json: |
+    { "clientId": "blockout-mobile", "name": "Blockout app", "enabled": true, "publicClient": true, "protocol": "openid-connect",
+      "standardFlowEnabled": true, "implicitFlowEnabled": false, "directAccessGrantsEnabled": false,
+      "attributes": { "pkce.code.challenge.method": "S256" } }
+  mapper-audience.json: |
+    { "name": "blockout audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper",
+      "config": { "included.client.audience": "blockout", "access.token.claim": "true", "id.token.claim": "false", "introspection.token.claim": "true" } }
+  mapper-identity-provider.json: |
+    { "name": "identity provider", "protocol": "openid-connect", "protocolMapper": "oidc-usersessionmodel-note-mapper",
+      "config": { "user.session.note": "identity_provider", "claim.name": "identity_provider", "jsonType.label": "String",
+                  "id.token.claim": "true", "access.token.claim": "false", "userinfo.token.claim": "false", "introspection.token.claim": "false" } }
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-keycloak-realm
+  labels: {{- include "blockout.part.labels" (list $ "keycloak") | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 900
+  template:
+    metadata:
+      labels: {{- include "blockout.part.selectorLabels" (list $ "keycloak-realm-job") | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: realm
+          image: {{ .Values.keycloakx.image.repository | default "quay.io/keycloak/keycloak" }}:{{ .Values.keycloakx.image.tag }}
+          command: [bash, /job/realm.sh]
+          env:
+            - { name: KEYCLOAK, value: "http://{{ .Release.Name }}-keycloakx-http" }
+            - { name: URLS, value: {{ join " " $urls | quote }} }
+            - { name: MOBILE_URLS, value: {{ join " " .Values.keycloak.mobile.redirectUrls | quote }} }
+            - name: ADMIN_USER
+              valueFrom: { secretKeyRef: { name: {{ .Release.Name }}-keycloak-admin, key: username } }
+            - name: ADMIN_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ .Release.Name }}-keycloak-admin, key: password } }
+            {{- if $smtp }}
+            {{- range $key := list "host" "port" "from" "user" "password" }}
+            - name: SMTP_{{ upper $key }}
+              valueFrom: { secretKeyRef: { name: {{ $smtp }}, key: {{ $key }} } }
+            {{- end }}
+            {{- end }}
+            - { name: JAVA_OPTS_APPEND, value: "-XX:MaxRAMPercentage=70 -Djava.io.tmpdir=/tmp" }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          resources: {{- toYaml .Values.keycloak.realmJob.resources | nindent 12 }}
+          volumeMounts:
+            - { name: job, mountPath: /job, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: job
+          configMap: { name: {{ .Release.Name }}-keycloak-realm-job }
+        - { name: tmp, emptyDir: {} }
+{{- end }}

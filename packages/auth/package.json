@@ -1,0 +1,16 @@
+{
+  "name": "@blockout/auth",
+  "version": "0.11.0",
+  "private": true,
+  "description": "Browser sign-in: dev sign-in or Keycloak (OIDC + PKCE), the bearer token, and syncing a signed-in player's progress.",
+  "type": "module",
+  "exports": {
+    ".": "./src/client.js"
+  },
+  "dependencies": {
+    "@blockout/progress": "*"
+  },
+  "scripts": {
+    "lint": "eslint src"
+  }
+}

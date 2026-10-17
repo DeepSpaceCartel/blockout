@@ -1,0 +1,7 @@
+# Development: only MongoDB and Valkey, for servers run from a checkout
+# (npm run services forwards them). They sign in with the workspace's Keycloak.
+#   helm upgrade --install blockout-dev deploy/blockout -n blockout-dev --create-namespace -f deploy/blockout/values-dev.yaml
+server:
+  enabled: false
+keycloak:
+  enabled: false

@@ -1,0 +1,121 @@
+site_name: Blockout
+site_description: A multiplication game for 3rd graders — roll two dice, draw the rectangle, claim the board — with classroom play, homework and more games.
+repo_url: https://github.com/DeepSpaceCartel/blockout
+repo_name: DeepSpaceCartel/blockout
+edit_uri: edit/main/docs/
+
+# The v0.3.0 plan and work log are real records of how this version was built,
+# not reader docs; not_in_nav keeps them out of the site's navigation without
+# mkdocs build reporting them.
+not_in_nav: |
+  v0.3.0-plan.md
+  v0.3.0-log.md
+
+nav:
+  - Home:
+      - Welcome: home/index.md
+      - Quickstart: home/quickstart.md
+  - Guides:
+      - Playing: guides/playing.md
+      - Teachers: guides/teachers.md
+      - Parents: guides/parents.md
+      - Admins: guides/admins.md
+      - Share through a tunnel: guides/share-through-a-tunnel.md
+      - Run the phone app: guides/run-the-phone-app.md
+      - Switch sign-in to Keycloak: guides/set-up-keycloak.md
+      - Set up MongoDB and Valkey: guides/set-up-the-databases.md
+      - Deploy to a cluster: guides/deploy.md
+      - Run it day to day: guides/operate.md
+      - Back up the database: guides/back-up-the-database.md
+  - Application:
+      - Architecture: concepts/architecture.md
+      - Security: concepts/security.md
+      - Progression: concepts/progression.md
+      - Privacy: privacy.md
+      - Configuration: reference/CONFIGURATION.md
+      - HTTP API: reference/HTTP-API.md
+  - Project:
+      - Installing: project/installing.md
+      - Running the tests: project/testing.md
+      - CI: project/ci.md
+      - Changelog: project/changelog.md
+  - Decisions:
+      - Decision log: decisions/index.md
+      - 0001. A Turborepo of plain-JavaScript Vite apps: decisions/0001-turborepo-monorepo.md
+      - 0002. Swappable sign-in, dev now and Keycloak later: decisions/0002-swappable-sign-in.md
+      - 0003. sqlite through node:sqlite: decisions/0003-sqlite-with-node-builtin.md
+      - 0004. Store the minimum about children: decisions/0004-store-minimum-child-data.md
+      - 0005. Game modules declare at import, work in run(): decisions/0005-game-modules-run-phase.md
+      - 0006. MongoDB and Redis, for several servers: decisions/0006-mongodb-and-redis.md
+      - 0007. Live classes in Redis: decisions/0007-live-classes-in-redis.md
+      - 0008. Roles kept by Blockout, changed by invites: decisions/0008-roles-in-blockout.md
+      - 0009. One Helm chart for everything: decisions/0009-one-chart.md
+      - 0010. Boards and difficulties are Journey levels: decisions/0010-journey-progression.md
+      - 0011. Practice is free, a times table a level: decisions/0011-practice-journey.md
+      - 0012. Three stages a level: decisions/0012-journey-stages.md
+      - 0013. Expert rounds in Practice: decisions/0013-practice-expert-rounds.md
+      - 0014. First boards one stage; stage 3 every answer right: decisions/0014-first-boards-one-stage.md
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - navigation.footer
+    - navigation.path
+    - navigation.instant
+    - navigation.instant.progress
+    - toc.follow
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - content.action.edit
+    - content.tooltips
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep orange
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep orange
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/github
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.snippets:
+      check_paths: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+
+plugins:
+  - search

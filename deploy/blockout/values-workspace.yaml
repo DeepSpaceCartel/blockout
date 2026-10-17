@@ -1,0 +1,35 @@
+# The workspace cluster: the shared Cilium gateway (gateway/rts-gateway) with a
+# listener and certificate per hostname (rts-terraform, platform/blockout.tf).
+# Secrets are passed at install time (docs/guides/deploy.md), never kept here.
+publicUrl: https://blockout.deepspacecartel.com
+httpRoute:
+  hostnames: [blockout.deepspacecartel.com]
+  parentRefs:
+    - name: rts-gateway
+      namespace: gateway
+      sectionName: blockout-deepspacecartel-com
+keycloak:
+  url: https://id.deepspacecartel.com
+  # Development servers sign in here too
+  extraRedirectUrls: [http://localhost:8080, http://localhost:5173]
+  # The phone app: its own scheme, Expo Go (exp:// addresses change with the
+  # network, so any of them: development only) and its web build
+  mobile:
+    redirectUrls: ["blockout://*", "exp://*", "http://localhost:8081/*"]
+  httpRoute:
+    # https://id.deepspacecartel.com/admin
+    adminConsole: true
+    parentRefs:
+      - name: rts-gateway
+        namespace: gateway
+        sectionName: id-deepspacecartel-com
+networkPolicy:
+  enabled: true
+  cilium: true
+metrics:
+  serviceMonitor:
+    enabled: true
+    labels: { release: kube-prometheus-stack }
+  rules:
+    enabled: true
+    labels: { release: kube-prometheus-stack }

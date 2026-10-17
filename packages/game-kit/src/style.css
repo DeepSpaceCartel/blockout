@@ -1,0 +1,16 @@
+/* Everything the other games' pages need, in order: the shared look from
+   @blockout/ui (like the multiplication game, minus its classroom and account
+   screens), then these games' extras. */
+@import '@blockout/ui/css/tokens.css';
+@import '@blockout/ui/css/base.css';
+@import '@blockout/ui/css/menu.css';
+@import '@blockout/ui/css/game.css';
+@import '@blockout/ui/css/play.css';
+@import '@blockout/ui/css/dice-skins.css';
+@import '@blockout/ui/css/results.css';
+@import '@blockout/ui/css/panels.css';
+@import '@blockout/ui/css/rewards.css';
+@import '@blockout/ui/css/small-screens.css';
+@import '@blockout/ui/css/wardrobe.css';
+@import '@blockout/ui/css/players.css';
+@import './games.css';

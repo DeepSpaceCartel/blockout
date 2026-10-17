@@ -1,0 +1,17 @@
+# Only what the image build needs: sources, package files, the lock file
+**/node_modules
+**/dist
+**/.turbo
+.git
+.github
+.devcontainer
+.venv
+.claude
+data
+site
+docs
+deploy
+*.md
+Blockout.pdf
+Dockerfile
+.dockerignore

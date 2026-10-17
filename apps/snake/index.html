@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Number Snake · Blockout</title>
+</head>
+<body>
+  <main id="start-screen" class="screen">
+    <div class="start-card">
+      <a class="back-link" href="/more-games/">← More games</a>
+      <div class="top-row"><div class="wallet" title="Your best score">🏅 Best <span id="best">0</span></div></div>
+      <h1 class="logo">NUMBER <span>SNAKE</span></h1>
+      <p class="tagline">No apples here: eat the right numbers to grow.</p>
+      <form id="setup-form" autocomplete="off">
+        <div class="mode-picker" role="radiogroup" aria-label="Game">
+          <button type="button" class="mode-card" data-mode="answer" role="radio">
+            <span class="mode-icon" aria-hidden="true">🍎</span>
+            <span class="mode-title">Answer it</span>
+            <span class="mode-sub">6 × 7 = ? Eat the answer</span>
+          </button>
+          <button type="button" class="mode-card" data-mode="multiples" role="radio">
+            <span class="mode-icon" aria-hidden="true">🍇</span>
+            <span class="mode-title">Multiples</span>
+            <span class="mode-sub">Eat every multiple of 4</span>
+          </button>
+          <button type="button" class="mode-card" data-mode="sum" role="radio">
+            <span class="mode-icon" aria-hidden="true">🧮</span>
+            <span class="mode-title">Add it up</span>
+            <span class="mode-sub">Eat any number, say the new total</span>
+          </button>
+        </div>
+        <div class="field">
+          <span>Difficulty</span>
+          <div class="segmented" id="level"></div>
+        </div>
+        <div class="field">
+          <span>Movement</span>
+          <div class="segmented" id="movement"></div>
+        </div>
+        <div class="field" id="speed-field">
+          <span>Speed</span>
+          <div class="segmented" id="speed"></div>
+        </div>
+        <div class="field">
+          <span>Walls</span>
+          <div class="segmented" id="walls"></div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-big" id="start-btn">Start</button>
+      </form>
+      <p class="setting-help snake-keys">Arrow keys or WASD to steer (in Manual, each press moves one square), Space to pause. On a touch screen, swipe or use the arrows under the board. In Add it up, type the new total (or use the keypad) and press Enter.</p>
+    </div>
+  </main>
+
+  <main id="game-screen" class="screen" hidden>
+    <header class="game-header">
+      <button type="button" class="btn btn-small menu-btn" id="quit-btn" aria-label="Back to menu" title="Back to menu">←</button>
+      <h1 class="logo small">NUMBER <span>SNAKE</span></h1>
+      <div class="header-right"><button type="button" class="btn btn-small" id="pause-btn">Pause</button></div>
+    </header>
+    <div class="game-layout">
+      <section class="board-wrap"><canvas id="board" aria-label="The snake and the numbers"></canvas></section>
+      <aside class="side">
+        <div class="turn-panel snake-panel">
+          <div class="snake-task" id="task" aria-live="polite"></div>
+          <div class="snake-ask" id="ask" hidden>
+            <div class="math-q"><span id="ask-q"></span> <span class="answer-box" id="ask-box" aria-live="polite"></span></div>
+            <div class="keypad" id="keypad">
+              <button type="button" data-key="1">1</button><button type="button" data-key="2">2</button><button type="button" data-key="3">3</button>
+              <button type="button" data-key="4">4</button><button type="button" data-key="5">5</button><button type="button" data-key="6">6</button>
+              <button type="button" data-key="7">7</button><button type="button" data-key="8">8</button><button type="button" data-key="9">9</button>
+              <button type="button" data-key="back" class="back" aria-label="Delete">⌫</button><button type="button" data-key="0">0</button><button type="button" data-key="check" class="check" aria-label="Check">✓</button>
+            </div>
+          </div>
+          <div class="snake-fact" id="fact" aria-live="polite"></div>
+          <div class="snake-stats">
+            <span class="snake-hearts" id="hearts" aria-label="Hearts"></span>
+            <span class="snake-score"><span id="score">0</span> <small>points</small></span>
+          </div>
+        </div>
+        <div class="dpad" aria-label="Steer">
+          <button type="button" class="btn" data-dir="up" aria-label="Up">▲</button>
+          <button type="button" class="btn" data-dir="left" aria-label="Left">◀</button>
+          <button type="button" class="btn" data-dir="down" aria-label="Down">▼</button>
+          <button type="button" class="btn" data-dir="right" aria-label="Right">▶</button>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <div class="overlay" id="over" hidden>
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="over-title">
+      <h2 id="over-title"></h2>
+      <p class="result-sub" id="over-sub"></p>
+      <div id="over-extra"></div>
+      <div class="dialog-actions">
+        <button type="button" class="btn" id="over-menu">Menu</button>
+        <button type="button" class="btn btn-primary" id="over-again">Play again</button>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

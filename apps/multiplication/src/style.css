@@ -1,0 +1,16 @@
+/* The multiplication game's styles, in their original order: shared pieces from
+   @blockout/ui and this game's own (./css). Order matters for the cascade. */
+@import '@blockout/ui/css/tokens.css';
+@import '@blockout/ui/css/base.css';
+@import '@blockout/ui/css/menu.css';
+@import '@blockout/ui/css/game.css';
+@import './css/classroom.css';
+@import '@blockout/ui/css/play.css';
+@import '@blockout/ui/css/dice-skins.css';
+@import '@blockout/ui/css/results.css';
+@import '@blockout/ui/css/panels.css';
+@import '@blockout/ui/css/rewards.css';
+@import '@blockout/ui/css/small-screens.css';
+@import '@blockout/ui/css/wardrobe.css';
+@import '@blockout/ui/css/players.css';
+@import './css/accounts.css';

@@ -1,0 +1,7 @@
+.DS_Store
+*.swp
+*.tmp
+# scripts that use the chart, not part of it
+install.sh
+forward.sh
+.env.1password

@@ -1,0 +1,33 @@
+/* ---------- Settings ---------- */
+.menu-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 1rem; }
+.menu-actions .btn { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding-left: 0.4rem; padding-right: 0.4rem; white-space: nowrap; }
+.howto-dialog { max-width: 520px; max-height: calc(100vh - 32px); overflow-y: auto; text-align: left; }
+.howto-dialog h2 { text-align: center; margin-bottom: 0.5rem; }
+.howto-dialog ul { padding-left: 1.2rem; line-height: 1.55; }
+
+/* ---------- All-time stats ---------- */
+.history-dialog { max-width: 600px; max-height: calc(100vh - 32px); overflow-y: auto; text-align: left; }
+.history-dialog h2 { text-align: center; margin-bottom: 1rem; }
+.history-empty { text-align: center; color: var(--muted); margin: 1rem 0 1.5rem; }
+.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 6px; }
+.tile { background: var(--surface); border: 2px solid var(--line); border-radius: 10px; padding: 8px; text-align: center; }
+.tile-value { display: block; font-size: 1.35rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+.tile-label { display: block; font-size: 0.78rem; font-weight: 700; color: var(--muted); }
+.recent { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.recent li { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 0.88rem; }
+.recent .meta { color: var(--muted); font-weight: 700; margin-right: 6px; }
+.recent .winner { font-weight: 800; }
+.history-dialog .dialog-actions { margin-top: 20px; }
+.history-dialog .stats-table thead th { white-space: normal; font-size: 0.8rem; }
+@media (max-width: 420px) {
+  .tile-value { font-size: 1.1rem; }
+  .history-dialog { --pad-y: 20px; --pad-x: 14px; }
+  .history-dialog .stats-table th, .history-dialog .stats-table td { padding: 5px 4px; }
+  .history-dialog .stats-table { font-size: 0.8rem; }
+  .history-dialog .stats-table thead th { font-size: 0.72rem; }
+}
+.settings-dialog { text-align: left; max-height: calc(100vh - 32px); overflow-y: auto; }
+.settings-dialog h2 { text-align: center; margin-bottom: 1rem; }
+.setting { margin-bottom: 1.1rem; }
+.setting-label { font-weight: 800; font-size: 0.9rem; margin-bottom: 6px; }
+.setting-help { margin: 6px 0 0; font-size: 0.82rem; color: var(--muted); }

@@ -1,0 +1,21 @@
+{
+  "name": "@blockout/multiplication",
+  "version": "0.11.0",
+  "private": true,
+  "type": "module",
+  "description": "Blockout: the multiplication game (single player, practice, Home multiplayer, classroom, accounts).",
+  "dependencies": {
+    "@blockout/engine": "*",
+    "@blockout/progress": "*",
+    "@blockout/ui": "*",
+    "@blockout/classroom": "*",
+    "@blockout/auth": "*",
+    "qrcode-generator": "^2.0.4"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "node --test",
+    "lint": "eslint src test"
+  }
+}

@@ -1,0 +1,106 @@
+{{- if .Values.mongo.enabled }}
+{{- $name := printf "%s-mongo" .Release.Name }}
+{{- $sel := include "blockout.part.selectorLabels" (list $ "mongo") }}
+# MongoDB for accounts: one member of the replica set rs0
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels: {{- include "blockout.part.labels" (list $ "mongo") | nindent 4 }}
+spec:
+  clusterIP: None # each member by name: <release>-mongo-0.<release>-mongo.<namespace>.svc
+  # Names resolve before the member is ready: the replica set is started (and
+  # the servers find it) by that name
+  publishNotReadyAddresses: true
+  selector: {{- $sel | nindent 4 }}
+  ports: [{ name: mongo, port: 27017 }]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}
+  labels: {{- include "blockout.part.labels" (list $ "mongo") | nindent 4 }}
+spec:
+  serviceName: {{ $name }}
+  replicas: 1
+  selector:
+    matchLabels: {{- $sel | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- $sel | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      # The image's mongodb user; fsGroup lets it own the volume
+      securityContext:
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        # mongod wants the replica set key readable by its owner only
+        - name: keyfile
+          image: {{ .Values.mongo.image }}
+          command: [sh, -c, 'cp /secret/keyfile /key/keyfile && chmod 400 /key/keyfile']
+          securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+          volumeMounts:
+            - { name: secret, mountPath: /secret, readOnly: true }
+            - { name: key, mountPath: /key }
+      containers:
+        - name: mongo
+          image: {{ .Values.mongo.image }}
+          args: [--replSet, rs0, --bind_ip_all, --keyFile, /key/keyfile]
+          securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+          env:
+            - { name: MONGO_INITDB_ROOT_USERNAME, value: root }
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ $name }}, key: root-password } }
+          ports: [{ name: mongo, containerPort: 27017 }]
+          readinessProbe:
+            exec: { command: [mongosh, --quiet, --eval, 'db.adminCommand("ping").ok'] }
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources: {{- toYaml .Values.mongo.resources | nindent 12 }}
+          volumeMounts:
+            - { name: data, mountPath: /data/db }
+            - { name: key, mountPath: /key, readOnly: true }
+        # Starts the replica set of one, once: until then MongoDB has no
+        # primary and nothing can write. (On a first start the image restarts
+        # mongod after making the root user, so it tries until that's done.)
+        - name: replica-set
+          image: {{ .Values.mongo.image }}
+          command:
+            - sh
+            - -c
+            - |
+              host="$(hostname).{{ $name }}.{{ .Release.Namespace }}.svc.cluster.local:27017"
+              until mongosh --quiet -u root -p "$MONGO_PASSWORD" --authenticationDatabase admin --eval "
+                try { rs.status().ok } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: '$host' }] }).ok }
+                for (let i = 0; i < 30 && !db.hello().isWritablePrimary; i++) sleep(1000);
+                if (!db.hello().isWritablePrimary) quit(1)" >/dev/null 2>&1; do sleep 5; done
+              echo "replica set rs0 is ready"
+              exec sleep infinity
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          env:
+            - name: MONGO_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ $name }}, key: root-password } }
+            # mongosh keeps its history and logs in the home folder
+            - { name: HOME, value: /tmp }
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { memory: 256Mi }
+          volumeMounts: [{ name: tmp, mountPath: /tmp }]
+      volumes:
+        - name: secret
+          secret: { secretName: {{ $name }}, items: [{ key: keyfile, path: keyfile }] }
+        - { name: key, emptyDir: { medium: Memory } }
+        - { name: tmp, emptyDir: {} }
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- with .Values.mongo.storageClass }}
+        storageClassName: {{ . }}
+        {{- end }}
+        resources: { requests: { storage: {{ .Values.mongo.storage }} } }
+{{- end }}

@@ -1,0 +1,33 @@
+{
+	"id": "agent-skills",
+	"version": "1.1.0",
+	"name": "Agent Skills",
+	"description": "Agent Skills from a GitHub repo, installed user-level (~/.claude/skills) for the container user with the skills CLI.",
+	"options": {
+		"source": {
+			"type": "string",
+			"default": "DeepSpaceCartel/skills",
+			"description": "The skills repo on GitHub (owner/repo)."
+		},
+		"ref": {
+			"type": "string",
+			"default": "",
+			"description": "A commit, branch or tag to install from. Empty means the default branch; a commit SHA makes builds reproducible."
+		},
+		"skills": {
+			"type": "string",
+			"default": "*",
+			"description": "Space-separated skill names to install, or * for all of them."
+		},
+		"agent": {
+			"type": "string",
+			"default": "claude-code",
+			"description": "The agent to install for (the skills CLI's --agent)."
+		},
+		"cliVersion": {
+			"type": "string",
+			"default": "1.7.1",
+			"description": "The skills CLI (npm package skills) version to run."
+		}
+	}
+}

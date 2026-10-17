@@ -1,0 +1,61 @@
+{{- if .Values.server.enabled }}
+{{- if .Values.metrics.rules.enabled }}
+{{- $deploy := include "blockout.fullname" . }}
+{{- $ns := .Release.Namespace }}
+# What needs a person: no servers, errors, slowness, and backups that stopped
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ $deploy }}
+  labels:
+    {{- include "blockout.labels" . | nindent 4 }}
+    {{- with .Values.metrics.rules.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: blockout
+      rules:
+        - alert: BlockoutDown
+          expr: kube_deployment_status_replicas_available{namespace="{{ $ns }}", deployment="{{ $deploy }}"} < 1
+          for: 2m
+          labels: { severity: critical }
+          annotations:
+            summary: No Blockout server is ready
+            description: Nobody can play or sign in. kubectl -n {{ $ns }} describe pods; logs in Loki.
+        - alert: BlockoutServersMissing
+          expr: kube_deployment_status_replicas_available{namespace="{{ $ns }}", deployment="{{ $deploy }}"} < kube_deployment_spec_replicas{namespace="{{ $ns }}", deployment="{{ $deploy }}"}
+          for: 10m
+          labels: { severity: warning }
+          annotations:
+            summary: Fewer Blockout servers are ready than asked for
+        - alert: BlockoutServerErrors
+          expr: |
+            sum(rate(blockout_http_requests_total{namespace="{{ $ns }}", status=~"5.."}[5m]))
+              / clamp_min(sum(rate(blockout_http_requests_total{namespace="{{ $ns }}"}[5m])), 1e-9) > 0.01
+          for: 10m
+          labels: { severity: warning }
+          annotations:
+            summary: More than 1% of Blockout requests fail
+            description: Look for http.error records in the logs.
+        - alert: BlockoutSlow
+          # (event streams and long polls are slow on purpose)
+          expr: |
+            histogram_quantile(0.95, sum by (le) (rate(blockout_http_request_duration_seconds_bucket{namespace="{{ $ns }}", route!~".*/(events|poll)"}[5m]))) > 1
+          for: 10m
+          labels: { severity: warning }
+          annotations:
+            summary: One Blockout request in 20 takes more than a second
+        {{- if .Values.backup.enabled }}{{ with printf "%s-backup-mongo" .Release.Name }}
+        - alert: BlockoutBackupMissing
+          expr: |
+            time() - max(kube_cronjob_status_last_successful_time{namespace="{{ $ns }}", cronjob="{{ . }}"}) > 26 * 3600
+              or absent(kube_cronjob_status_last_successful_time{namespace="{{ $ns }}", cronjob="{{ . }}"})
+          for: 30m
+          labels: { severity: warning }
+          annotations:
+            summary: No Blockout database backup for over a day
+            description: kubectl -n {{ $ns }} get jobs; docs/guides/operate.md
+        {{- end }}{{ end }}
+{{- end }}
+{{- end }}

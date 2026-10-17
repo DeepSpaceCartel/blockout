@@ -1,0 +1,19 @@
+{
+  "name": "@blockout/server",
+  "version": "0.11.0",
+  "private": true,
+  "type": "module",
+  "description": "The Blockout server: serves the built games, runs classrooms (whole class, pairs, tournaments) and accounts (MongoDB).",
+  "dependencies": {
+    "@blockout/engine": "*",
+    "@blockout/progress": "*",
+    "mongodb": "^7.7.0",
+    "redis": "^6.3.0"
+  },
+  "scripts": {
+    "dev": "node --watch src/index.js 8080",
+    "start": "node src/index.js 8080",
+    "test": "node --test",
+    "lint": "eslint src test"
+  }
+}

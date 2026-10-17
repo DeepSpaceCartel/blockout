@@ -1,0 +1,13 @@
+{
+	"id": "coder-cli",
+	"version": "1.0.0",
+	"name": "Coder CLI",
+	"description": "The coder CLI, downloaded from a Coder deployment so it matches that server's version.",
+	"options": {
+		"url": {
+			"type": "string",
+			"default": "https://coder.deepspacecartel.com",
+			"description": "The Coder deployment to download the CLI from (what CODER_AGENT_URL points at in a workspace)."
+		}
+	}
+}

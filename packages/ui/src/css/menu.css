@@ -1,0 +1,275 @@
+/* ---------- Start screen ---------- */
+#start-screen {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+  padding-top: clamp(16px, 6vh, 64px);
+}
+
+.start-card {
+  width: 100%;
+  max-width: 520px;
+  background: var(--paper);
+  border: 2px solid var(--edge);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 0 var(--edge-shadow);
+  padding: clamp(20px, 5vw, 36px);
+  text-align: center;
+}
+
+.tagline { color: var(--muted); margin: 0.6rem 0 1.5rem; }
+
+.mode-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 1.25rem; }
+@media (max-width: 480px) {
+  /* Single + Multiplayer side by side, Practice underneath across the full width */
+  .mode-picker { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .mode-card { padding: 12px 6px; }
+  .mode-card[data-mode="practice"] {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto;
+    column-gap: 12px;
+    justify-items: start;
+    text-align: left;
+    padding: 10px 16px;
+  }
+  .mode-card[data-mode="practice"] { grid-template-rows: auto auto auto; }
+  .mode-card[data-mode="practice"] .mode-icon { grid-row: 1 / -1; align-self: center; }
+  .mode-card[data-mode="practice"] .lock-badge { grid-column: 2; }
+  /* Board size: 12, 16, 20 on one row, Custom on its own row */
+  /* phones: two per row (How to play · Settings / Stats · Achievements / Shop · Invite) */
+  .start-card .menu-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .start-card .menu-actions .btn { font-size: 0.85rem; padding-top: 0.5rem; padding-bottom: 0.5rem; }
+}
+@media (max-width: 340px) {
+  .start-card .menu-actions .btn { font-size: 0.76rem; gap: 4px; }
+}
+
+.mode-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px 10px;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.mode-card:hover { border-color: var(--muted); }
+.mode-card.selected { border-color: var(--accent); background: var(--accent-soft); }
+.mode-icon { font-size: 2rem; }
+.mode-title { font-weight: 900; font-size: 1.05rem; }
+.mode-sub { font-size: 0.85rem; color: var(--muted); }
+
+#setup-form { display: flex; flex-direction: column; gap: 1rem; text-align: left; }
+
+/* Single player's Journey: the level you're on, its goal and the path so far */
+.journey-card { display: flex; flex-direction: column; gap: 0.75rem; }
+.journey-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 12px;
+  border: 2px solid var(--accent);
+  border-radius: 12px;
+  background: var(--accent-soft);
+  text-align: center;
+}
+.journey-level { margin: 0; font-weight: 900; font-size: 1.5rem; }
+.journey-line { margin: 0; font-weight: 700; }
+.journey-info .setting-help { margin: 0; }
+.journey-steps { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin: 6px 0 0; padding: 0; list-style: none; }
+.journey-steps li {
+  display: grid;
+  place-items: center;
+  min-width: 22px; /* (a pill for Practice's ×10 to ×12) */
+  height: 22px;
+  padding: 0 3px;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+.journey-steps li.done { border-color: var(--good); background: var(--good); color: var(--accent-ink); }
+.journey-steps li.current { border-color: var(--accent); background: var(--accent-button); color: var(--accent-ink); transform: scale(1.15); }
+.setup-section { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field > span { font-weight: 800; font-size: 0.9rem; }
+.field input {
+  font: inherit;
+  padding: 0.55rem 0.7rem;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.field input:focus { outline: none; border-color: var(--accent); }
+
+.name-inputs { display: flex; flex-direction: column; gap: 8px; }
+.name-row { display: flex; align-items: center; gap: 8px; }
+.name-row input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  padding: 0.55rem 0.7rem;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.name-row input:focus { outline: none; border-color: var(--accent); }
+.name-row input.missing { border-color: var(--bad); background: var(--bad-bg); }
+.name-row input:disabled { background: var(--soft); color: var(--muted); }
+.kind-toggle {
+  flex: none;
+  min-width: 6.8em;
+  white-space: nowrap;
+  padding: 0.55rem 0.6rem;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  font-weight: 800;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.kind-toggle.cpu { background: var(--invert-bg); border-color: var(--invert-bg); color: var(--invert-ink); }
+.swatch { width: 18px; height: 18px; border-radius: 5px; flex: none; border: 2px solid var(--swatch-edge); }
+
+.segmented { display: flex; border: 2px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); }
+.segmented button {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  padding: 0.55rem 0.3rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.segmented button + button { border-left: 2px solid var(--line); }
+.segmented button.selected { background: var(--invert-bg); color: var(--invert-ink); }
+.segmented small { font-weight: 600; }
+.segmented[data-setting="difficulty"] small { display: block; }
+
+.custom-size { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.custom-size .step { width: 40px; padding: 0.3rem 0; font-size: 1.2rem; line-height: 1; }
+.custom-size input {
+  width: 4.2em;
+  font: inherit;
+  font-weight: 900;
+  text-align: center;
+  padding: 0.4rem;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.custom-size input:focus { outline: none; border-color: var(--accent); }
+.custom-times { font-weight: 900; min-width: 3.2em; }
+.custom-hint { flex-basis: 100%; text-align: center; font-size: 0.8rem; color: var(--muted); }
+
+.keys { color: var(--muted); }
+kbd {
+  font-family: inherit;
+  font-size: 0.8em;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 0 4px;
+  background: var(--surface);
+}
+
+/* Landscape tablets and laptops (Chromebooks, iPads held sideways): the card goes
+   wide, with the title, modes and menu on the left and the settings on the right,
+   so Start is on screen without scrolling. Phones and portrait screens keep the
+   one column above. By shape, not device: user agents don't tell an iPad apart. */
+@media (orientation: landscape) and (min-width: 900px) and (min-height: 560px) {
+  #start-screen { padding-top: clamp(12px, 3vh, 32px); }
+  .start-card {
+    max-width: 1080px;
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    grid-template-areas:
+      "top     form"
+      "logo    form"
+      "tagline form"
+      "live    form"
+      "modes   form"
+      "actions form";
+    /* the last row takes the slack, so the menu sits level with Start */
+    grid-template-rows: auto auto auto auto auto 1fr;
+    column-gap: clamp(24px, 3vw, 40px);
+    align-items: start;
+    padding: clamp(20px, 3vh, 32px) clamp(24px, 3vw, 36px);
+  }
+  .start-card > .top-row { grid-area: top; }
+  .start-card > .logo { grid-area: logo; }
+  .start-card > .tagline { grid-area: tagline; margin-bottom: 1rem; }
+  .start-card > .live-banner { grid-area: live; }
+  .start-card > .mode-picker { grid-area: modes; }
+  .start-card > #setup-form { grid-area: form; }
+  .start-card > .menu-actions { grid-area: actions; align-self: end; }
+
+  /* Modes stack as rows: the icon on the left, title and subtitle beside it */
+  .mode-picker { grid-template-columns: 1fr; gap: 8px; margin-bottom: 1rem; }
+  .mode-card {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto auto;
+    column-gap: 12px;
+    justify-items: start;
+    text-align: left;
+    padding: 8px 16px;
+  }
+  .mode-card .mode-icon { grid-row: 1 / -1; align-self: center; font-size: 1.6rem; }
+  .mode-card .lock-badge { grid-column: 2; }
+
+  /* Three buttons a row (two on narrower screens, so the labels fit); the last
+     row stretches, so no button is left on its own */
+  .start-card .menu-actions { display: flex; flex-wrap: wrap; margin-top: 0; }
+  .start-card .menu-actions .btn { flex: 1 1 calc((100% - 16px) / 3); min-width: 0; font-size: 0.9rem; }
+}
+@media (orientation: landscape) and (min-width: 900px) and (max-width: 1099px) and (min-height: 560px) {
+  .start-card .menu-actions .btn { flex-basis: calc((100% - 8px) / 2); }
+}
+
+/* Today's practice: one small task a day (@blockout/progress/daily), at the top of Homework */
+/* Today's practice: three cards to pick from, like a level-up's */
+.daily { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 12px; text-align: left; }
+.daily-head { margin: 0; font-weight: 900; }
+.daily-reward { color: var(--gold-ink); }
+.daily-streak { color: var(--muted); font-size: 0.85rem; font-weight: 700; }
+.daily-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.daily-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 10px 12px;
+  border: 2px solid var(--gold-line);
+  border-radius: 14px;
+  background: var(--gold-bg);
+  color: var(--ink);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--gold-line);
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+.daily-pick:hover { transform: translateY(-3px); box-shadow: 0 6px 0 var(--gold-line); }
+.daily-pick:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--gold-line); }
+.daily-icon { font-size: 2rem; line-height: 1; }
+.daily-body { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.daily-task { font-weight: 800; }
+.daily-why { color: var(--muted); font-size: 0.85rem; font-weight: 600; }
+.daily-go { color: var(--gold-ink); font-weight: 900; }
+.daily-reroll { align-self: center; }
+.daily.done .daily-done { margin: 0; color: var(--muted); font-weight: 700; }
+@media (max-width: 560px) {
+  .daily-cards { grid-template-columns: 1fr; }
+  .daily-pick { flex-direction: row; gap: 12px; text-align: left; }
+  .daily-go { white-space: nowrap; }
+}

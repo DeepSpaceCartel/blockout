@@ -1,0 +1,416 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Blockout chart values",
+  "type": "object",
+  "required": [
+    "image",
+    "publicUrl",
+    "keycloak",
+    "mongo",
+    "valkey"
+  ],
+  "properties": {
+    "image": {
+      "type": "object",
+      "required": [
+        "repository"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tag": {
+          "type": "string"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^(sha256:[0-9a-f]{64})?$"
+        },
+        "pullPolicy": {
+          "enum": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ]
+        }
+      }
+    },
+    "imagePullSecrets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "replicaCount": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "publicUrl": {
+      "type": "string",
+      "pattern": "^(https://.+)?$",
+      "description": "https only; required to render"
+    },
+    "keycloak": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string",
+          "pattern": "^(https?://[^/]+/?)?$",
+          "description": "Keycloak's public address (bundled Keycloak)"
+        },
+        "issuer": {
+          "type": "string",
+          "pattern": "^(https?://.+/realms/[^/]+)?$"
+        },
+        "clientId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "extraRedirectUrls": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^https?://[^*]+$"
+          }
+        },
+        "google": {
+          "type": "object",
+          "properties": {
+            "clientSecret": {
+              "type": "string"
+            }
+          }
+        },
+        "smtp": {
+          "type": "object",
+          "properties": {
+            "host": {
+              "type": "string"
+            },
+            "port": {
+              "type": [
+                "integer",
+                "string"
+              ]
+            },
+            "from": {
+              "type": "string"
+            },
+            "user": {
+              "type": "string"
+            },
+            "password": {
+              "type": "string"
+            },
+            "existingSecret": {
+              "type": "string"
+            }
+          }
+        },
+        "httpRoute": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "parentRefs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "name"
+                ]
+              }
+            },
+            "adminConsole": {
+              "type": "boolean"
+            }
+          }
+        },
+        "postgres": {
+          "$ref": "#/$defs/store"
+        },
+        "realmJob": {
+          "type": "object"
+        },
+        "mobile": {
+          "type": "object",
+          "properties": {
+            "redirectUrls": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "trustProxy": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "log": {
+      "type": "object",
+      "properties": {
+        "level": {
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error",
+            "silent"
+          ]
+        },
+        "format": {
+          "enum": [
+            "json",
+            "text"
+          ]
+        }
+      }
+    },
+    "redisPrefix": {
+      "type": "string"
+    },
+    "extraEnv": {
+      "type": "array"
+    },
+    "terminationGracePeriodSeconds": {
+      "type": "integer",
+      "minimum": 10
+    },
+    "preStopSleepSeconds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "httpRoute": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "hostnames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "parentRefs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ]
+          }
+        }
+      }
+    },
+    "autoscaling": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "minReplicas": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxReplicas": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "networkPolicy": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "cilium": {
+          "type": "boolean"
+        },
+        "dataNamespace": {
+          "type": "string"
+        },
+        "ingressNamespaces": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "server": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "imageCredentials": {
+      "type": "object",
+      "properties": {
+        "registry": {
+          "type": "string",
+          "minLength": 1
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        }
+      }
+    },
+    "openai": {
+      "type": "object",
+      "properties": {
+        "apiKey": {
+          "type": "string"
+        },
+        "existingSecret": {
+          "type": "string"
+        }
+      }
+    },
+    "mongo": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/store"
+        }
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "external": {
+          "type": "object",
+          "properties": {
+            "secretName": {
+              "type": "string"
+            },
+            "key": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "valkey": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "image": {
+          "type": "string",
+          "minLength": 1
+        },
+        "maxmemory": {
+          "type": "string",
+          "pattern": "^[0-9]+[kmgKMG]?[bB]?$"
+        },
+        "resources": {
+          "type": "object"
+        },
+        "external": {
+          "type": "object",
+          "properties": {
+            "secretName": {
+              "type": "string"
+            },
+            "key": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "backup": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "rclone": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "propertyNames": {
+            "pattern": "^RCLONE_"
+          }
+        },
+        "existingSecret": {
+          "type": "string"
+        },
+        "rcloneImage": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schedule": {
+          "type": "object",
+          "properties": {
+            "mongo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "keycloak": {
+              "type": "string",
+              "minLength": 1
+            },
+            "restoreCheck": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "keycloakx": {
+      "type": "object",
+      "description": "The keycloakx chart's values"
+    }
+  },
+  "$defs": {
+    "store": {
+      "type": "object",
+      "properties": {
+        "image": {
+          "type": "string",
+          "minLength": 1
+        },
+        "storage": {
+          "type": "string",
+          "pattern": "^[0-9]+(Mi|Gi|Ti)$"
+        },
+        "storageClass": {
+          "type": "string"
+        },
+        "resources": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

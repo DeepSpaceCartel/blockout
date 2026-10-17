@@ -1,0 +1,113 @@
+{{- if .Values.keycloak.enabled }}
+{{- $db := printf "%s-keycloak-db" .Release.Name }}
+{{- $dbSel := include "blockout.part.selectorLabels" (list $ "keycloak-db") }}
+# Keycloak's settings that come from this chart (the keycloakx chart reads them
+# through keycloakx.extraEnvFrom)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-keycloak
+  labels: {{- include "blockout.part.labels" (list $ "keycloak") | nindent 4 }}
+data:
+  # Every URL Keycloak hands out, and the tokens' issuer, use this address
+  KC_HOSTNAME: {{ required "keycloak.url: Keycloak's public address (https://…)" .Values.keycloak.url | trimSuffix "/" | quote }}
+  KC_DB: postgres
+  KC_DB_URL_HOST: {{ $db }}
+  KC_DB_URL_DATABASE: keycloak
+  KC_DB_USERNAME: keycloak
+  KC_VAULT: file
+  KC_VAULT_DIR: /opt/keycloak/vault
+---
+# The blockout realm, imported when Keycloak first starts (an existing realm is
+# left alone: the realm job below keeps it in line)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-keycloak-realm
+  labels: {{- include "blockout.part.labels" (list $ "keycloak") | nindent 4 }}
+data:
+  realm-blockout.json: {{ .Files.Get "files/realm-blockout.json" | quote }}
+---
+# Postgres for Keycloak: the realm's users, their Google links and settings
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $db }}
+  labels: {{- include "blockout.part.labels" (list $ "keycloak-db") | nindent 4 }}
+spec:
+  selector: {{- $dbSel | nindent 4 }}
+  ports: [{ name: postgres, port: 5432 }]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $db }}
+  labels: {{- include "blockout.part.labels" (list $ "keycloak-db") | nindent 4 }}
+spec:
+  serviceName: {{ $db }}
+  replicas: 1
+  selector:
+    matchLabels: {{- $dbSel | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- $dbSel | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      # The alpine image's postgres user; fsGroup lets it own the volume
+      securityContext:
+        runAsUser: 70
+        runAsGroup: 70
+        fsGroup: 70
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: postgres
+          image: {{ .Values.keycloak.postgres.image }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          env:
+            - { name: POSTGRES_DB, value: keycloak }
+            - { name: POSTGRES_USER, value: keycloak }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ $db }}, key: password } }
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+          ports: [{ name: postgres, containerPort: 5432 }]
+          readinessProbe:
+            exec: { command: [pg_isready, -U, keycloak, -d, keycloak] }
+            periodSeconds: 5
+          resources: {{- toYaml .Values.keycloak.postgres.resources | nindent 12 }}
+          volumeMounts: [{ name: data, mountPath: /var/lib/postgresql/data }]
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- with .Values.keycloak.postgres.storageClass }}
+        storageClassName: {{ . }}
+        {{- end }}
+        resources: { requests: { storage: {{ .Values.keycloak.postgres.storage }} } }
+{{- if .Values.keycloak.httpRoute.enabled }}
+---
+# Keycloak's public address: sign-in, and with adminConsole the admin console
+# (/admin, and the master realm it signs in with)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ .Release.Name }}-keycloak
+  labels: {{- include "blockout.part.labels" (list $ "keycloak") | nindent 4 }}
+spec:
+  parentRefs: {{- required "keycloak.httpRoute.parentRefs: the Gateway (and listener) for Keycloak's address" .Values.keycloak.httpRoute.parentRefs | toYaml | nindent 4 }}
+  hostnames: [{{ urlParse .Values.keycloak.url | dig "host" "" | quote }}]
+  rules:
+    - matches:
+        - path: { type: PathPrefix, value: /realms/blockout }
+        - path: { type: PathPrefix, value: /resources }
+        {{- if .Values.keycloak.httpRoute.adminConsole }}
+        - path: { type: PathPrefix, value: /admin }
+        - path: { type: PathPrefix, value: /realms/master }
+        {{- end }}
+      backendRefs:
+        - name: {{ .Release.Name }}-keycloakx-http
+          port: 80
+{{- end }}
+{{- end }}

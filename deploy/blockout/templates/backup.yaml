@@ -1,0 +1,188 @@
+{{- if .Values.backup.enabled }}
+{{- $secret := .Values.backup.existingSecret | default (printf "%s-backup" .Release.Name) }}
+{{- $rclone := .Values.backup.rcloneImage }}
+# MongoDB, nightly: mongodump to one compressed archive, then rclone copies it
+# through the crypt remote (encrypted before it leaves the cluster)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Release.Name }}-backup-mongo
+  labels: {{- include "blockout.part.labels" (list $ "backup") | nindent 4 }}
+spec:
+  schedule: {{ .Values.backup.schedule.mongo | quote }}
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 3600
+      template:
+        metadata:
+          labels: {{- include "blockout.part.selectorLabels" (list $ "backup") | nindent 12 }}
+        spec:
+          {{- include "blockout.backup.pod" (dict "uid" 999) | nindent 10 }}
+          initContainers:
+            - name: dump
+              image: {{ .Values.mongo.image }}
+              command: [sh, -c, 'mongodump --uri "$MONGO_URL" --gzip --archive="/backup/blockout-$(date -u +%Y-%m-%d).archive.gz" && ls -l /backup']
+              env:
+                - name: MONGO_URL
+                  valueFrom: { secretKeyRef: { name: {{ include "blockout.mongoSecret" . }}, key: {{ include "blockout.mongoKey" . }} } }
+              {{- include "blockout.backup.restricted" . | nindent 14 }}
+              resources:
+                requests: { cpu: 50m, memory: 128Mi }
+                limits: { memory: 512Mi }
+              volumeMounts: [{ name: backup, mountPath: /backup }]
+          containers:
+            - name: upload
+              image: {{ $rclone }}
+              command:
+                - sh
+                - -c
+                - |
+                  set -e
+                  rclone mkdir crypt:daily && rclone mkdir crypt:monthly  # (deleting old copies needs both)
+                  rclone copy /backup crypt:daily
+                  if [ "$(date -u +%d)" = 01 ]; then rclone copy /backup crypt:monthly; fi
+                  rclone delete --min-age 31d crypt:daily
+                  rclone delete --min-age 366d crypt:monthly
+                  rclone lsl crypt: | tail -5
+              envFrom: [{ secretRef: { name: {{ $secret }} } }]
+              env:
+                - { name: RCLONE_CONFIG, value: /tmp/rclone.conf } # (settings come from the environment; nothing to read)
+              {{- include "blockout.backup.restricted" . | nindent 14 }}
+              resources:
+                requests: { cpu: 50m, memory: 64Mi }
+                limits: { memory: 256Mi }
+              volumeMounts:
+                - { name: backup, mountPath: /backup, readOnly: true }
+                - { name: tmp, mountPath: /tmp }
+          volumes:
+            - { name: backup, emptyDir: { sizeLimit: 2Gi } }
+            - { name: tmp, emptyDir: {} }
+---
+# The restore check, monthly: fetches the newest MongoDB backup, restores it into
+# a scratch database (restore_check) next to the real one, counts what's in it,
+# and drops it. A backup nobody has restored is only a hope.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Release.Name }}-restore-check
+  labels: {{- include "blockout.part.labels" (list $ "backup") | nindent 4 }}
+spec:
+  schedule: {{ .Values.backup.schedule.restoreCheck | quote }}
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels: {{- include "blockout.part.selectorLabels" (list $ "backup") | nindent 12 }}
+        spec:
+          {{- include "blockout.backup.pod" (dict "uid" 999) | nindent 10 }}
+          initContainers:
+            - name: fetch
+              image: {{ $rclone }}
+              command: [sh, -c, 'latest=$(rclone lsf crypt:daily | sort | tail -1) && echo "newest: $latest" && rclone copyto "crypt:daily/$latest" /restore/backup.archive.gz']
+              envFrom: [{ secretRef: { name: {{ $secret }} } }]
+              env:
+                - { name: RCLONE_CONFIG, value: /tmp/rclone.conf }
+              {{- include "blockout.backup.restricted" . | nindent 14 }}
+              volumeMounts:
+                - { name: restore, mountPath: /restore }
+                - { name: tmp, mountPath: /tmp }
+          containers:
+            - name: restore
+              image: {{ .Values.mongo.image }}
+              command:
+                - sh
+                - -c
+                - |
+                  set -e
+                  mongorestore --uri "$MONGO_URL" --gzip --archive=/restore/backup.archive.gz --nsFrom 'blockout.*' --nsTo 'restore_check.*' --drop --quiet
+                  mongosh "$MONGO_URL" --quiet --eval '
+                    const r = db.getSiblingDB("restore_check");
+                    for (const c of r.getCollectionNames().sort()) print(c.padEnd(14), r.getCollection(c).countDocuments());
+                    r.dropDatabase();
+                    print("restored, counted and dropped");'
+              env:
+                - name: MONGO_URL
+                  valueFrom: { secretKeyRef: { name: {{ include "blockout.mongoSecret" . }}, key: {{ include "blockout.mongoKey" . }} } }
+                - { name: HOME, value: /tmp }
+              {{- include "blockout.backup.restricted" . | nindent 14 }}
+              volumeMounts:
+                - { name: restore, mountPath: /restore, readOnly: true }
+                - { name: tmp, mountPath: /tmp }
+          volumes:
+            - { name: restore, emptyDir: { sizeLimit: 2Gi } }
+            - { name: tmp, emptyDir: {} }
+{{- if .Values.keycloak.enabled }}
+---
+# Keycloak's Postgres, nightly: pg_dump, then the same crypt remote, under keycloak/
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Release.Name }}-backup-keycloak
+  labels: {{- include "blockout.part.labels" (list $ "backup") | nindent 4 }}
+spec:
+  schedule: {{ .Values.backup.schedule.keycloak | quote }}
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 3600
+      template:
+        metadata:
+          labels: {{- include "blockout.part.selectorLabels" (list $ "backup") | nindent 12 }}
+        spec:
+          {{- include "blockout.backup.pod" (dict "uid" 70) | nindent 10 }}
+          initContainers:
+            - name: dump
+              image: {{ .Values.keycloak.postgres.image }}
+              command: [sh, -c, 'pg_dump -h {{ .Release.Name }}-keycloak-db -U keycloak -d keycloak --format=custom --file="/backup/keycloak-$(date -u +%Y-%m-%d).dump" && ls -l /backup']
+              env:
+                - name: PGPASSWORD
+                  valueFrom: { secretKeyRef: { name: {{ .Release.Name }}-keycloak-db, key: password } }
+              {{- include "blockout.backup.restricted" . | nindent 14 }}
+              resources:
+                requests: { cpu: 50m, memory: 64Mi }
+                limits: { memory: 256Mi }
+              volumeMounts: [{ name: backup, mountPath: /backup }]
+          containers:
+            - name: upload
+              image: {{ $rclone }}
+              command:
+                - sh
+                - -c
+                - |
+                  set -e
+                  rclone mkdir crypt:keycloak/daily && rclone mkdir crypt:keycloak/monthly
+                  rclone copy /backup crypt:keycloak/daily
+                  if [ "$(date -u +%d)" = 01 ]; then rclone copy /backup crypt:keycloak/monthly; fi
+                  rclone delete --min-age 31d crypt:keycloak/daily
+                  rclone delete --min-age 366d crypt:keycloak/monthly
+                  rclone lsl crypt:keycloak | tail -3
+              envFrom: [{ secretRef: { name: {{ $secret }} } }]
+              env:
+                - { name: RCLONE_CONFIG, value: /tmp/rclone.conf }
+              {{- include "blockout.backup.restricted" . | nindent 14 }}
+              resources:
+                requests: { cpu: 50m, memory: 64Mi }
+                limits: { memory: 256Mi }
+              volumeMounts:
+                - { name: backup, mountPath: /backup, readOnly: true }
+                - { name: tmp, mountPath: /tmp }
+          volumes:
+            - { name: backup, emptyDir: { sizeLimit: 1Gi } }
+            - { name: tmp, emptyDir: {} }
+{{- end }}
+{{- end }}

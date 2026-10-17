@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BLOCKOUT</title>
+</head>
+<body>
+  <!-- Start screen -->
+  <main id="start-screen" class="screen">
+    <div class="start-card">
+      <div class="top-row">
+        <div class="wallet" title="Points you can spend in the shop">🪙 <span id="wallet-amount">0</span> points</div>
+        <button type="button" class="account-chip" id="account-btn" hidden><svg class="icon" aria-hidden="true"><use href="#i-user"></use></svg> Sign in</button>
+      </div>
+      <h1 class="logo">BLOCK<span>OUT</span></h1>
+      <p class="tagline">Roll two dice, draw a rectangle, claim the most squares.</p>
+      <div class="live-banner" id="live-banner" aria-live="polite" hidden></div>
+
+      <div class="mode-picker" role="radiogroup" aria-label="Game mode">
+        <button type="button" class="mode-card selected" data-mode="single" role="radio" aria-checked="true">
+          <span class="mode-icon" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-user"></use></svg></span>
+          <span class="mode-title">Single player</span>
+          <span class="mode-sub">You vs the CPU</span>
+        </button>
+        <button type="button" class="mode-card" data-mode="multi" role="radio" aria-checked="false">
+          <span class="mode-icon" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-users"></use></svg></span>
+          <span class="mode-title">Multiplayer</span>
+          <span class="mode-sub">Play with friends or a class</span>
+        </button>
+        <button type="button" class="mode-card" data-mode="practice" role="radio" aria-checked="false">
+          <span class="mode-icon" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-target"></use></svg></span>
+          <span class="mode-title">Practice</span>
+          <span class="mode-sub">Your own times-table drill</span>
+        </button>
+      </div>
+
+      <form id="setup-form" autocomplete="off">
+        <!-- Single player and Practice: the Journey (level by level) or Free play / Free practice, see game/journey.js -->
+        <div class="journey-card" id="journey-card">
+          <div class="segmented" id="play-kind" role="radiogroup" aria-label="What to play" hidden>
+            <button type="button" data-play="journey" class="selected" role="radio" aria-checked="true"><svg class="icon" aria-hidden="true"><use href="#i-mountain"></use></svg> Journey <small>level by level</small></button>
+            <button type="button" data-play="free" role="radio" aria-checked="false"><svg class="icon" aria-hidden="true"><use href="#i-dices"></use></svg> Free play <small>pick a board</small></button>
+          </div>
+          <div class="journey-info" id="journey-info">
+            <p class="journey-level" id="journey-level"></p>
+            <p class="journey-line" id="journey-line"></p>
+            <p class="setting-help" id="journey-goal"></p>
+            <ol class="journey-steps" id="journey-steps" aria-label="Your Journey"></ol>
+          </div>
+        </div>
+
+        <div class="field" id="difficulty-field">
+          <span>Difficulty</span>
+          <div class="segmented" data-setting="difficulty">
+            <button type="button" data-value="easy">Easy <small>6-sided dice</small></button>
+            <button type="button" data-value="medium">Medium <small>8-sided dice</small></button>
+            <button type="button" data-value="hard">Hard <small>12-sided dice</small></button>
+            <button type="button" data-value="tricky">Tricky <small>no easy facts</small></button>
+            <button type="button" data-value="master">Master <small>your weak facts</small></button>
+            <button type="button" data-value="legend">Legend <small>teens × 2–9</small></button>
+          </div>
+        </div>
+
+        <div id="single-setup" class="setup-section">
+          <!-- Hidden: single player and practice play as "You" (stats and times table are saved under that name) -->
+          <label class="field" hidden>
+            <span>Your name</span>
+            <input type="text" id="single-name" maxlength="14" value="You" />
+          </label>
+          <div class="field">
+            <span>Level</span>
+            <div class="segmented" id="game-level">
+              <button type="button" data-level="learn" class="selected"><svg class="icon" aria-hidden="true"><use href="#i-sprout"></use></svg> Learn</button>
+              <button type="button" data-level="expert"><svg class="icon" aria-hidden="true"><use href="#i-brain"></use></svg> Expert</button>
+            </div>
+            <p class="setting-help" id="game-level-help"></p>
+          </div>
+          <div class="field" id="game-timer-field" hidden>
+            <span>Timer</span>
+            <div class="segmented" id="game-timer">
+              <button type="button" data-secs="0" class="selected">No timer</button>
+              <button type="button" data-secs="30">30 s</button>
+              <button type="button" data-secs="10">10 s</button>
+              <button type="button" data-secs="5">5 s</button>
+            </div>
+            <p class="setting-help" id="game-timer-help"></p>
+          </div>
+        </div>
+
+        <div id="multi-setup" class="setup-section" hidden>
+          <div class="segmented" id="multi-kind" role="radiogroup" aria-label="Where you're playing">
+            <button type="button" data-kind="local" class="selected" role="radio" aria-checked="true"><svg class="icon" aria-hidden="true"><use href="#i-house"></use></svg> Home <small>2–4 on one screen</small></button>
+            <button type="button" data-kind="classroom" role="radio" aria-checked="false"><svg class="icon" aria-hidden="true"><use href="#i-school"></use></svg> Classroom <small>Whole class, own devices</small></button>
+          </div>
+          <div id="local-setup" class="setup-section">
+            <div class="field">
+              <span>Players</span>
+              <div class="segmented" id="player-count">
+                <button type="button" data-count="2" class="selected">2</button>
+                <button type="button" data-count="3">3</button>
+                <button type="button" data-count="4">4</button>
+              </div>
+            </div>
+            <div id="name-inputs" class="name-inputs"></div>
+            <p class="invite-error" id="names-error" role="alert" hidden>Every player needs a name.</p>
+          </div>
+          <div id="classroom-setup" class="setup-section" hidden>
+            <p class="setting-help">Play as a whole class or in pairs. The teacher’s screen shows the join code, the dice and the scores.</p>
+            <div class="classroom-actions">
+              <button type="button" class="btn btn-primary btn-big" id="class-join-open">Join a class</button>
+              <button type="button" class="btn" id="class-host-open"><svg class="icon" aria-hidden="true"><use href="#i-school"></use></svg> Host a class (teacher)</button>
+            </div>
+            <p class="classroom-note" id="class-offline" hidden></p>
+          </div>
+        </div>
+
+        <div id="practice-setup" class="setup-section" hidden>
+          <!-- Hidden: single player and practice play as "You" (stats and times table are saved under that name) -->
+          <label class="field" hidden>
+            <span>Your name</span>
+            <input type="text" id="practice-name" maxlength="14" value="You" />
+          </label>
+          <div class="field" id="practice-level-field">
+            <span>Level</span>
+            <div class="segmented" id="practice-level">
+              <button type="button" data-level="learn" class="selected"><svg class="icon" aria-hidden="true"><use href="#i-sprout"></use></svg> Learn</button>
+              <button type="button" data-level="expert"><svg class="icon" aria-hidden="true"><use href="#i-brain"></use></svg> Expert</button>
+            </div>
+            <p class="setting-help" id="practice-level-help">Learn: see each fact as a rectangle and get help counting.</p>
+          </div>
+          <div class="field" id="practice-timer-field" hidden>
+            <span>Timer</span>
+            <div class="segmented" id="practice-timer">
+              <button type="button" data-secs="0" class="selected">No timer</button>
+              <button type="button" data-secs="30">30 s</button>
+              <button type="button" data-secs="10">10 s</button>
+              <button type="button" data-secs="5">5 s</button>
+            </div>
+            <p class="setting-help" id="practice-timer-help">Expert only: answer before the clock runs out, or it counts as missed.</p>
+          </div>
+          <div class="field" id="practice-count-field">
+            <span>Questions</span>
+            <div class="segmented" id="practice-count">
+              <button type="button" data-count="5" class="selected">5</button>
+              <button type="button" data-count="10">10</button>
+              <button type="button" data-count="20">20</button>
+            </div>
+            <p class="setting-help" id="practice-count-help"></p>
+          </div>
+          <p class="practice-preview" id="practice-preview"></p>
+        </div>
+
+        <div class="field" id="board-size-field">
+          <span>Board size</span>
+          <div class="segmented" id="board-size">
+            <button type="button" data-size="6" class="selected">6×6</button>
+            <button type="button" data-size="8">8×8</button>
+            <button type="button" data-size="10">10×10</button>
+            <button type="button" data-size="12">12×12</button>
+            <button type="button" data-size="16">16×16</button>
+            <button type="button" data-size="20">20×20</button>
+            <button type="button" data-size="24">24×24</button>
+            <button type="button" data-size="custom">Custom</button>
+          </div>
+          <div class="custom-size" id="custom-size" hidden>
+            <button type="button" class="btn btn-small step" data-step="-1" aria-label="Smaller board">−</button>
+            <input type="number" id="custom-size-input" min="6" max="30" value="14" inputmode="numeric" aria-label="Board size" />
+            <span class="custom-times">× <span id="custom-size-echo">14</span></span>
+            <button type="button" class="btn btn-small step" data-step="1" aria-label="Bigger board">+</button>
+            <span class="custom-hint">6 to 30</span>
+          </div>
+          <p class="setting-help" id="board-size-help"></p>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-big" id="start-btn">Start game</button>
+      </form>
+
+      <div class="menu-actions">
+        <button type="button" class="btn btn-small acct-menu-btn" id="homework-btn" hidden><svg class="icon" aria-hidden="true"><use href="#i-book-open"></use></svg> Homework</button>
+        <button type="button" class="btn btn-small acct-menu-btn" id="classes-btn" hidden><svg class="icon" aria-hidden="true"><use href="#i-school"></use></svg> My classes</button>
+        <button type="button" class="btn btn-small acct-menu-btn" id="kids-btn" hidden><svg class="icon" aria-hidden="true"><use href="#i-users"></use></svg> My kids</button>
+        <button type="button" class="btn btn-small" id="howto-btn"><svg class="icon" aria-hidden="true"><use href="#i-circle-help"></use></svg> How to play</button>
+        <button type="button" class="btn btn-small" id="settings-btn"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg> Settings</button>
+        <button type="button" class="btn btn-small" id="history-btn"><svg class="icon" aria-hidden="true"><use href="#i-chart-column"></use></svg> Stats</button>
+        <button type="button" class="btn btn-small" id="shop-btn"><svg class="icon" aria-hidden="true"><use href="#i-shopping-cart"></use></svg> Shop</button>
+        <button type="button" class="btn btn-small" id="wardrobe-btn"><svg class="icon" aria-hidden="true"><use href="#i-shirt"></use></svg> Wardrobe</button>
+        <button type="button" class="btn btn-small" id="stickers-btn"><svg class="icon" aria-hidden="true"><use href="#i-sticker"></use></svg> Stickers</button>
+        <button type="button" class="btn btn-small" id="achievements-btn"><svg class="icon" aria-hidden="true"><use href="#i-trophy"></use></svg> Achievements</button>
+        <button type="button" class="btn btn-small" id="invite-btn"><svg class="icon" aria-hidden="true"><use href="#i-link"></use></svg> Invite</button>
+        <a class="btn btn-small" id="more-games-btn" href="/more-games/"><svg class="icon" aria-hidden="true"><use href="#i-gamepad"></use></svg> More games</a>
+        <a class="btn btn-small" id="demos-btn" href="/demos/"><svg class="icon" aria-hidden="true"><use href="#i-dices"></use></svg> Demos</a>
+      </div>
+    </div>
+  </main>
+
+  <!-- Classroom: the teacher's screen, for the projector -->
+  <main id="class-host-screen" class="screen" hidden>
+    <header class="game-header">
+      <button type="button" class="btn btn-small menu-btn" id="host-close-btn" aria-label="Close the class" title="Close the class"><svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg></button>
+      <h1 class="logo small">BLOCK<span>OUT</span></h1>
+      <div class="header-right"><div class="host-code-pill">Class <strong id="host-code-small"></strong></div></div>
+    </header>
+    <div class="host-layout">
+      <section class="host-main">
+        <div id="host-lobby" class="host-panel">
+          <p class="host-kicker">Join the class</p>
+          <div class="host-join">
+            <canvas id="host-qr" class="host-qr" aria-label="QR code that opens the join page"></canvas>
+            <div class="host-join-text">
+              <p class="host-step">1. Go to</p>
+              <p class="host-url" id="host-url"></p>
+              <div class="host-share">
+                <button type="button" class="btn btn-small" id="host-copy-link"><svg class="icon" aria-hidden="true"><use href="#i-copy"></use></svg> Copy link</button>
+                <button type="button" class="btn btn-small" id="host-copy-msg"><svg class="icon" aria-hidden="true"><use href="#i-mail"></use></svg> Copy message</button>
+                <button type="button" class="btn btn-small" id="host-share-btn" hidden><svg class="icon" aria-hidden="true"><use href="#i-link"></use></svg> Share</button>
+              </div>
+              <p class="host-step">2. Enter the code</p>
+              <p class="host-code" id="host-code"></p>
+            </div>
+          </div>
+          <button type="button" class="btn btn-primary btn-big" id="host-start-btn">Start game</button>
+          <p class="setting-help" id="host-local-help" hidden>This screen is on <strong>localhost</strong>, which other computers can’t open. Chromebooks should use this computer’s network address instead (shown above when the server finds one).</p>
+          <section class="host-game-settings" aria-labelledby="host-game-settings-title">
+            <div class="host-settings-head">
+              <h3 class="stats-heading" id="host-game-settings-title">Game settings</h3>
+              <button type="button" class="btn btn-small" id="host-quick"><svg class="icon" aria-hidden="true"><use href="#i-zap"></use></svg> Make it quick</button>
+            </div>
+            <p class="setting-help">For everyone in the class, no unlocks needed.</p>
+            <div class="host-settings-grid" id="host-settings-grid"></div>
+          </section>
+          <div class="host-pairs" id="host-pairs" hidden>
+            <div class="field">
+              <span>Pairs</span>
+              <div class="segmented" id="host-matching">
+                <button type="button" data-value="shuffle">New random pairs</button>
+                <button type="button" data-value="keep">Keep pairs</button>
+                <button type="button" data-value="arrange">I’ll arrange them</button>
+              </div>
+            </div>
+            <div class="field">
+              <span>With an odd number, the odd one out plays</span>
+              <div class="segmented" id="host-odd">
+                <button type="button" data-value="screen">You <small>on this screen</small></button>
+                <button type="button" data-value="device">You <small>on another device</small></button>
+                <button type="button" data-value="cpu">The CPU <small>by itself</small></button>
+              </div>
+            </div>
+            <p class="setting-help" id="host-pairs-help"></p>
+            <ol class="host-pair-list" id="host-pair-list"></ol>
+            <div class="host-teacher-device" id="host-teacher-device" hidden>
+              <canvas id="host-teacher-qr" class="host-qr small" aria-label="QR code for your other device"></canvas>
+              <div>
+                <p class="host-step">Open this on your other device to play:</p>
+                <p class="host-teacher-url" id="host-teacher-url"></p>
+                <button type="button" class="btn btn-small" id="host-copy-teacher"><svg class="icon" aria-hidden="true"><use href="#i-copy"></use></svg> Copy link</button>
+                <p class="host-teacher-status" id="host-teacher-status"></p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="host-play" class="host-panel" hidden>
+          <p class="host-kicker" id="host-round"></p>
+          <button type="button" class="btn btn-primary host-mygame" id="host-mygame-btn" hidden></button>
+          <div class="host-tournament" id="host-tournament" hidden></div>
+          <ol class="host-matches" id="host-matches" hidden></ol>
+          <div class="dice host-dice" id="host-dice">
+            <div class="die" id="host-die-a"></div>
+            <div class="die" id="host-die-b"></div>
+          </div>
+          <p class="host-roll-text" id="host-roll-text"></p>
+          <div class="host-progress" id="host-progress">
+            <div class="progress-bar"><span id="host-done-fill"></span></div>
+            <span id="host-done-text"></span>
+          </div>
+          <div class="host-actions">
+            <button type="button" class="btn btn-primary" id="host-next-btn"><svg class="icon" aria-hidden="true"><use href="#i-dices"></use></svg> Next roll</button>
+            <button type="button" class="btn" id="host-end-btn"><svg class="icon" aria-hidden="true"><use href="#i-flag"></use></svg> End game</button>
+          </div>
+          <label class="host-auto" id="host-auto-label"><input type="checkbox" id="host-auto" checked /> Roll again by itself when everyone’s done</label>
+          <div class="host-boards" id="host-boards" hidden></div>
+        </div>
+        <div id="host-ended" class="host-panel" hidden>
+          <p class="host-kicker">Class results</p>
+          <ol class="podium" id="host-podium"></ol>
+          <ol class="host-matches ended" id="host-match-results" hidden></ol>
+          <div class="host-tournament" id="host-tournament-final" hidden></div>
+          <div class="tiles" id="host-report"></div>
+          <h3 class="stats-heading">Facts the class found hardest</h3>
+          <ol class="host-hardest" id="host-hardest"></ol>
+          <div class="host-actions">
+            <button type="button" class="btn btn-primary" id="host-again-btn">New game, same class</button>
+            <button type="button" class="btn" id="host-close2-btn">Close class</button>
+          </div>
+        </div>
+      </section>
+      <aside class="host-side">
+        <h3 class="stats-heading" id="host-roster-title"></h3>
+        <ol class="host-roster" id="host-roster"></ol>
+      </aside>
+    </div>
+  </main>
+
+  <!-- Game screen -->
+  <main id="game-screen" class="screen" hidden>
+    <header class="game-header">
+      <button type="button" class="btn btn-small menu-btn" id="menu-btn" aria-label="Menu" title="Menu"><svg class="icon" aria-hidden="true"><use href="#i-menu"></use></svg></button>
+      <h1 class="logo small">BLOCK<span>OUT</span></h1>
+      <div class="header-right">
+        <div class="progress" id="progress">
+          <div class="progress-text" id="progress-text"></div>
+          <div class="progress-bar" id="progress-bar" role="progressbar" aria-label="Board filled"></div>
+        </div>
+        <button type="button" class="btn btn-small icon-btn" id="game-settings-btn" aria-label="Settings" title="Settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg></button>
+      </div>
+    </header>
+
+    <div class="game-layout">
+      <section class="board-wrap" id="board-wrap">
+        <canvas id="board" aria-label="Game board"></canvas>
+      </section>
+
+      <aside class="side">
+        <div class="turn-panel" id="turn-panel">
+          <div class="turn-label" id="turn-label"></div>
+          <div class="dice" id="dice">
+            <div class="die" id="die-a"></div>
+            <div class="die" id="die-b"></div>
+          </div>
+          <div class="turn-msg" id="turn-msg" aria-live="polite"></div>
+
+          <!-- Human: work out the points -->
+          <div class="math" id="math" hidden>
+            <div class="timer" id="timer" hidden>
+              <div class="timer-bar"><span id="timer-fill"></span></div>
+              <span class="timer-num" id="timer-num" aria-live="off"></span>
+            </div>
+            <div class="math-q">
+              <span id="math-q"></span> = <span class="answer-box" id="answer-box" aria-live="polite"></span>
+            </div>
+            <div class="count-trail" id="count-trail" aria-live="polite"></div>
+            <div class="streak-badge" id="streak-badge"></div>
+            <div class="math-feedback" id="math-feedback" aria-live="polite"></div>
+            <div class="keypad" id="keypad">
+              <button type="button" data-key="1">1</button>
+              <button type="button" data-key="2">2</button>
+              <button type="button" data-key="3">3</button>
+              <button type="button" data-key="4">4</button>
+              <button type="button" data-key="5">5</button>
+              <button type="button" data-key="6">6</button>
+              <button type="button" data-key="7">7</button>
+              <button type="button" data-key="8">8</button>
+              <button type="button" data-key="9">9</button>
+              <button type="button" data-key="back" class="back" aria-label="Delete"><svg class="icon" aria-hidden="true"><use href="#i-delete"></use></svg></button>
+              <button type="button" data-key="0">0</button>
+              <button type="button" data-key="check" class="check" aria-label="Check answer"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg></button>
+            </div>
+            <button type="button" class="btn btn-small" id="help-btn"><svg class="icon" aria-hidden="true"><use href="#i-list-ordered"></use></svg> Help me count</button>
+          </div>
+
+          <!-- Computer: show its working step by step -->
+          <ol class="steps" id="steps" hidden></ol>
+
+          <div class="turn-actions">
+            <button type="button" class="btn btn-primary" id="roll-btn"><svg class="icon" aria-hidden="true"><use href="#i-dices"></use></svg> Roll dice</button>
+            <button type="button" class="btn btn-primary" id="continue-btn" hidden>My turn <svg class="icon" aria-hidden="true"><use href="#i-chevron-right"></use></svg></button>
+          </div>
+        </div>
+
+        <div class="scores" id="scores"></div>
+
+        <div class="classmates" id="classmates" hidden></div>
+      </aside>
+    </div>
+  </main>
+
+  <!-- Practice mode -->
+  <main id="practice-screen" class="screen" hidden>
+    <header class="game-header">
+      <button type="button" class="btn btn-small menu-btn" id="practice-menu-btn" aria-label="Menu" title="Menu"><svg class="icon" aria-hidden="true"><use href="#i-menu"></use></svg></button>
+      <h1 class="logo small">Practice</h1>
+      <div class="header-right">
+        <button type="button" class="btn btn-small icon-btn" id="practice-settings-btn" aria-label="Settings" title="Settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg></button>
+      </div>
+    </header>
+
+    <section class="practice-card">
+      <div class="practice-top">
+        <span id="pr-counter"></span>
+        <span id="pr-streak"></span>
+      </div>
+      <div class="practice-bar"><span id="pr-bar"></span></div>
+      <div class="pr-array" id="pr-array" aria-hidden="true"></div>
+      <div class="math">
+        <div class="timer" id="pr-timer" hidden>
+          <div class="timer-bar"><span id="pr-timer-fill"></span></div>
+          <span class="timer-num" id="pr-timer-num" aria-live="off"></span>
+        </div>
+        <div class="math-q">
+          <span id="pr-q"></span> = <span class="answer-box" id="pr-answer" aria-live="polite"></span>
+        </div>
+        <div class="count-trail" id="pr-trail" aria-live="polite"></div>
+        <div class="math-feedback" id="pr-feedback" aria-live="polite"></div>
+        <div class="keypad" id="pr-keypad">
+              <button type="button" data-key="1">1</button>
+              <button type="button" data-key="2">2</button>
+              <button type="button" data-key="3">3</button>
+              <button type="button" data-key="4">4</button>
+              <button type="button" data-key="5">5</button>
+              <button type="button" data-key="6">6</button>
+              <button type="button" data-key="7">7</button>
+              <button type="button" data-key="8">8</button>
+              <button type="button" data-key="9">9</button>
+              <button type="button" data-key="back" class="back" aria-label="Delete"><svg class="icon" aria-hidden="true"><use href="#i-delete"></use></svg></button>
+              <button type="button" data-key="0">0</button>
+              <button type="button" data-key="check" class="check" aria-label="Check answer"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg></button>
+            </div>
+        <button type="button" class="btn btn-small" id="pr-help"><svg class="icon" aria-hidden="true"><use href="#i-list-ordered"></use></svg> Help me count</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Practice round finished -->
+  <div class="overlay" id="practice-done" hidden>
+    <div class="dialog results-dialog" role="dialog" aria-modal="true" aria-labelledby="pd-title">
+      <h2 id="pd-title">Practice done! 🎯</h2>
+      <p class="result-sub" id="pd-sub"></p>
+      <p class="journey-result" id="pd-journey" hidden></p>
+      <div id="pd-body" class="stats" hidden></div>
+      <div class="dialog-actions results-actions">
+        <button type="button" class="btn btn-primary" id="pd-again">Practice again</button>
+        <button type="button" class="btn" id="pd-menu">Main menu</button>
+        <button type="button" class="btn details-btn" id="pd-details-btn" aria-controls="pd-body" aria-expanded="false"><svg class="icon" aria-hidden="true"><use href="#i-chart-column"></use></svg> Show details</button>
+        <div class="nudges">
+          <button type="button" class="btn nudge" id="pd-shop-btn" hidden></button>
+          <button type="button" class="btn nudge" id="pd-wardrobe-btn" hidden></button>
+          <button type="button" class="btn nudge" id="pd-stickers-btn" hidden></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- How to play -->
+  <div class="overlay" id="howto" hidden>
+    <div class="dialog howto-dialog" role="dialog" aria-modal="true" aria-labelledby="howto-title">
+      <h2 id="howto-title">How to play</h2>
+        <ul>
+          <li>On your turn, roll two dice. Draw a rectangle with those side lengths — a 3 and a 6 makes a 3×6 (or 6×3) rectangle.</li>
+          <li>Rectangles can't overlap anything already on the board.</li>
+          <li>The dice only roll rectangles that fit, so there's always somewhere to put yours. (In a whole-class game the teacher's roll is the same for everyone: if it doesn't fit on your board, you pass.) When the board is full, or nobody can place anything, the game is over.</li>
+          <li>After you draw your rectangle, work out how many squares it has (like 3 × 4 = 12). Get it right to score those points!</li>
+          <li>You score one point per square. Most squares wins!</li>
+          <li>Watch the CPU — it shows how it counts its squares step by step.</li>
+          <li>Practice mode drills the times-table facts you find hardest, based on how you've answered before.</li>
+        </ul>
+        <p class="keys">Keys: <kbd>Space</kbd> roll · type your answer + <kbd>Enter</kbd> (<kbd>Esc</kbd> clears it)</p>
+        <p class="keys">Drawing: press on a square and drag to the opposite corner. You can change this in Settings.</p>
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-primary" id="howto-done">Got it</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings -->
+  <div class="overlay" id="settings" hidden>
+    <div class="dialog settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <h2 id="settings-title">Settings</h2>
+      <p class="settings-note" id="settings-note" hidden></p>
+
+      <div class="setting">
+        <div class="setting-label">Theme</div>
+        <div class="segmented" data-setting="theme">
+          <button type="button" data-value="auto"><svg class="icon" aria-hidden="true"><use href="#i-sun-moon"></use></svg> Auto</button>
+          <button type="button" data-value="light"><svg class="icon" aria-hidden="true"><use href="#i-sun"></use></svg> Light</button>
+          <button type="button" data-value="dark"><svg class="icon" aria-hidden="true"><use href="#i-moon"></use></svg> Dark</button>
+        </div>
+        <p class="setting-help">"Auto" follows your device's light or dark mode.</p>
+      </div>
+
+      <div class="setting">
+        <div class="setting-label">Rolling</div>
+        <div class="segmented" data-setting="autoRoll">
+          <button type="button" data-value="manual"><svg class="icon" aria-hidden="true"><use href="#i-mouse-pointer-click"></use></svg> Press to roll</button>
+          <button type="button" data-value="auto"><svg class="icon" aria-hidden="true"><use href="#i-zap"></use></svg> Auto roll</button>
+        </div>
+        <p class="setting-help">"Auto roll": your dice roll by themselves at the start of each turn.</p>
+      </div>
+
+      <div class="setting">
+        <div class="setting-label">Placing rectangles</div>
+        <div class="segmented" data-setting="placeMode">
+          <button type="button" data-value="draw"><svg class="icon" aria-hidden="true"><use href="#i-pencil"></use></svg> Draw it</button>
+          <button type="button" data-value="auto"><svg class="icon" aria-hidden="true"><use href="#i-bot"></use></svg> Auto</button>
+        </div>
+        <p class="setting-help">"Draw it": press and drag to draw a rectangle of the right size. "Auto": the game places it for you, so you only do the math.</p>
+      </div>
+
+      <div class="setting">
+        <div class="setting-label">CPU explanations</div>
+        <div class="segmented" data-setting="cpuSpeed">
+          <button type="button" data-value="slow"><svg class="icon" aria-hidden="true"><use href="#i-turtle"></use></svg> Slow</button>
+          <button type="button" data-value="normal">Normal</button>
+          <button type="button" data-value="fast"><svg class="icon" aria-hidden="true"><use href="#i-rabbit"></use></svg> Fast</button>
+        </div>
+        <p class="setting-help">How long each step of a CPU turn takes — every message, every square it draws and every number it counts. Slow: 2 seconds · Normal: 1 second · Fast: ½ second.</p>
+      </div>
+
+      <div class="setting">
+        <div class="setting-label">CPU turns</div>
+        <div class="segmented" data-setting="cpuSteps">
+          <button type="button" data-value="show"><svg class="icon" aria-hidden="true"><use href="#i-eye"></use></svg> Show steps</button>
+          <button type="button" data-value="instant"><svg class="icon" aria-hidden="true"><use href="#i-zap"></use></svg> Instant</button>
+        </div>
+        <p class="setting-help">"Instant": the CPU plays its turn straight away without explaining, and it's your go again.</p>
+      </div>
+
+      <div class="setting">
+        <div class="setting-label">After a CPU turn</div>
+        <div class="segmented" data-setting="cpuEnd">
+          <button type="button" data-value="auto"><svg class="icon" aria-hidden="true"><use href="#i-fast-forward"></use></svg> Continue automatically</button>
+          <button type="button" data-value="button"><svg class="icon" aria-hidden="true"><use href="#i-pointer"></use></svg> Press a button</button>
+        </div>
+        <p class="setting-help">"Press a button" keeps the CPU's explanation on screen until you press the button to go on.</p>
+      </div>
+
+      <div class="setting">
+        <div class="setting-label">Answer timer (Home multiplayer)</div>
+        <div class="segmented" data-setting="answerTime">
+          <button type="button" data-value="0">Off</button>
+          <button type="button" data-value="30">30 s</button>
+          <button type="button" data-value="10">10 s</button>
+          <button type="button" data-value="5">5 s</button>
+        </div>
+        <p class="setting-help">Time to answer the multiplication in Home multiplayer games. Run out and you lose your turn: the rectangle comes off the board and scores nothing. The clock pauses during "Help me count". (Single player has its own timers under Expert.)</p>
+      </div>
+
+      <div class="setting">
+        <div class="setting-label">Times-table grid (in Stats)</div>
+        <p class="setting-help">Each cell can show its icon or your best time for that fact. Cells with no right answer yet keep the icon.</p>
+        <div class="setting-sub">Mastered cells</div>
+        <div class="segmented" data-setting="timesMastered">
+          <button type="button" data-value="icon"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg> Icon</button>
+          <button type="button" data-value="time"><svg class="icon" aria-hidden="true"><use href="#i-timer"></use></svg> Best time</button>
+        </div>
+        <div class="setting-sub">Learning cells</div>
+        <div class="segmented" data-setting="timesLearning">
+          <button type="button" data-value="icon"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg> Icon</button>
+          <button type="button" data-value="time"><svg class="icon" aria-hidden="true"><use href="#i-timer"></use></svg> Best time</button>
+        </div>
+        <div class="setting-sub">Needs practice cells</div>
+        <div class="segmented" data-setting="timesPractice">
+          <button type="button" data-value="icon"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg> Icon</button>
+          <button type="button" data-value="time"><svg class="icon" aria-hidden="true"><use href="#i-timer"></use></svg> Best time</button>
+        </div>
+      </div>
+
+      <div class="setting">
+        <div class="setting-label">Board progress</div>
+        <div class="segmented" data-setting="showProgress">
+          <button type="button" data-value="false">Hide</button>
+          <button type="button" data-value="true">Show</button>
+        </div>
+        <p class="setting-help">Shows "Board: 24 of 144 filled" with a colored bar at the top of the game.</p>
+      </div>
+
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-primary" id="settings-done">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shop -->
+  <div class="overlay" id="shop" hidden>
+    <div class="dialog shop-dialog" role="dialog" aria-modal="true" aria-labelledby="shop-title">
+      <h2 id="shop-title">Shop</h2>
+      <p class="stats-summary">Earn points by playing, answering quickly, streaks, achievements and daily check-ins.</p>
+      <div id="shop-body"></div>
+      <div class="wallet-bar">
+        <div class="wallet-line" aria-live="polite">🪙 <strong id="shop-wallet">0</strong><span class="wallet-after" id="shop-wallet-after"></span></div>
+        <div class="segmented view-toggle" id="shop-view" aria-label="Show">
+          <button type="button" data-view="all" class="selected">All</button>
+          <button type="button" data-view="available">Available</button>
+        </div>
+        <button type="button" class="btn btn-primary" id="shop-done">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Achievements -->
+  <div class="overlay" id="achievements" hidden>
+    <div class="dialog achievements-dialog" role="dialog" aria-modal="true" aria-labelledby="achievements-title">
+      <h2 id="achievements-title">Achievements</h2>
+      <div id="achievements-body"></div>
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-primary" id="achievements-done">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Invite: make one, or open a code -->
+  <div class="overlay" id="invite-make" hidden>
+    <div class="dialog invite-dialog" role="dialog" aria-modal="true" aria-labelledby="invite-make-title">
+      <h2 id="invite-make-title">Invite</h2>
+
+      <div class="field">
+        <span>Got a code or link?</span>
+        <div class="invite-row">
+          <input type="text" id="invite-code-input" placeholder="Paste it here" autocomplete="off" />
+          <button type="button" class="btn btn-small" id="invite-code-open">Open</button>
+        </div>
+        <p class="invite-error" id="invite-code-error" hidden>That code doesn't look right. Check it and try again.</p>
+      </div>
+
+      <h3 class="stats-heading">Make an invite</h3>
+      <p class="setting-help">Set up a game for a child. The link starts a game with exactly these settings, and nothing needs unlocking in the shop.</p>
+      <div class="field">
+        <span>Players</span>
+        <p class="invite-players" id="invite-players"></p>
+        <p class="setting-help">To change who plays, pick them on the main menu first.</p>
+      </div>
+      <label class="field">
+        <span>Note for the player (optional)</span>
+        <textarea id="invite-note" maxlength="140" rows="2" placeholder="e.g. Practice your 7s and try to beat the CPU!"></textarea>
+      </label>
+      <div class="invite-grid">
+        <label class="field"><span>Board</span><select id="invite-board"><option value="6">6×6</option><option value="8">8×8</option><option value="10">10×10</option><option value="12" selected>12×12</option><option value="16">16×16</option><option value="20">20×20</option><option value="24">24×24</option><option value="custom">Custom…</option></select></label>
+        <label class="field" id="invite-custom-field" hidden><span>Board size (6–30)</span><input type="number" id="invite-custom" min="6" max="30" value="14" inputmode="numeric" /></label>
+        <label class="field"><span>Difficulty</span><select id="invite-difficulty"><option value="easy">Easy (6-sided)</option><option value="medium">Medium (8-sided)</option><option value="hard">Hard (12-sided)</option><option value="tricky">Tricky (no easy facts)</option><option value="master">Master (weak facts)</option><option value="legend">Legend (teens × 2–9)</option></select></label>
+        <label class="field"><span>Placing</span><select id="invite-placeMode"><option value="draw">Draw it</option><option value="auto">Auto</option></select></label>
+        <label class="field"><span>Answer timer</span><select id="invite-answerTime"><option value="0">Off</option><option value="30">30 s</option><option value="10">10 s</option><option value="5">5 s</option></select></label>
+        <label class="field"><span>Rolling</span><select id="invite-autoRoll"><option value="manual">Press to roll</option><option value="auto">Auto roll</option></select></label>
+        <label class="field"><span>CPU turns</span><select id="invite-cpuSteps"><option value="show">Show steps</option><option value="instant">Instant</option></select></label>
+      </div>
+      <label class="check-row"><input type="checkbox" id="invite-seed" checked /> Same dice rolls for everyone who uses this invite</label>
+      <button type="button" class="btn btn-primary" id="invite-create">Create invite</button>
+
+      <div class="invite-result" id="invite-result" hidden>
+        <div class="field">
+          <span>Link</span>
+          <div class="invite-row">
+            <input type="text" id="invite-link" readonly />
+            <button type="button" class="btn btn-small" data-copy="invite-link">Copy</button>
+          </div>
+        </div>
+        <div class="field">
+          <span>Code</span>
+          <div class="invite-row">
+            <input type="text" id="invite-code" readonly />
+            <button type="button" class="btn btn-small" data-copy="invite-code">Copy</button>
+          </div>
+        </div>
+        <p class="setting-help" id="invite-local-warning" hidden>⚠️ The game is open from a file on this computer, so the link (and its QR code) only works here. To share it, host the game (for example through the Cloudflare tunnel) and make the invite from there. The code works anywhere.</p>
+        <div class="invite-qr" id="invite-qr-wrap">
+          <canvas id="invite-qr" role="img" aria-label="QR code for the invite link"></canvas>
+          <div class="invite-qr-actions">
+            <p class="setting-help">Scan with a phone or tablet camera to open the game.</p>
+            <button type="button" class="btn btn-small" id="invite-qr-save"><svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg> Save QR image</button>
+            <button type="button" class="btn btn-small" id="invite-qr-print"><svg class="icon" aria-hidden="true"><use href="#i-printer"></use></svg> Print</button>
+          </div>
+        </div>
+        <button type="button" class="btn btn-small" id="invite-try"><svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg> Try it</button>
+      </div>
+
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-primary" id="invite-done">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Invite: a child opened one -->
+  <div class="overlay" id="invite-open" hidden>
+    <div class="dialog invite-dialog" role="dialog" aria-modal="true" aria-labelledby="invite-open-title">
+      <h2 id="invite-open-title"><svg class="icon" aria-hidden="true"><use href="#i-mail"></use></svg> You've got a game!</h2>
+      <p class="invite-note" id="invite-open-note" hidden></p>
+      <ul class="invite-summary" id="invite-open-summary"></ul>
+      <label class="field" id="invite-open-name-field">
+        <span>Your name</span>
+        <input type="text" id="invite-open-name" maxlength="14" />
+      </label>
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-primary" id="invite-start">Start game</button>
+        <button type="button" class="btn" id="invite-cancel">Not now</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Wardrobe: choose owned cosmetics, locked ones open the shop -->
+  <div class="overlay" id="wardrobe" hidden>
+    <div class="dialog wardrobe-dialog" role="dialog" aria-modal="true" aria-labelledby="wardrobe-title">
+      <h2 id="wardrobe-title">Wardrobe</h2>
+      <p class="stats-summary">Make Blockout yours. Tap a locked look to unlock it with your points.</p>
+      <div id="wardrobe-body"></div>
+      <div class="wallet-bar">
+        <div class="wallet-line" aria-live="polite">🪙 <strong id="wardrobe-wallet">0</strong><span class="wallet-after" id="wardrobe-wallet-after"></span></div>
+        <div class="segmented view-toggle" id="wardrobe-view" aria-label="Show">
+          <button type="button" data-view="all" class="selected">All</button>
+          <button type="button" data-view="available">Available</button>
+        </div>
+        <button type="button" class="btn btn-primary" id="wardrobe-done">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sticker album -->
+  <div class="overlay" id="stickers" hidden>
+    <div class="dialog stickers-dialog" role="dialog" aria-modal="true" aria-labelledby="stickers-title">
+      <h2 id="stickers-title">Sticker album</h2>
+      <p class="stats-summary">Every achievement drops a random sticker. Swap your spares for points!</p>
+      <div id="stickers-body"></div>
+      <div class="dialog-actions">
+        <button type="button" class="btn" id="stickers-trade"></button>
+        <button type="button" class="btn btn-primary" id="stickers-done">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick unlock: "Unlock X for 🪙 N?" -->
+  <div class="overlay" id="unlock" hidden>
+    <div class="dialog unlock-dialog" role="alertdialog" aria-modal="true" aria-labelledby="unlock-title" aria-describedby="unlock-message">
+      <h2 id="unlock-title"></h2>
+      <p class="unlock-price" id="unlock-price"></p>
+      <p class="setting-help" id="unlock-message"></p>
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-primary" id="unlock-yes"></button>
+        <button type="button" class="btn" id="unlock-no">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <!-- All-time stats -->
+  <div class="overlay" id="history" hidden>
+    <div class="dialog history-dialog" role="dialog" aria-modal="true" aria-labelledby="history-title">
+      <h2 id="history-title">Stats</h2>
+      <div id="history-body"></div>
+      <div class="dialog-actions">
+        <button type="button" class="btn" id="reset-history">Reset stats</button>
+        <button type="button" class="btn btn-primary" id="history-done">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game over -->
+  <!-- Classroom: join a class (students) -->
+  <div class="overlay" id="class-join" hidden>
+    <div class="dialog class-dialog" role="dialog" aria-modal="true" aria-labelledby="class-join-title">
+      <h2 id="class-join-title">Join a class</h2>
+      <form id="class-join-form" autocomplete="off">
+        <label class="field">
+          <span>Class code</span>
+          <input type="text" id="class-code-input" class="code-input" maxlength="4" autocapitalize="characters" spellcheck="false" placeholder="ABCD" />
+        </label>
+        <label class="field">
+          <span>Your first name</span>
+          <input type="text" id="class-name-input" maxlength="14" spellcheck="false" />
+        </label>
+        <p class="invite-error" id="class-join-error" role="alert" hidden></p>
+        <div class="dialog-actions">
+          <button type="button" class="btn" id="class-join-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="class-join-btn">Join</button>
+        </div>
+      </form>
+      <div id="class-wait" hidden>
+        <p class="class-wait-big">You’re in, <strong id="class-wait-name"></strong>! 🎉</p>
+        <p class="class-wait-text" id="class-wait-text">Waiting for your teacher to start the game…</p>
+        <div class="dialog-actions">
+          <button type="button" class="btn" id="class-leave-btn">Leave class</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Classroom: the teacher sets up a class -->
+  <div class="overlay" id="class-host-setup" hidden>
+    <div class="dialog class-dialog" role="dialog" aria-modal="true" aria-labelledby="class-host-title">
+      <h2 id="class-host-title">Host a class</h2>
+      <p class="setting-help">Put your screen on the projector: it shows the join code, the dice and the scores.</p>
+      <div class="field" id="host-type-field">
+        <span>Game type</span>
+        <div class="segmented" id="host-type" role="radiogroup" aria-label="Game type">
+          <button type="button" data-value="class" class="selected" role="radio" aria-checked="true"><svg class="icon" aria-hidden="true"><use href="#i-school"></use></svg> Whole class <small>One leaderboard</small></button>
+          <button type="button" data-value="pairs" role="radio" aria-checked="false"><svg class="icon" aria-hidden="true"><use href="#i-users"></use></svg> Pairs <small>Head to head in twos</small></button>
+          <button type="button" data-value="tournament" role="radio" aria-checked="false"><svg class="icon" aria-hidden="true"><use href="#i-trophy"></use></svg> Tournament <small>Brackets and champions</small></button>
+        </div>
+        <p class="setting-help" id="host-type-help"></p>
+      </div>
+      <div class="field">
+        <span>Board size</span>
+        <div class="segmented" id="host-size">
+          <button type="button" data-value="6">6×6</button>
+          <button type="button" data-value="8">8×8</button>
+          <button type="button" data-value="10">10×10</button>
+          <button type="button" data-value="12" class="selected">12×12</button>
+          <button type="button" data-value="16">16×16</button>
+          <button type="button" data-value="20">20×20</button>
+          <button type="button" data-value="24">24×24</button>
+        </div>
+      </div>
+      <div class="field">
+        <span>Difficulty</span>
+        <div class="segmented" id="host-difficulty">
+          <button type="button" data-value="easy" class="selected">Easy <small>6-sided dice</small></button>
+          <button type="button" data-value="medium">Medium <small>8-sided dice</small></button>
+          <button type="button" data-value="hard">Hard <small>12-sided dice</small></button>
+        </div>
+      </div>
+      <div class="field">
+        <span>Rolls in a game</span>
+        <div class="segmented" id="host-rounds">
+          <button type="button" data-value="10">10</button>
+          <button type="button" data-value="15" class="selected">15</button>
+          <button type="button" data-value="20">20</button>
+        </div>
+      </div>
+      <p class="invite-error" id="host-error" role="alert" hidden></p>
+      <div class="dialog-actions">
+        <button type="button" class="btn" id="host-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="host-create">Create class</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cheat codes: press ~ -->
+  <div class="overlay" id="cheats" hidden>
+    <div class="dialog cheats-dialog" role="dialog" aria-modal="true" aria-labelledby="cheats-title">
+      <h2 id="cheats-title">🕹️ Cheat codes</h2>
+      <form id="cheats-form" autocomplete="off">
+        <input type="password" id="cheats-input" class="cheats-input" spellcheck="false" autocapitalize="off" placeholder="Type a code" aria-label="Cheat code" />
+        <p class="cheats-msg" id="cheats-msg" aria-live="polite"></p>
+        <div class="cheats-active" id="cheats-active" hidden></div>
+        <div class="dialog-actions">
+          <button type="button" class="btn" id="cheats-close">Close</button>
+          <button type="submit" class="btn btn-primary">Enter</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="overlay" id="game-over" hidden>
+    <div class="dialog results-dialog" role="dialog" aria-modal="true" aria-labelledby="result-title">
+      <h2 id="result-title"></h2>
+      <p id="result-sub" class="result-sub"></p>
+      <ol id="result-list" class="result-list"></ol>
+      <p class="result-tournament" id="result-tournament" hidden></p>
+      <div id="rewards" class="rewards"></div>
+      <div id="stats" class="stats" hidden></div>
+      <div class="dialog-actions results-actions">
+        <button type="button" class="btn btn-primary" id="again-btn">Play again</button>
+        <button type="button" class="btn" id="to-menu-btn">Main menu</button>
+        <button type="button" class="btn details-btn" id="details-btn" aria-controls="stats" aria-expanded="false"><svg class="icon" aria-hidden="true"><use href="#i-chart-column"></use></svg> Show details</button>
+        <div class="nudges">
+          <button type="button" class="btn nudge" id="results-shop-btn" hidden></button>
+          <button type="button" class="btn nudge" id="results-wardrobe-btn" hidden></button>
+          <button type="button" class="btn nudge" id="results-stickers-btn" hidden></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

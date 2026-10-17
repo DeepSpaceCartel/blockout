@@ -1,0 +1,89 @@
+/* ---------- Players: title under the name; streak counter ---------- */
+.player-title { display: block; font-size: 0.72rem; font-weight: 800; color: var(--gold-ink); }
+.streak-badge { min-height: 0; font-weight: 900; color: var(--muted); }
+.streak-badge:empty { display: none; }
+.flames { display: inline-block; color: #e25822; animation: flicker 0.6s ease-in-out infinite alternate; transform-origin: center bottom; }
+.flames[data-level="1"] { font-size: 1.1em; }
+.flames[data-level="2"] { font-size: 1.35em; text-shadow: 0 0 8px rgba(255, 140, 0, 0.6); }
+.flames[data-level="3"] { font-size: 1.6em; text-shadow: 0 0 14px rgba(255, 90, 0, 0.8); }
+@keyframes flicker {
+  from { transform: scale(1) rotate(-1deg); }
+  to { transform: scale(1.06) rotate(1deg); }
+}
+
+/* Mastery badge on a times-table line */
+.fact-head.line-mastered { color: var(--star); font-size: 0.72rem; }
+
+/* iPhone-style notification badge on main-menu buttons */
+.badge {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 11px;
+  background: #ff3b30;
+  color: #fff;
+  border: 2px solid var(--paper);
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+  animation: pop 0.25s ease-out;
+  pointer-events: none;
+}
+
+/* Locked steps further down a skill tree: a blurred placeholder with just a lock */
+.skeleton { position: relative; color: transparent !important; text-shadow: none !important; overflow: hidden; }
+.skeleton > :not(.lock-badge) { visibility: hidden; }
+.skeleton::before {
+  content: '';
+  position: absolute;
+  inset: 22% 18%;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--soft-2), var(--line), var(--soft-2));
+  background-size: 200% 100%;
+  filter: blur(2px);
+  animation: skeleton-shine 1.6s linear infinite;
+  opacity: 0.8;
+}
+.skeleton .lock-badge {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--muted);
+  visibility: visible;
+}
+.skeleton .lock-badge .icon { width: 1.1em; height: 1.1em; }
+@keyframes skeleton-shine {
+  to { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::before { animation: none; }
+}
+.shop-perk { display: block; font-size: 0.78rem; font-weight: 700; color: var(--gold-ink); margin-top: 2px; }
+.skeleton-row .shop-name { color: transparent; background: linear-gradient(90deg, var(--soft-2), var(--line), var(--soft-2)); border-radius: 6px; filter: blur(1.5px); user-select: none; }
+/* Wardrobe placeholders: all the same size, so a hidden look's name length doesn't show */
+.wardrobe-chip.skeleton { width: 84px; min-width: 84px; max-width: 84px; }
+.wardrobe-chip.skeleton > :not(.lock-badge) { display: none; }
+.wardrobe-chip.skeleton { min-height: 92px; }
+
+/* Every dialog's buttons sit in a bottom panel, like the Shop's: full width, a
+   line above, room around the buttons, and pinned to the bottom while the
+   dialog scrolls. */
+.dialog .dialog-actions {
+  position: sticky;
+  bottom: calc(-1 * var(--pad-y));
+  margin: 20px calc(-1 * var(--pad-x)) calc(-1 * var(--pad-y));
+  padding: 14px var(--pad-x) 16px;
+  background: var(--paper);
+  border-top: 2px solid var(--line);
+  border-radius: 0 0 var(--radius) var(--radius);
+  z-index: 1;
+}

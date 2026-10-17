@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin · Blockout</title>
+</head>
+<body>
+  <main class="admin">
+    <header class="admin-head">
+      <a class="back-link" href="/">← Blockout</a>
+      <h1 class="logo">BLOCK<span>OUT</span> <small>Admin</small></h1>
+      <p id="admin-who" class="admin-who"></p>
+    </header>
+    <p id="admin-gate" class="admin-note" hidden></p>
+    <div id="admin-app" hidden>
+      <nav class="admin-tabs" role="tablist">
+        <button type="button" class="btn btn-small btn-primary" data-tab="accounts" role="tab">Accounts</button>
+        <button type="button" class="btn btn-small" data-tab="codes" role="tab">Teacher codes</button>
+        <button type="button" class="btn btn-small" data-tab="schools" role="tab">Schools</button>
+      </nav>
+
+      <section id="tab-accounts" class="admin-panel">
+        <form id="user-search" class="admin-row">
+          <input id="user-q" type="search" aria-label="First name" placeholder="First name" maxlength="40" autocomplete="off" />
+          <select id="user-role" aria-label="Role">
+            <option value="">Everyone</option>
+            <option value="student">Students</option>
+            <option value="teacher">Teachers</option>
+            <option value="parent">Parents</option>
+          </select>
+          <button type="submit" class="btn btn-small btn-primary">Find</button>
+        </form>
+        <p class="admin-help">Blockout keeps only a first name, a last initial and an email domain for each account, so look people up by first name and school. Newest sign-ins first.</p>
+        <div class="admin-table-wrap"><table class="admin-table" id="user-table"></table></div>
+        <div class="admin-row" id="user-pages"></div>
+      </section>
+
+      <section id="tab-codes" class="admin-panel" hidden>
+        <p class="admin-help">A teacher code makes one account a teacher: the person signs in on Blockout, then types the code (or opens its link). Each works once, for 7 days.</p>
+        <form id="code-form" class="admin-row">
+          <select id="code-school" aria-label="School"></select>
+          <button type="submit" class="btn btn-small btn-primary">Make a teacher code</button>
+        </form>
+        <div id="code-made"></div>
+        <div class="admin-table-wrap"><table class="admin-table" id="code-table"></table></div>
+      </section>
+
+      <section id="tab-schools" class="admin-panel" hidden>
+        <p class="admin-help">A school is matched by its students' email domain: only accounts from that domain can join its classes.</p>
+        <div class="admin-table-wrap"><table class="admin-table" id="school-table"></table></div>
+        <form id="school-form" class="admin-row">
+          <input id="school-name" type="text" aria-label="School name" placeholder="School name" maxlength="60" />
+          <input id="school-domain" type="text" aria-label="Email domain" placeholder="email domain, like iusd.org" maxlength="80" />
+          <button type="submit" class="btn btn-small btn-primary">Add school</button>
+        </form>
+      </section>
+      <p id="admin-error" class="admin-error" hidden></p>
+    </div>
+  </main>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

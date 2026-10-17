@@ -1,0 +1,17 @@
+{
+  "name": "@blockout/admin",
+  "version": "0.11.0",
+  "private": true,
+  "type": "module",
+  "description": "Blockout admin page (/admin/): accounts and roles, teacher codes, schools. For accounts with the Keycloak realm role admin.",
+  "dependencies": {
+    "@blockout/auth": "*",
+    "@blockout/progress": "*",
+    "@blockout/ui": "*"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint src"
+  }
+}

@@ -1,0 +1,50 @@
+{{- if .Values.valkey.enabled }}
+{{- $name := printf "%s-valkey" .Release.Name }}
+{{- $sel := include "blockout.part.selectorLabels" (list $ "valkey") }}
+# Valkey for live classes: no volume (a restart only ends the classes running then)
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels: {{- include "blockout.part.labels" (list $ "valkey") | nindent 4 }}
+spec:
+  selector: {{- $sel | nindent 4 }}
+  ports: [{ name: redis, port: 6379 }]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}
+  labels: {{- include "blockout.part.labels" (list $ "valkey") | nindent 4 }}
+spec:
+  serviceName: {{ $name }}
+  replicas: 1
+  selector:
+    matchLabels: {{- $sel | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- $sel | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsUser: 999
+        runAsGroup: 999
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: valkey
+          image: {{ .Values.valkey.image }}
+          # The password from the environment, not the command line (it would show in ps)
+          command: [sh, -c, 'exec valkey-server --save "" --appendonly no --maxmemory {{ .Values.valkey.maxmemory }} --maxmemory-policy noeviction --requirepass "$VALKEY_PASSWORD"']
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          env:
+            - name: VALKEY_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ .Release.Name }}-redis, key: password } }
+          ports: [{ name: redis, containerPort: 6379 }]
+          readinessProbe:
+            exec: { command: [sh, -c, 'REDISCLI_AUTH="$VALKEY_PASSWORD" valkey-cli ping | grep -q PONG'] }
+            periodSeconds: 5
+          resources: {{- toYaml .Values.valkey.resources | nindent 12 }}
+          volumeMounts: [{ name: tmp, mountPath: /data }]
+      volumes: [{ name: tmp, emptyDir: {} }]
+{{- end }}

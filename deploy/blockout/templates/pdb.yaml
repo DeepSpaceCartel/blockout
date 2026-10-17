@@ -1,0 +1,14 @@
+{{- if .Values.server.enabled }}
+{{- if .Values.podDisruptionBudget.enabled }}
+# Node maintenance takes servers one at a time, so classes always have one to move to
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "blockout.fullname" . }}
+  labels: {{- include "blockout.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels: {{- include "blockout.selectorLabels" . | nindent 6 }}
+{{- end }}
+{{- end }}

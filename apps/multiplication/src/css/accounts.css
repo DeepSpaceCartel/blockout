@@ -1,0 +1,103 @@
+/* ---------- Accounts: sign in, homework, classes, kids (js/accounts.js) ---------- */
+.top-row { display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.top-row .wallet { margin-bottom: 0; }
+.account-chip {
+  font: inherit;
+  font-weight: 800;
+  padding: 4px 12px;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-chip:hover { border-color: var(--accent); }
+.live-banner { margin: 10px 0 0; display: flex; flex-direction: column; gap: 6px; }
+.live-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; border: 2px solid var(--gold-line); background: var(--gold-bg); border-radius: 12px; font-weight: 800; text-align: left; }
+.acct-menu-btn { position: relative; }
+
+.acct-dialog { text-align: left; max-height: calc(100vh - 32px); overflow-y: auto; }
+.acct-dialog h2 { text-align: center; margin-bottom: 0.8rem; }
+.acct-dialog.wide-dialog { max-width: 860px; }
+.acct-dialog.account-dialog { max-width: 460px; }
+.acct-dialog :is(input[type="text"], input[type="email"], input[type="date"], input[type="datetime-local"], select) {
+  font: inherit;
+  padding: 0.5rem 0.65rem;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  min-width: 0;
+}
+.acct-dialog :is(input, select):focus { outline: none; border-color: var(--accent); }
+.acct-form { display: flex; flex-direction: column; gap: 12px; }
+.acct-names { display: grid; grid-template-columns: 1fr 110px; gap: 10px; }
+.acct-initial { text-transform: uppercase; }
+.acct-note { margin: 0 0 10px; padding: 8px 12px; border-radius: 10px; background: var(--gold-bg); border: 2px solid var(--gold-line); font-weight: 800; }
+.acct-privacy { margin: 0; }
+.acct-card { text-align: center; margin-bottom: 8px; }
+.acct-big { font-size: 1.4rem; font-weight: 900; }
+.acct-sub { color: var(--muted); font-weight: 700; }
+.acct-small { display: block; font-size: 0.8rem; color: var(--muted); font-weight: 700; }
+.acct-section { margin-top: 16px; }
+.acct-section h4, .acct-hw-form h4 { margin: 0 0 8px; }
+.acct-list { display: flex; flex-direction: column; gap: 8px; }
+.acct-item { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 12px; border: 2px solid var(--line); border-radius: 10px; background: var(--surface); }
+.acct-item strong { flex: 1 1 auto; }
+.acct-item.live { border-color: var(--gold-line); background: var(--gold-bg); }
+.acct-inline { display: flex; gap: 8px; margin-top: 8px; }
+.acct-inline input { flex: 1 1 auto; }
+.acct-code-input { text-transform: uppercase; letter-spacing: 0.08em; font-weight: 800; }
+.acct-code { font-size: 1.6rem; font-weight: 900; letter-spacing: 0.12em; font-family: ui-monospace, "Courier New", monospace; }
+.acct-mono { font-family: ui-monospace, "Courier New", monospace; font-weight: 700; }
+.acct-join { text-align: center; padding: 12px; border: 2px dashed var(--line); border-radius: 12px; margin: 12px 0; }
+.acct-join .btn { margin-top: 6px; }
+.acct-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.acct-mastery { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: var(--soft-2); min-width: 90px; }
+.acct-mastery .seg.is-mastered, .acct-count.is-mastered { background: var(--good); color: #fff; }
+.acct-mastery .seg.is-learning, .acct-count.is-learning { background: var(--learning); color: var(--learning-ink); }
+.acct-mastery .seg.is-practice, .acct-count.is-practice, .acct-chip.is-practice { background: var(--danger); color: #fff; }
+.acct-mastery .seg.is-unseen, .acct-count.is-unseen { background: var(--soft-2); color: var(--ink); }
+.acct-counts { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.acct-count, .acct-chip { padding: 2px 8px; border-radius: 999px; font-size: 0.8rem; font-weight: 800; }
+.acct-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.acct-hw { padding: 10px 12px; border: 2px solid var(--line); border-radius: 12px; background: var(--surface); display: flex; flex-direction: column; gap: 6px; }
+.acct-hw.done { border-color: var(--good); }
+.acct-hw.playable .acct-hw-meta .btn-primary { margin-left: auto; }
+.acct-hw.late { border-color: var(--danger); }
+.acct-hw-top, .acct-hw-meta { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.acct-hw-state { font-weight: 800; font-size: 0.85rem; color: var(--muted); }
+.acct-hw.late .acct-hw-state { color: var(--bad); }
+.acct-hw.done .acct-hw-state { color: var(--good-ink); }
+.acct-hw-meta { font-size: 0.8rem; color: var(--muted); font-weight: 700; }
+.acct-hw-form { margin-top: 12px; padding: 12px; border: 2px dashed var(--line); border-radius: 12px; }
+.acct-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 10px; }
+.acct-grid > .field:first-child { grid-column: span 2; }
+.acct-grid select, .acct-grid input { width: 100%; }
+.acct-table-wrap { overflow-x: auto; }
+.acct-roster td { vertical-align: middle; }
+.acct-roster td:first-child { white-space: nowrap; }
+.acct-link { font: inherit; font-weight: 800; background: none; border: 0; padding: 0; color: var(--accent-text); cursor: pointer; text-decoration: underline; }
+.acct-remove { font: inherit; margin-left: 8px; border: 0; background: none; color: var(--muted); cursor: pointer; font-weight: 900; }
+.acct-remove:hover { color: var(--bad); }
+.acct-activity { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--line); font-size: 0.9rem; }
+.acct-when { color: var(--muted); white-space: nowrap; }
+.acct-kids { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.acct-kid { font: inherit; text-align: left; display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 2px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); cursor: pointer; }
+.acct-kid:hover { border-color: var(--accent); }
+.acct-detail .fact-grid-wrap { max-width: 420px; margin: 8px auto; }
+@media (max-width: 560px) {
+  .acct-dialog { --pad-x: 14px; --pad-y: 18px; }
+  .acct-names { grid-template-columns: 1fr 80px; }
+}
+
+/* A one-time code to hand over: QR code beside the code itself */
+.acct-invite { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin: 10px 0; padding: 12px; border: 2px dashed var(--line); border-radius: var(--radius); background: var(--surface); }
+.acct-qr { width: 120px; height: 120px; image-rendering: pixelated; border-radius: 6px; }
+.acct-invite-text { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; }
+.acct-invite-text .setting-help { margin: 0; }
+.acct-check { display: flex; gap: 8px; align-items: center; font-size: 0.95rem; color: var(--muted); }

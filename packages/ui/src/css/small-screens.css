@@ -1,0 +1,15 @@
+/* ---------- Small screens ---------- */
+@media (max-width: 820px) {
+  .game-layout { grid-template-columns: 1fr; }
+  /* Header: ☰ logo ⚙️ on one row, the progress meter (if shown) on its own row below */
+  .header-right { display: contents; }
+  .header-right .icon-btn { grid-column: 3; grid-row: 1; justify-self: end; }
+  .game-header .progress { grid-column: 1 / -1; grid-row: 2; width: 100%; margin-top: 8px; }
+  .game-header .progress-text { text-align: left; }
+  .progress-text .long { display: none; }
+  .progress-text .short { display: inline; }
+  .board-wrap { padding: 6px; }
+  .side { display: grid; grid-template-columns: 1fr; }
+  .die { width: 48px; height: 48px; padding: 6px; }
+  .pip { width: 8px; height: 8px; }
+}

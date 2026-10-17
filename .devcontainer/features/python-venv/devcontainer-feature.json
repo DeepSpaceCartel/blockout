@@ -1,0 +1,6 @@
+{
+	"id": "python-venv",
+	"version": "1.0.0",
+	"name": "Python venv",
+	"description": "python3 with venv and pip, to build the docs site (MkDocs Material)."
+}

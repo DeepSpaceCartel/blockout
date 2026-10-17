@@ -1,0 +1,174 @@
+/* Theme colours. Light by default; dark follows the device unless the
+   player picks a theme (html[data-theme="light" | "dark"]). */
+:root {
+  --bg: #f6f1e7;
+  --paper: #fffdf8;
+  --surface: #ffffff;
+  --soft: #f3eee4;
+  --soft-2: #efeae0;
+  --ink: #2b2a33;
+  --muted: #6d6a75;
+  --line: #ddd5c6;
+  --edge: #2b2a33;
+  --edge-shadow: #2b2a33;
+  --invert-bg: #2b2a33;
+  --invert-ink: #ffffff;
+  --accent: #e4572e;
+  /* (WCAG AA: white text on --accent-button, and --accent-text on paper, are 4.5:1 or more) */
+  --accent-button: #c4421c;
+  --accent-text: #c4421c;
+  --accent-ink: #fff;
+  --accent-soft: #fff1ec;
+  --accent-ring: #ffd9cc;
+  --good: #2a9d5c;
+  --good-ink: #1d6e41;
+  --good-bg: #e6f6ec;
+  --good-line: #9fd6b3;
+  --bad: #b0342a;
+  --bad-bg: #fbe9e7;
+  --danger: #d64533;
+  --gold-line: #e0b93c;
+  --gold-bg: #fff6d6;
+  --gold-ink: #8a5a00;
+  --star: #e0a800;
+  --learning: #f2c94c;
+  --learning-ink: #5c4400;
+  --placeholder: #c9c1b2;
+  --overlay: rgba(43, 42, 51, 0.45);
+  --dot: rgba(43, 42, 51, 0.06);
+  --swatch-edge: rgba(0, 0, 0, 0.15);
+  /* board canvas */
+  --board-bg: #ffffff;
+  --board-grid: #d9d2c3;
+  --board-edge: #2b2a33;
+  --board-fade: rgba(255, 255, 255, 0.62);
+  --board-wrong: #8a8578;
+  --radius: 14px;
+  --shadow: 0 2px 0 rgba(43, 42, 51, 0.08), 0 8px 24px rgba(43, 42, 51, 0.08);
+  color-scheme: light;
+  font-family: "Nunito", "Segoe UI", system-ui, -apple-system, sans-serif;
+  color: var(--ink);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #16151b;
+    --paper: #211f27;
+    --surface: #2a2731;
+    --soft: #322e3a;
+    --soft-2: #2e2a35;
+    --ink: #ece9f2;
+    --muted: #a8a3b4;
+    --line: #3f3a49;
+    --edge: #57525f;
+    --edge-shadow: #09080c;
+    --invert-bg: #ece9f2;
+    --invert-ink: #16151b;
+    --accent: #ef6a44;
+    --accent-button: #c94a26;
+    --accent-text: #ef6a44;
+    --accent-ink: #fff;
+    --accent-soft: #3b2620;
+    --accent-ring: #6a3526;
+    --good: #34a466;
+    --good-ink: #86dba9;
+    --good-bg: #1d3528;
+    --good-line: #2f6b48;
+    --bad: #e26c5e;
+    --bad-bg: #3d2320;
+    --danger: #cf4634;
+    --gold-line: #a8842a;
+    --gold-bg: #342c1c;
+    --gold-ink: #f0c96a;
+    --star: #f2c14e;
+    --learning: #d6ae36;
+    --learning-ink: #2a2000;
+    --placeholder: #6e6a78;
+    --overlay: rgba(0, 0, 0, 0.6);
+    --dot: rgba(255, 255, 255, 0.05);
+    --swatch-edge: rgba(255, 255, 255, 0.2);
+    --board-bg: #1d1b22;
+    --board-grid: #3a3643;
+    --board-edge: #57525f;
+    --board-fade: rgba(22, 21, 27, 0.65);
+    --board-wrong: #8f8a99;
+    --shadow: 0 2px 0 rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #16151b;
+  --paper: #211f27;
+  --surface: #2a2731;
+  --soft: #322e3a;
+  --soft-2: #2e2a35;
+  --ink: #ece9f2;
+  --muted: #a8a3b4;
+  --line: #3f3a49;
+  --edge: #57525f;
+  --edge-shadow: #09080c;
+  --invert-bg: #ece9f2;
+  --invert-ink: #16151b;
+  --accent: #ef6a44;
+  --accent-button: #c94a26;
+  --accent-text: #ef6a44;
+  --accent-ink: #fff;
+  --accent-soft: #3b2620;
+  --accent-ring: #6a3526;
+  --good: #34a466;
+  --good-ink: #86dba9;
+  --good-bg: #1d3528;
+  --good-line: #2f6b48;
+  --bad: #e26c5e;
+  --bad-bg: #3d2320;
+  --danger: #cf4634;
+  --gold-line: #a8842a;
+  --gold-bg: #342c1c;
+  --gold-ink: #f0c96a;
+  --star: #f2c14e;
+  --learning: #d6ae36;
+  --learning-ink: #2a2000;
+  --placeholder: #6e6a78;
+  --overlay: rgba(0, 0, 0, 0.6);
+  --dot: rgba(255, 255, 255, 0.05);
+  --swatch-edge: rgba(255, 255, 255, 0.2);
+  --board-bg: #1d1b22;
+  --board-grid: #3a3643;
+  --board-edge: #57525f;
+  --board-fade: rgba(22, 21, 27, 0.65);
+  --board-wrong: #8f8a99;
+  --shadow: 0 2px 0 rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  background-image: radial-gradient(var(--dot) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+[hidden] { display: none !important; }
+
+button { font: inherit; color: inherit; }
+
+/* Lucide line icons: sized to the text and drawn in its colour, so they follow the theme */
+.icon {
+  width: 1.15em;
+  height: 1.15em;
+  flex: none;
+  vertical-align: -0.2em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.mode-icon .icon { width: 1em; height: 1em; stroke-width: 2; color: var(--accent); }
+.menu-btn .icon, .icon-btn .icon { width: 22px; height: 22px; display: block; }
+.keypad .icon { width: 24px; height: 24px; stroke-width: 2.75; vertical-align: middle; }
+.lock-badge .icon { width: 0.95em; height: 0.95em; stroke-width: 2.5; vertical-align: -0.15em; }
+.achievement-icon .icon { width: 1.1em; height: 1.1em; color: var(--muted); }
+.invite-dialog h2 .icon { color: var(--accent); }

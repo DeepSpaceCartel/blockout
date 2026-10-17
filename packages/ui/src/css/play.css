@@ -1,0 +1,66 @@
+/* ---------- Game screen: board, side panel, turn, dice ---------- */
+.settings-note { background: var(--gold-bg); border: 2px solid var(--gold-line); border-radius: 10px; padding: 8px 12px; font-size: 0.88rem; font-weight: 700; margin: 0 0 14px; }
+.progress { width: min(100%, 190px); display: flex; flex-direction: column; gap: 4px; }
+.progress-text { color: var(--muted); font-weight: 700; font-size: 0.85rem; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.progress-text .short { display: none; }
+.progress-bar {
+  display: flex;
+  height: 10px;
+  border: 2px solid var(--edge);
+  border-radius: 6px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.progress-bar span { height: 100%; transition: width 0.4s ease-out; }
+
+.game-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 16px;
+  max-width: 1100px;
+  margin: 0 auto;
+  align-items: start;
+}
+
+.board-wrap {
+  background: var(--paper);
+  border: 2px solid var(--edge);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 0 var(--edge-shadow);
+  padding: 12px;
+  display: flex;
+  justify-content: center;
+}
+#board { display: block; touch-action: none; cursor: crosshair; }
+
+.side { display: flex; flex-direction: column; gap: 16px; }
+
+.turn-panel {
+  background: var(--paper);
+  border: 2px solid var(--edge);
+  border-radius: var(--radius);
+  padding: 16px;
+  text-align: center;
+  border-top: 8px solid var(--turn-color, var(--ink));
+}
+.turn-label { font-weight: 900; font-size: 1.15rem; }
+.turn-msg { min-height: 2.6em; color: var(--muted); font-size: 0.92rem; margin: 6px 0 10px; }
+.turn-msg:empty { display: none; }
+.turn-msg.oops { color: var(--bad); font-weight: 800; }
+.turn-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+.dice { display: flex; gap: 14px; justify-content: center; margin-top: 12px; }
+.die {
+  width: 58px;
+  height: 58px;
+  border: 2px solid var(--edge);
+  border-radius: 12px;
+  background: var(--surface);
+  display: grid;
+  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+  padding: 8px;
+  box-shadow: 0 3px 0 var(--edge-shadow);
+}
+.die.blank { background: repeating-linear-gradient(45deg, var(--surface), var(--surface) 6px, var(--soft) 6px, var(--soft) 12px); }
+.die.rolling { animation: wobble 0.12s linear infinite; }
+.pip { width: 10px; height: 10px; border-radius: 50%; background: var(--ink); place-self: center; }

@@ -1,0 +1,35 @@
+# Keeps the pinned action SHAs (with their version comments), npm packages, the
+# dev container, and the images (the Dockerfile's Node, and the cluster's
+# MongoDB, Valkey and Postgres) current.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      tooling:
+        patterns: ['*']
+  # The ghcr.io features in .devcontainer/devcontainer.json. Not the image (its
+  # 5-26-trixie tag already floats within image version 5) or the local features in
+  # .devcontainer/features, whose versions are bumped by hand.
+  - package-ecosystem: devcontainers
+    directory: /
+    schedule:
+      interval: weekly
+  # Image tags and digests in the Dockerfile (the chart's images: the helm entry below)
+  - package-ecosystem: docker
+    directories: [/]
+    schedule:
+      interval: weekly
+    groups:
+      images:
+        patterns: ['*']
+  - package-ecosystem: helm
+    directory: /deploy/blockout
+    schedule:
+      interval: weekly

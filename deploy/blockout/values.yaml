@@ -1,0 +1,308 @@
+# Blockout and everything it runs on, in one release: the server, MongoDB
+# (accounts), Valkey (live classes), Keycloak (sign-in) with its Postgres, and
+# their backups. Each of MongoDB, Valkey and Keycloak can be switched off to use
+# one run elsewhere.
+#
+# Required: publicUrl; keycloak.url and keycloak.google.clientSecret (or
+# keycloak.enabled: false and keycloak.issuer). Passwords the chart needs are
+# made once and kept in its Secrets; the ones only you have (the Google client
+# secret, image credentials, mail, backup storage) are values below, or the
+# names of Secrets you made. Pass them at install time, never commit them:
+#   helm upgrade --install … -f values-workspace.yaml -f secrets.yaml
+
+# The Blockout server. enabled: false runs only the services (development).
+server:
+  enabled: true
+
+image:
+  repository: ghcr.io/deepspacecartel/blockout
+  # Defaults to the chart's appVersion. A digest (sha256:…) pins the exact image.
+  tag: ""
+  digest: ""
+  pullPolicy: IfNotPresent
+
+# A private image: the chart makes a pull Secret from these (a token that can
+# read packages), or name Secrets you made in imagePullSecrets
+imageCredentials:
+  registry: ghcr.io
+  username: ""
+  password: ""
+imagePullSecrets: []
+
+replicaCount: 2
+
+# The address people use, https only, e.g. https://blockout.example.org
+publicUrl: ""
+
+# How many proxies sit in front of the server (the gateway): their
+# X-Forwarded-For is trusted for rate limits
+trustProxy: 1
+
+log:
+  level: info
+  format: json
+
+# A prefix for every Redis key (to keep several Blockouts apart in one Redis)
+redisPrefix: ""
+
+# Optional: OpenAI's free moderation for guests' names
+openai:
+  apiKey: ""
+  # or a Secret you made, with the key api-key
+  existingSecret: ""
+
+# More environment variables, as in a container spec
+extraEnv: []
+
+resources:
+  requests: { cpu: 100m, memory: 160Mi }
+  limits: { memory: 512Mi }
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  seccompProfile: { type: RuntimeDefault }
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: { drop: [ALL] }
+
+# Time to finish: streams are ended so browsers reconnect elsewhere, and
+# classes are handed over (the server needs a few seconds; the gateway a few more
+# to stop sending new requests)
+terminationGracePeriodSeconds: 30
+preStopSleepSeconds: 5
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+service:
+  port: 80
+
+# Gateway API: an HTTPRoute on a shared Gateway (the cluster's ingress)
+httpRoute:
+  enabled: true
+  hostnames: []
+  parentRefs: []
+  #  - name: rts-gateway
+  #    namespace: gateway
+  #    sectionName: blockout-example-org
+  # Live classes hold event streams open for hours: no request timeout
+  timeouts:
+    request: "0s"
+
+# Or a classic Ingress
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts: []
+  #  - host: blockout.example.org
+  tls: []
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+# Prometheus (the Prometheus Operator's ServiceMonitor and PrometheusRule).
+# The metrics port is never on the public route.
+metrics:
+  port: 9464
+  serviceMonitor:
+    enabled: false
+    # labels the cluster's Prometheus selects monitors and rules by
+    labels: {}
+    interval: 30s
+  # Alert rules (seen in Prometheus and Grafana; an Alertmanager sends them on),
+  # with one for backups when backup.enabled
+  rules:
+    enabled: false
+    labels: {}
+  # the namespace Prometheus runs in (allowed through the network policy)
+  namespace: observability
+
+# Who may talk to the server, and whom it may talk to (Cilium: traffic from the
+# gateway is the "ingress" entity, which a plain NetworkPolicy can't name)
+networkPolicy:
+  enabled: false
+  # CiliumNetworkPolicy (true) or a Kubernetes NetworkPolicy (false)
+  cilium: true
+  # where MongoDB and Valkey run when they're not in this release (empty: here)
+  dataNamespace: ""
+  # Plain NetworkPolicy only: namespaces whose pods may connect (the ingress controller's)
+  ingressNamespaces: []
+
+# MongoDB for accounts: one member of the replica set rs0 (transactions need a
+# replica set, even of one). The root password and the members' key are made once.
+mongo:
+  enabled: true
+  image: mongo:8.0.34
+  # Hetzner volumes start at 10 GB
+  storage: 10Gi
+  storageClass: ""
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { memory: 1Gi }
+  # enabled: false: another MongoDB, its URL in this Secret
+  external:
+    secretName: ""
+    key: url
+
+# Valkey (Redis-compatible, BSD licensed) for live classes. Rooms are small and
+# last hours, so no volume: a restart only ends the classes running at the time.
+valkey:
+  enabled: true
+  image: valkey/valkey:8.1.10-alpine
+  maxmemory: 256mb
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { memory: 384Mi }
+  # enabled: false: another Redis, its URL in this Secret
+  external:
+    secretName: ""
+    key: url
+
+# Sign-in. enabled: Keycloak runs in this release (the keycloakx chart, set up
+# under keycloakx below) with its own Postgres and the blockout realm.
+keycloak:
+  enabled: true
+  # Keycloak's public address, e.g. https://id.example.org (enabled only)
+  url: ""
+  # The tokens' issuer. Defaults to <url>/realms/blockout; set it to use a
+  # Keycloak run elsewhere (enabled: false).
+  issuer: ""
+  clientId: blockout
+  # More addresses sign-in may send people back to (e.g. http://localhost:8080
+  # for development); publicUrl is always one
+  extraRedirectUrls: []
+  # The phone app (apps/mobile): its own public client, blockout-mobile, whose
+  # tokens name "blockout" as their audience. The addresses it may come back
+  # to, e.g. blockout://* (empty: no app client)
+  mobile:
+    redirectUrls: []
+  # The Google OAuth client's secret (its id is in files/realm-blockout.json)
+  google:
+    clientSecret: ""
+  # Mail, for checking addresses and resetting passwords. Without it both are off.
+  smtp:
+    host: ""
+    port: 587
+    from: ""
+    user: ""
+    password: ""
+    # or a Secret you made, with the keys host, port, from, user and password
+    existingSecret: ""
+  # Its public address on the gateway: sign-in, and the admin console only with
+  # adminConsole (its login is the master realm's, with brute-force protection;
+  # without it, Keycloak still sends the console to the public address, so it
+  # can't be reached at all)
+  httpRoute:
+    enabled: true
+    adminConsole: false
+    parentRefs: []
+  postgres:
+    image: postgres:17.11-alpine
+    storage: 10Gi
+    storageClass: ""
+    resources:
+      requests: { cpu: 50m, memory: 128Mi }
+      limits: { memory: 512Mi }
+  # The job that brings the realm in line after each install and upgrade
+  # (redirect addresses, the admin role, brute-force protection, mail); the
+  # realm file itself is only imported into an empty Keycloak
+  realmJob:
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits: { memory: 512Mi }
+
+# The keycloakx chart's own values (https://github.com/codecentric/helm-charts).
+# The wiring to this chart's Secrets and ConfigMaps is here; Keycloak's address,
+# database and settings come from keycloak above.
+keycloakx:
+  image:
+    tag: "26.7.4"
+  # Production mode on plain HTTP behind the gateway; the blockout realm is
+  # imported on first start (an existing realm is left alone)
+  args: ["start", "--import-realm"]
+  # The client's address and https come from X-Forwarded-* (only the gateway
+  # and port-forwards reach the pod)
+  proxy:
+    enabled: true
+    mode: xforwarded
+  http:
+    relativePath: "/"
+    managementRelativePath: "/"
+  extraEnvFrom: |
+    - configMapRef: { name: {{ .Release.Name }}-keycloak }
+  extraEnv: |
+    - name: KC_DB_PASSWORD
+      valueFrom: { secretKeyRef: { name: {{ .Release.Name }}-keycloak-db, key: password } }
+    - name: KC_BOOTSTRAP_ADMIN_USERNAME
+      valueFrom: { secretKeyRef: { name: {{ .Release.Name }}-keycloak-admin, key: username } }
+    - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+      valueFrom: { secretKeyRef: { name: {{ .Release.Name }}-keycloak-admin, key: password } }
+    - name: JAVA_OPTS_APPEND
+      value: -XX:MaxRAMPercentage=70
+  # Secrets the realm refers to as ${vault.<key>} are files named <realm>_<key>:
+  # the Google client secret is blockout_google-secret
+  extraVolumes: |
+    - name: realm
+      configMap: { name: {{ .Release.Name }}-keycloak-realm }
+    - name: vault
+      secret:
+        secretName: {{ .Release.Name }}-keycloak-google
+        items: [{ key: secret, path: blockout_google-secret }]
+  extraVolumeMounts: |
+    - name: realm
+      mountPath: /opt/keycloak/data/import
+      readOnly: true
+    - name: vault
+      mountPath: /opt/keycloak/vault
+      readOnly: true
+  resources:
+    requests: { cpu: 250m, memory: 768Mi }
+    limits: { memory: 1Gi }
+  # The restricted Pod Security profile (Keycloak writes under /opt/keycloak/data,
+  # so the root filesystem stays writable)
+  podSecurityContext:
+    fsGroup: 1000
+    seccompProfile: { type: RuntimeDefault }
+  securityContext:
+    runAsUser: 1000
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    capabilities: { drop: [ALL] }
+
+# Nightly backups of MongoDB and Keycloak's Postgres: dumped, encrypted by
+# rclone's crypt remote before they leave the cluster, and copied to object
+# storage: daily/ (kept 31 days) and, on the 1st, monthly/ (kept a year). A
+# monthly restore check restores the newest MongoDB backup into a scratch
+# database, counts what's in it, and drops it. See docs/guides/operate.md.
+backup:
+  enabled: false
+  # rclone's settings as environment variables (a remote "store" and a "crypt"
+  # remote over it), e.g.
+  #   RCLONE_CONFIG_STORE_TYPE: s3
+  #   RCLONE_CONFIG_STORE_PROVIDER: …   RCLONE_CONFIG_STORE_ENDPOINT: …
+  #   RCLONE_CONFIG_STORE_ACCESS_KEY_ID: …   RCLONE_CONFIG_STORE_SECRET_ACCESS_KEY: …
+  #   RCLONE_CONFIG_CRYPT_TYPE: crypt   RCLONE_CONFIG_CRYPT_REMOTE: store:<bucket>/blockout
+  #   RCLONE_CONFIG_CRYPT_PASSWORD: <rclone obscure …>  (keep the plain password: restores need it)
+  rclone: {}
+  # or a Secret you made with those keys
+  existingSecret: ""
+  rcloneImage: rclone/rclone:1.75.2@sha256:2687085f718d3c628f7fdfb77c52a1d344332aed543110bb88088f2c70d43eb5
+  schedule:
+    mongo: "17 3 * * *"
+    keycloak: "47 3 * * *"
+    # 04:37 on the 2nd of each month (after the 1st's monthly copy)
+    restoreCheck: "37 4 2 * *"

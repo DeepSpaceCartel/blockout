@@ -1,0 +1,30 @@
+/* ---------- Shared ---------- */
+.logo {
+  margin: 0;
+  font-size: clamp(2.6rem, 9vw, 4rem);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.logo span { color: var(--accent); }
+.logo.small { font-size: 1.6rem; }
+
+.btn {
+  border: 2px solid var(--edge);
+  background: var(--paper);
+  border-radius: 10px;
+  padding: 0.55rem 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--edge-shadow);
+  transition: transform 0.08s, box-shadow 0.08s;
+}
+.btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 0 var(--edge-shadow); }
+.btn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--edge-shadow); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-primary { background: var(--accent-button); color: var(--accent-ink); }
+/* Can't be undone (deleting an account): red text, not a red button, so it's never the obvious one to press */
+.btn-danger { color: var(--bad); border-color: var(--bad); }
+.btn-big { width: 100%; padding: 0.85rem 1rem; font-size: 1.15rem; }
+
+.screen { padding: 16px; }

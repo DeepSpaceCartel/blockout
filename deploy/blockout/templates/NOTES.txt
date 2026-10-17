@@ -1,0 +1,22 @@
+{{- if .Values.server.enabled }}
+Blockout {{ .Chart.AppVersion }} is on its way: {{ .Values.publicUrl }}
+
+  kubectl -n {{ .Release.Namespace }} rollout status deployment/{{ include "blockout.fullname" . }}
+  kubectl -n {{ .Release.Namespace }} logs deployment/{{ include "blockout.fullname" . }} | head
+{{- end }}
+{{- if .Values.keycloak.enabled }}
+
+Keycloak: {{ .Values.keycloak.url }}
+{{- if .Values.keycloak.httpRoute.adminConsole }}
+Its admin console: {{ .Values.keycloak.url | trimSuffix "/" }}/admin, user admin, password:
+{{- else }} (sign-in only; set keycloak.httpRoute.adminConsole for the admin console)
+Its admin console's password (user admin):
+{{- end }}
+  kubectl -n {{ .Release.Namespace }} get secret {{ .Release.Name }}-keycloak-admin -o jsonpath='{.data.password}' | base64 -d
+
+The first admin: give your account the realm role "admin" (docs/guides/set-up-keycloak.md).
+{{- end }}
+{{- if not .Values.backup.enabled }}
+
+No backups: set backup.enabled and backup.rclone (docs/guides/operate.md).
+{{- end }}

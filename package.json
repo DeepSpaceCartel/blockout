@@ -1,14 +1,32 @@
 {
   "name": "blockout",
-  "version": "0.1.0",
+  "version": "0.11.0",
   "private": true,
-  "description": "Blockout: a multiplication game. The game has no dependencies; these are for development and testing.",
+  "type": "module",
+  "description": "Blockout: multiplication (and more) as area. A Turborepo of plain JavaScript apps and packages.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "packageManager": "npm@11.17.0",
+  "engines": {
+    "node": ">=26"
+  },
   "scripts": {
-    "test": "node --test test/*.test.js",
-    "classroom": "node server/classroom.js 8080"
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "start": "npm run build && node apps/server/src/index.js 8080",
+    "services": "deploy/blockout/forward.sh"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.11.0",
+    "globals": "^17.12.0",
     "jsqr": "^1.4.0",
-    "playwright": "^1.63.0"
+    "playwright": "^1.63.0",
+    "turbo": "^2.11.3",
+    "vite": "^8.3.0"
   }
 }

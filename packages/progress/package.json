@@ -1,0 +1,31 @@
+{
+  "name": "@blockout/progress",
+  "version": "0.11.0",
+  "private": true,
+  "description": "Wallet, shop (skill-tree unlocks), achievements, fact stats, bonuses, homework goals, cheats; and the Wardrobe (cosmetics).",
+  "type": "module",
+  "exports": {
+    ".": "./src/progress.js",
+    "./cosmetics": "./src/cosmetics.js",
+    "./shop": "./src/shop.js",
+    "./views": "./src/views.js",
+    "./stats": "./src/stats.js",
+    "./settings": "./src/settings.js",
+    "./setup": "./src/setup.js",
+    "./journey": "./src/journey.js",
+    "./practice": "./src/practice.js",
+    "./wardrobe": "./src/wardrobe.js",
+    "./homework": "./src/homework.js",
+    "./classroom": "./src/classroom.js",
+    "./grownups": "./src/grownups.js",
+    "./hosting": "./src/hosting.js",
+    "./daily": "./src/daily.js"
+  },
+  "dependencies": {
+    "@blockout/engine": "*"
+  },
+  "scripts": {
+    "test": "node --test",
+    "lint": "eslint src test"
+  }
+}

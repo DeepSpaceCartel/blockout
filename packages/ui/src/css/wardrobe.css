@@ -1,0 +1,98 @@
+/* ---------- Wardrobe: keypad skins ---------- */
+.keypad.skin-candy button, .key-preview.skin-candy { background: linear-gradient(#ffd6e4, #ffb3c7); border-color: #d6336c; color: #7a1340; box-shadow: 0 3px 0 #a61e4d; border-radius: 16px; }
+.keypad.skin-candy button.check { background: linear-gradient(#b9f0cf, #7fd8a3); color: #0f4d2a; }
+.keypad.skin-candy button.back { background: linear-gradient(#ffc9a8, #ff9c6e); color: #6b2400; }
+.keypad.skin-retro button, .key-preview.skin-retro { background: linear-gradient(#e7e3d6, #cfc9b6); border-color: #5c5747; color: #2a271f; box-shadow: 0 3px 0 #3d3a2f; border-radius: 6px; font-family: ui-monospace, "Courier New", monospace; }
+.keypad.skin-retro button.check { background: linear-gradient(#f0a64a, #d9822b); color: #2a1500; }
+.keypad.skin-retro button.back { background: linear-gradient(#7d7866, #5c5747); color: #fff; }
+.keypad.skin-neon button, .key-preview.skin-neon { background: #120f24; border-color: #3cf2ff; color: #3cf2ff; box-shadow: 0 0 8px rgba(60, 242, 255, 0.6); text-shadow: 0 0 6px #3cf2ff; }
+.keypad.skin-neon button.check { border-color: #7dff9a; color: #7dff9a; box-shadow: 0 0 8px rgba(125, 255, 154, 0.6); background: #0e1d14; }
+.keypad.skin-neon button.back { border-color: #ff4fd8; color: #ff4fd8; box-shadow: 0 0 8px rgba(255, 79, 216, 0.6); background: #22101d; }
+
+/* ---------- Wardrobe dialog ---------- */
+.wardrobe-dialog, .stickers-dialog { max-width: 620px; max-height: calc(100vh - 32px); overflow-y: auto; text-align: left; }
+.wardrobe-dialog h2, .stickers-dialog h2 { text-align: center; margin-bottom: 0.25rem; }
+.wardrobe-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.wardrobe-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 84px;
+  padding: 8px 6px;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 0.8rem;
+}
+.wardrobe-chip.selected { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+.wardrobe-chip.locked { background: var(--soft); color: var(--muted); }
+.wardrobe-chip:disabled { cursor: not-allowed; }
+.wardrobe-chip.title-chip { min-width: 0; padding: 8px 12px; }
+.chip-need { font-size: 0.7rem; font-weight: 700; color: var(--muted); max-width: 140px; text-align: center; }
+.chip-preview { display: flex; align-items: center; justify-content: center; gap: 2px; min-height: 36px; }
+.chip-preview .die.mini { cursor: inherit; }
+.chip-preview .swatch { width: 14px; height: 26px; border-radius: 4px; }
+.emoji-preview { font-size: 1.6rem; line-height: 1; }
+.key-preview { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 30px; border: 2px solid var(--edge); border-radius: 8px; background: var(--surface); font-weight: 900; box-shadow: 0 2px 0 var(--edge-shadow); }
+.motion-preview { font-size: 1.4rem; display: inline-block; }
+.wardrobe-chip:hover .motion-preview.roll-tumble { animation: tumble 0.6s linear infinite; }
+.wardrobe-chip:hover .motion-preview.roll-bounce { animation: bounce 0.3s ease-in-out infinite alternate; }
+.wardrobe-chip:hover .motion-preview.roll-sparkle { animation: spin 0.6s linear infinite; }
+.wardrobe-chip:hover .motion-preview.roll-wobble { animation: wobble 0.3s linear infinite; }
+.wardrobe-chip:hover .motion-preview.place-pop { animation: pop 0.5s ease-out infinite; }
+.tile-preview { width: 40px; height: 30px; border-radius: 6px; border: 2px solid var(--edge); background: var(--accent); }
+.tile-preview.pattern-stripes { background: repeating-linear-gradient(45deg, var(--accent) 0 5px, #f59a7b 5px 8px); }
+.tile-preview.pattern-dots { background: radial-gradient(circle, #f9b7a2 2px, transparent 2.5px) 0 0 / 8px 8px, var(--accent); }
+.tile-preview.pattern-bricks { background: linear-gradient(#f59a7b 1px, transparent 1px) 0 0 / 100% 8px, var(--accent); }
+.tile-preview.pattern-checker { background: repeating-conic-gradient(var(--accent) 0 25%, #f59a7b 0 50%) 0 0 / 12px 12px; }
+.tile-preview.pattern-wood { background: repeating-linear-gradient(0deg, var(--accent) 0 5px, #f08560 5px 6px); }
+.tile-preview[class*="board-"] { background-size: 8px 8px; }
+.tile-preview.board-graph { background: linear-gradient(#d9d2c3 1px, transparent 1px) 0 0 / 8px 8px, linear-gradient(90deg, #d9d2c3 1px, #fff 1px) 0 0 / 8px 8px; }
+.tile-preview.board-notebook { background: linear-gradient(90deg, transparent 6px, #e98a8a 6px 7px, transparent 7px), linear-gradient(#b9d3ea 1px, #fdfdf6 1px) 0 0 / 8px 8px; }
+.tile-preview.board-chalkboard { background: linear-gradient(rgba(255, 255, 255, 0.18) 1px, transparent 1px) 0 0 / 8px 8px, #2f4f3a; }
+.tile-preview.board-beach { background: radial-gradient(circle, rgba(160, 120, 60, 0.4) 1px, transparent 1.5px) 0 0 / 5px 5px, #f4e1b0; }
+.tile-preview.board-space { background: radial-gradient(circle, #fff 1px, transparent 1.5px) 0 0 / 9px 11px, #10143a; }
+.tile-preview.board-snow { background: radial-gradient(circle, #a9c8ea 1.5px, transparent 2px) 0 0 / 9px 9px, #eef6ff; }
+
+/* "Showing only … · Show everything" in Shop / Wardrobe / Stickers opened from the results */
+/* Shop / Wardrobe footer: stays at the bottom of the scrolling dialog */
+.wallet-bar {
+  position: sticky;
+  bottom: calc(-1 * var(--pad-y));
+  margin: 16px calc(-1 * var(--pad-x)) calc(-1 * var(--pad-y));
+  padding: 12px var(--pad-x) 16px;
+  background: var(--paper);
+  border-top: 2px solid var(--line);
+  border-radius: 0 0 var(--radius) var(--radius);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  z-index: 1;
+}
+.wallet-line { flex: 1 1 auto; min-width: 0; font-weight: 800; font-size: 1.1rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wallet-after { color: var(--muted); }
+.wallet-cost { color: var(--accent-text); }
+.wallet-left { color: var(--ink); }
+.wallet-after.short { color: var(--bad); font-size: 0.95rem; }
+.view-toggle button { padding: 0.45rem 0.8rem; }
+.wallet-bar .btn { flex: none; }
+@media (max-width: 480px) {
+  .wallet-line { flex-basis: 100%; }
+  .wallet-bar .view-toggle { flex: 1; }
+}
+.filter-note { text-align: center; font-size: 0.85rem; font-weight: 700; color: var(--muted); margin: 0 0 8px; }
+.link-btn { border: 0; background: none; padding: 0; color: var(--accent-text); font-weight: 800; text-decoration: underline; cursor: pointer; }
+
+/* ---------- Sticker album ---------- */
+.sticker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 8px; }
+.sticker { position: relative; display: flex; align-items: center; justify-content: center; aspect-ratio: 1; border-radius: 14px; border: 2px solid var(--line); background: var(--surface); }
+.sticker.rare { border-color: #5b9bd5; }
+.sticker.epic { border-color: #b36bff; box-shadow: 0 0 10px rgba(179, 107, 255, 0.45); }
+.sticker.missing { background: var(--soft); border-style: dashed; }
+.sticker-emoji { font-size: 2rem; }
+.sticker.missing .sticker-emoji { font-size: 1.2rem; color: var(--muted); font-weight: 900; }
+.sticker-count { position: absolute; right: 4px; bottom: 2px; font-size: 0.72rem; font-weight: 900; color: var(--muted); }
