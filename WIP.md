@@ -2,81 +2,48 @@
 
 Where things stand on the `v0.3.0` branch, for picking the work up again. No secrets, tokens, passwords, IDs or addresses are recorded here: they live in the cluster's Secrets or in 1Password.
 
-The full production-readiness plan (approved 2026-10-15) is at the end of this file. Next session: GitHub access and Terraform arrive, then finish the release and M5.
+The full production-readiness plan (approved 2026-10-15) is at the end of this file.
 
 ## Status by milestone
 
 | | Milestone | State |
 |---|---|---|
-| M0 | Housekeeping | Done |
-| M1 | Server hardening: crash fix, config guard, headers and CSP, secure codes, rate limits, stream caps, `/health/*` and drain, structured logs, fewer writes, token refresh | Done |
-| M2 | MongoDB for accounts, Valkey (Redis) for live classes; several servers; classes survive restarts | Done. Two servers behind a proxy: a class carried on through a killed server and a rolling restart |
-| M3 | Roles kept by Blockout, one-time invites, admins (`/admin/`), deleting accounts | Done (ADR-0008) |
-| M4 | Container image, Helm chart (`deploy/blockout`), CI image scan, release workflow | Done; CI is green on GitHub. The `v0.4.0` release failed at the push to GHCR (see below) |
-| M5 | First public deployment in the workspace cluster | In-repo parts done (public Keycloak via `KEYCLOAK_URL`, `realm.sh`, `values-workspace.yaml`). MongoDB and Valkey are installed in `blockout-data`. Waiting on the items below |
-| M6 | Metrics, alert rules, nightly encrypted backups, restore drill, runbooks | Done; backup and restore drill tested in the cluster with a local remote. Real backups wait for object storage |
-| M7 | Retention (13 months), data export, privacy page, accessibility pass | Done |
-| M8 | Production cluster: operators, GitOps, load test, cutover | Load test done (`apps/server/scripts/loadtest.js`; results in `docs/project/testing.md`): 30×30 on two servers, p95 636 ms, no errors after fixing lost answers under contention. The rest waits for the production cluster |
+| M0–M3 | Housekeeping, server hardening, MongoDB and Valkey, roles and invites | Done |
+| M4 | Container image, Helm chart, CI image scan, release workflow | Done. Releases publish to GHCR (`blockout` is internal to the org, with Actions write access for this repo) |
+| M5 | First public deployment in the workspace cluster | **Done (2026-10-17):** 0.5.0 at `https://blockout.deepspacecartel.com`, Keycloak at `https://id.deepspacecartel.com`, Google sign-in tested by the owner |
+| M6 | Metrics, alert rules, backups, restore check, runbooks | Done in the chart; **backups are off** until there's object storage |
+| M7 | Retention, data export, privacy page, accessibility | Done |
+| M8 | Production cluster: operators, GitOps, cutover | Load test done. The rest waits for the production cluster |
 
-## Done (all committed and pushed on `v0.3.0`; tag `v0.4.0` pushed)
+## How it's deployed now (0.5.0)
 
-- **Server:** answers malformed URLs instead of crashing; checks every setting at start-up (production refuses dev sign-in, plain HTTP, and missing MongoDB or Redis); CSP, HSTS and Permissions-Policy; crypto-random codes; rate limits (shared in Redis, failing open); caps on streams; `/health/startup`, `/health/live`, `/health/ready`; drains on SIGTERM; JSON logs with audit records; Prometheus metrics on `METRICS_PORT`.
-- **Data:** accounts in MongoDB (`src/store/`, contract-tested on memory and MongoDB, migrations with a lock); live classes in Valkey (`live.js`, `roombackend/`): compare-and-set writes, per-room owner leases, presence beside the room, pub/sub fan-out. `scripts/sqlite-to-mongo.js` copies old `data/blockout.db` files.
-- **Accounts:** everyone starts as a student; one-time hashed invites make teachers (admins, or teachers inviting colleagues) and grown-ups (the child, their teacher, an admin); `/admin/` (accounts, roles, teacher codes, schools); deleting accounts with everything in them; data export; accounts unused for 13 months expire; Keycloak access tokens last 15 minutes and are renewed.
-- **Deploy:** `Dockerfile` (no npm in the runtime image; Trivy-clean), Helm chart `deploy/blockout` (probes, HTTPRoute without a timeout, PDB, HPA, CiliumNetworkPolicy, ServiceMonitor, PrometheusRule), `deploy/data` (MongoDB, Valkey, backup CronJob, restore drill), `deploy/keycloak` (public address, `realm.sh`, backup CronJob), `release.yml` (image with SBOM and provenance, chart, GitHub release).
-- **Docs:** ADR-0006 (MongoDB and Redis), ADR-0007 (live classes in Redis), ADR-0008 (roles); guides for admins, databases, deploying, running it day to day; privacy, security, configuration and HTTP API pages updated.
-- **Accessibility:** axe-core (WCAG 2.1 A/AA) finds nothing on the main screens, light and dark.
-- **Version 0.4.0:** versions bumped, changelog section `[0.4.0] - 2026-10-15`.
+- **One chart, `deploy/blockout`, one release `blockout` in namespace `blockout`** ([ADR-0009](docs/decisions/0009-one-chart.md)): the servers, MongoDB, Valkey, Keycloak (`keycloakx` 7.3.2 as a dependency) with its Postgres, Keycloak's HTTPRoute, the realm Job (post-install/upgrade hook), backup CronJobs and the monthly restore check. Nothing is created by hand; `deploy/data` and `deploy/keycloak` are gone.
+- **Passwords** are made by the chart once and kept (`lookup`, `helm.sh/resource-policy: keep`). **Secrets only a person has** come from the environment (`op run --env-file=deploy/blockout/.env.1password -- deploy/blockout/install.sh <version>`) or a gitignored `secrets.yaml`.
+- **The workspace cluster currently installs with `deploy/blockout/secrets.yaml`** (the owner's file: the Google client secret and a GHCR token). The 1Password items named in `.env.1password` don't exist yet.
+- **Development:** release `blockout-dev` (namespace `blockout-dev`, `values-dev.yaml`): only MongoDB and Valkey; `npm run services` forwards them. Local servers sign in with the workspace Keycloak (`localhost:8080` and `:5173` are allowed redirects).
+- **rts-terraform PR #43** (merged, applied): Gateway listeners `blockout-deepspacecartel-com` and `id-deepspacecartel-com`, the shared certificate's SANs, and the DNS records.
 
-## What I need from you
+## What's open
 
-1. **Let the release publish to GHCR.** `release.yml` built the image, then the push was refused: `denied: permission_denied: write_package` on `ghcr.io/deepspacecartel/blockout:0.4.0`. Check the DeepSpaceCartel org's Packages settings (can members and Actions create packages?) and whether a `blockout` package already exists that isn't linked to this repository. Then, rather than re-running the failed `v0.4.0` run (#38697517015), release `v0.4.1`: it adds the fix for answers lost under load (found by the load test after the tag). Afterwards make the package public, or give a pull secret.
-2. **Gateway listeners and DNS** (infra repo) on `gateway/rts-gateway`: `blockout-deepspacecartel-com` for `blockout.deepspacecartel.com` and `id-deepspacecartel-com` for `id.deepspacecartel.com`, with certificates and DNS records.
-3. **Google Cloud Console:** add `https://id.deepspacecartel.com/realms/blockout/broker/google/endpoint` to the OAuth client's redirect URIs.
-4. **Mail for Keycloak.** A postfix that delivers directly can't work here: outbound port 25 (and 465) is blocked from the cluster (Hetzner's default); 587 is open. Either a relay on 587 (Google Workspace's SMTP relay, or a transactional service), which Keycloak can use directly through a `keycloak-smtp` Secret (no postfix needed), or ask Hetzner to unblock port 25 and add SPF, DKIM and DMARC records. Until then `realm.sh` keeps email verification and password reset off; Google sign-in works.
-5. **Self-registration:** decide whether the uncommitted realm change below goes in (see "The uncommitted realm change").
-6. **Later:** object storage for backups (the `blockout-backup` Secret, see `docs/guides/operate.md`); the production cluster's provider and region (M8).
-
-### Then (next session)
-
-1. Move `[Unreleased]` to `[0.4.1]` in `CHANGELOG.md`, set 0.4.1 in the `package.json` files and `deploy/blockout/Chart.yaml`, tag `v0.4.1`; confirm the image and chart are on GHCR.
-2. `KEYCLOAK_URL=https://id.deepspacecartel.com BLOCKOUT_URLS="https://blockout.deepspacecartel.com http://localhost:8080 http://localhost:5173" GATEWAY=rts-gateway GATEWAY_NAMESPACE=gateway LISTENER=id-deepspacecartel-com deploy/keycloak/install.sh`
-3. `deploy/blockout/install.sh 0.4.1`
-4. Give the first admin the `admin` realm role; smoke test on the public address (sign in with Google, teacher code, host a class with two students, kill a pod mid-round, roll the deployment).
+1. **Backups:** object storage and its keys (`RCLONE_CONFIG_*`, see `docs/guides/operate.md`). Until then, losing the MongoDB volume loses every account.
+2. **Secrets in 1Password:** create the items `.env.1password` points to, then install with `op run` and retire `secrets.yaml`. Use a dedicated `read:packages` token for the cluster.
+3. **Later, External Secrets Operator** with 1Password in rts-terraform; the chart then needs `existingSecret` for the Google secret and the pull secret (today the Google secret is a value only, because the keycloakx subchart mounts it under a fixed name).
+4. **Mail for Keycloak:** an SMTP relay on port 587 (25 and 465 are blocked from the cluster), as `keycloak.smtp` or `BLOCKOUT_SMTP_*`. Without it, address checks and password resets stay off.
+5. **Classroom smoke test on the public address** with two students and a server killed mid-round. Done so far: health stayed 200 through deleting server pods and a rolling restart.
+6. **Production cluster (M8):** provider and region, operators, Alertmanager (the workspace cluster has none: alerts notify nobody).
 
 ## Things to know
 
-- **The dev Keycloak** (namespace `keycloak`) has had `realm.sh` applied: the `admin` realm role, brute-force protection, a 10-character password policy, and `resetPasswordAllowed=false` (nothing can send mail). Its `registrationAllowed` is on in the running realm.
-- **`blockout-dev`** holds MongoDB and Valkey for development (`npm run services` forwards them and prints the URLs). Its `blockout` database has a few seeded test accounts from the restore drill.
-- **`blockout-data`** holds MongoDB and Valkey for the deployment (no backups yet: no `blockout-backup` Secret).
-- **Without `BLOCKOUT_MONGO_URL`, accounts are kept in memory** and lost on restart (the server says so at start-up). The old `data/blockout.db` (2 users) can be copied with `scripts/sqlite-to-mongo.js`.
+- **MongoDB 8 and the Linux kernel:** every MongoDB 8 refuses to start on kernels 6.19 to 7.0.13 (SERVER-121912). The Talos nodes run 6.18: check the kernel before any Talos upgrade. CI's `check` job is pinned to `ubuntu-24.04` for the same reason (Ubuntu 26 runners have an affected kernel; `ubuntu-latest` moves to 26 from 2026-10-19).
+- **Keycloak reads its address and the Google secret at start:** after changing `keycloak.url` or the secret, `kubectl -n blockout rollout restart statefulset/blockout-keycloakx`.
+- **Helm 4** warns that `--atomic` is deprecated (`--rollback-on-failure`); `install.sh` keeps `--atomic` so Helm 3 still works.
+- **`helm template` and Argo CD** can't look up the kept passwords and would make new ones: a GitOps setup must provide those Secrets.
+- **The uncommitted realm change** from before the plan is gone: the realm keeps `registrationAllowed: false`. Google sign-in is the way in.
 - **trivy-action** is pinned by commit; check its release against Aqua's March 2026 supply-chain advisory before trusting or bumping it.
 - **`npm audit`** reports one high-severity advisory in `source-map-js`, a build-time dependency of Vite (not in the image or the pages); Dependabot should bring the fix.
-- **The workspace cluster has no Alertmanager:** alerts show in Prometheus and Grafana but notify nobody.
-- **Docs screenshots:** 22 were retaken after the contrast fix. `practice`, `fraction-game`, `number-snake`, `number-snake-add` and `classroom-pairs-live` have no primary buttons, and `demos-all` only tiny ones, so they're still right. One still shows the old, brighter orange: `other-game-win` (it needs a game-kit game played to the end).
-- **GitHub's `ubuntu-latest`** moves to Ubuntu 26 from October 19, 2026 (a notice in the release run).
-- **Still to do from before the plan:** a real Google sign-in end to end (the "Signed out" dialog needs `identity_provider: "google"`), and the landscape layout for game-kit's menus.
+- **Docs screenshots:** `other-game-win` still shows the old, brighter orange (it needs a game-kit game played to the end).
+- **Still to do from before the plan:** the landscape layout for game-kit's menus.
 
-## The uncommitted realm change
-
-`deploy/keycloak/realm-blockout.json` has this change in the working tree, made before the plan and never committed (self-registration on, email as the username, password reset on but no email check). It's safe with ADR-0008 (a new account is only a student), but `resetPasswordAllowed` needs mail, and `realm.sh` overrides `verifyEmail` and `resetPasswordAllowed` anyway, depending on whether a `keycloak-smtp` Secret exists. Decide, then commit or revert it.
-
-```diff
-@@ -2,7 +2,10 @@
-   "realm": "blockout",
-   "displayName": "Blockout",
-   "enabled": true,
--  "registrationAllowed": false,
-+  "registrationAllowed": true,
-+  "verifyEmail": false,
-+  "resetPasswordAllowed": true,
-+  "registrationEmailAsUsername": true,
-   "loginWithEmailAllowed": true,
-   "accessTokenLifespan": 900,
-   "ssoSessionIdleTimeout": 28800,
-```
-
----
 
 # Appendix: the production-readiness plan
 
