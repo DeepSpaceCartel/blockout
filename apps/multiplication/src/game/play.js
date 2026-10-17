@@ -4,6 +4,7 @@ import * as Core from '@blockout/engine';
 import * as Cosmetics from '@blockout/progress/cosmetics';
 import * as Progress from '@blockout/progress';
 import * as Views from '@blockout/progress/views';
+import * as Stats from '@blockout/progress/stats';
 import { AUTO_PLACE_MS, AUTO_ROLL_MS, COUNT_STEP, PASS_DELAY, TRY_AGAIN, el, seededRandom, setup } from './base.js';
 import { BONUS_TOASTS, capitalize, celebrate, celebrateWin, grantStickers, progress, queueAchievements, saveProgress, toast } from './wallet.js';
 import { cpuStep, settings } from './settings.js';
@@ -959,18 +960,8 @@ function renderPractice(name, color, groups, noneText) {
 // Biggest times table the player can reach: 6 (Easy), 8 (Medium) or 12 (Hard).
 const unlockedTableSize = () => Views.tableSize(progress);
 
-// "2.1s", or "12s" once it's 10 seconds or more, to fit in a grid cell.
-function shortTime(ms) {
-  const secs = ms / 1000;
-  return secs < 10 ? `${secs.toFixed(1)}s` : `${Math.round(secs)}s`;
-}
 
-const FACT_STATUS = {
-  mastered: { mark: '✓', label: 'Mastered' },
-  learning: { mark: '~', label: 'Learning' },
-  practice: { mark: '!', label: 'Needs practice' },
-  unseen: { mark: '', label: 'Not seen yet' },
-};
+const FACT_STATUS = Stats.FACT_STATUS;
 
 // Which statuses show a best time instead of the icon (Settings → Times-table grid).
 const TIMES_SETTING = { mastered: 'timesMastered', learning: 'timesLearning', practice: 'timesPractice' };
@@ -991,47 +982,31 @@ function renderFactLegend() {
 
 // Rows and columns 1..N (6, or up to 12 once bigger dice are in play); hover a cell for details.
 // Single player and practice play as "You" (personal accounts will replace this).
-function isDefaultPlayer(name) {
-  return Progress.playerKey(name) === 'you';
-}
+const isDefaultPlayer = Stats.isDefaultPlayer;
 
 // size: a fixed size (a teacher or parent looking at a student), else what this player reached
 function renderFactGrid(name, facts, size = null) {
-  const seenMax = Math.max(0, ...Object.keys(facts).flatMap((k) => k.split('×').map((n) => Number(n.trim()))));
-  const unlocked = unlockedTableSize();
-  const max = size || Math.max(6, seenMax > 8 ? 12 : seenMax > 6 ? 8 : 6, unlocked);
+  const g = Stats.factGrid(facts, { size, unlocked: unlockedTableSize(), showTime: showsTime });
   const wrap = make('div', 'fact-grid-wrap');
   if (name) wrap.append(make('div', 'practice-name', name)); // no label for the default "You"
   const grid = make('div', 'fact-grid');
-  grid.style.setProperty('--n', max + 1);
+  grid.style.setProperty('--n', g.max + 1);
   // Mastery badge: a gold ★ on a line's header once the whole line is mastered (both orders)
-  const head = (n) => {
-    const done = Progress.lineReached(facts, n, max, 'mastered');
-    const cell = make('span', 'fact-head' + (done ? ' line-mastered' : ''), done ? `★${n}` : String(n));
-    if (done) cell.title = `Every ${n} times fact is mastered!`;
+  const head = ({ n, mastered }) => {
+    const cell = make('span', 'fact-head' + (mastered ? ' line-mastered' : ''), mastered ? `★${n}` : String(n));
+    if (mastered) cell.title = `Every ${n} times fact is mastered!`;
     return cell;
   };
   grid.append(make('span', 'fact-head', '×'));
-  for (let c = 1; c <= max; c++) grid.append(head(c));
-  for (let r = 1; r <= max; r++) {
-    grid.append(head(r));
-    for (let c = 1; c <= max; c++) {
-      const f = facts[Progress.factKey(r, c)];
-      const status = Progress.factStatus(f);
-      const best = Progress.factBestMs(f);
-      // Best time instead of the icon when that's switched on for this status.
-      const timed = showsTime(status) && best !== null;
-      const cell = make('span', `fact-cell ${status}${timed ? ' timed' : ''}`, timed ? shortTime(best) : FACT_STATUS[status].mark);
-      cell.title = f
-        ? `${r} × ${c} = ${r * c}: ${FACT_STATUS[status].label}. ${f.firstTry} of ${f.asked} right first time` +
-          (f.wrong ? `, ${f.wrong} wrong` : '') +
-          (f.timeouts ? `, ${f.timeouts} timed out` : '') +
-          (best !== null ? `, best ${(best / 1000).toFixed(1)} s` : '') +
-          (f.timed ? `, avg ${(f.totalMs / f.timed / 1000).toFixed(1)} s` : '')
-        : `${r} × ${c} = ${r * c}: not seen yet`;
+  for (const h of g.heads) grid.append(head(h));
+  g.cells.forEach((row, r) => {
+    grid.append(head(g.heads[r]));
+    for (const c of row) {
+      const cell = make('span', `fact-cell ${c.status}${c.timed ? ' timed' : ''}`, c.mark);
+      cell.title = c.detail;
       grid.append(cell);
     }
-  }
+  });
   wrap.append(grid);
   return wrap;
 }

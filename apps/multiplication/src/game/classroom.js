@@ -5,6 +5,7 @@ import { askTeacherSignIn } from '../accounts.js';
 import * as Classroom from '@blockout/classroom';
 import * as Core from '@blockout/engine';
 import * as Progress from '@blockout/progress';
+import * as Stats from '@blockout/progress/stats';
 import { AUTO_ROLL_MS, el } from './base.js';
 import { celebrate, celebrateWin, grantStickers, progress, saveProgress, toast } from './wallet.js';
 import { settings } from './settings.js';
@@ -74,11 +75,7 @@ function renderClassmates(view) {
 }
 
 
-function ordinal(n) {
-  const tens = n % 100;
-  const suffix = tens >= 11 && tens <= 13 ? 'th' : { 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th';
-  return `${n}${suffix}`;
-}
+const ordinal = Stats.ordinal;
 
 // Can this page reach the classroom server? Shown in the Classroom menu.
 async function checkClassroom() {
@@ -1016,7 +1013,7 @@ function renderHostSettings(view) {
 
 // ---- teacher: tournaments on the projector
 
-const TOURNAMENT_NAMES = { knockout: 'Knockout', double: 'Double knockout', roundrobin: 'Round robin', swiss: 'Swiss', koth: 'King of the hill' };
+const TOURNAMENT_NAMES = Stats.TOURNAMENT_NAMES;
 
 // Knockouts: the bracket, a column per round. Other formats: the standings
 // table (and, for king of the hill, each hill's king and line).

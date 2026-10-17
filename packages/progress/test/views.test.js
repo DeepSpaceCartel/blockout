@@ -74,3 +74,15 @@ test('the album: rarities, missing slots, spares to swap for points', () => {
   assert.equal(s.stickers[first.id], 1);
   assert.equal(Views.swapSpares(s).points, 0);
 });
+
+test('the daily check-in pays once a day, more for days in a row', () => {
+  const s = Progress.createProgress();
+  const day1 = Views.dailyCheckIn(s, new Date(2026, 9, 16, 9));
+  assert.equal(day1.bonus, 20);
+  assert.deepEqual(day1.toast, ['☀️ Daily check-in: +20 points', 'Welcome back!']);
+  assert.equal(Views.dailyCheckIn(s, new Date(2026, 9, 16, 18)), null, 'once a day');
+  const day2 = Views.dailyCheckIn(s, new Date(2026, 9, 17, 8));
+  assert.equal(day2.streak, 2);
+  assert.equal(day2.toast[1], 'Welcome back! · 2 days in a row 🔥');
+  assert.equal(s.wallet >= 45, true);
+});

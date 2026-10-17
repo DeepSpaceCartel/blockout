@@ -76,6 +76,18 @@ export function factSpeed(state) {
   };
 }
 
+// ---- the daily check-in
+
+// The first visit of the day pays points (more for days in a row) and checks
+// the streak achievements. Returns null when it's not the first visit today,
+// else { bonus, streak, earned, toast: [title, text] }.
+export function dailyCheckIn(state, now = new Date()) {
+  const visit = Progress.checkIn(state, now);
+  if (!visit) return null;
+  const streak = visit.streak > 1 ? ` · ${visit.streak} days in a row 🔥` : '';
+  return { ...visit, earned: Progress.awardAchievements(state, { event: 'checkin', streak: visit.streak }), toast: [`☀️ Daily check-in: +${visit.bonus} points`, `Welcome back!${streak}`] };
+}
+
 // ---- stickers
 
 export const RARITY_NAMES = { common: 'Common', rare: 'Rare', epic: 'Epic' };

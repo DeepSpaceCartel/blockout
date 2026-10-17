@@ -56,6 +56,14 @@ function Main() {
       setUser(who);
       let save = await Account.loadProgress();
       if (who) save = await Account.syncProgress().catch(() => save); // (offline: play on, sync later)
+      // the first visit of the day: points, and the streak achievements
+      const visit = Views.dailyCheckIn(save);
+      if (visit) {
+        toasts.show(...visit.toast);
+        for (const a of visit.earned) toasts.show(`${a.icon} ${a.name}`, `Achievement! +${a.reward} points`);
+        for (const drop of Views.grantStickers(save, visit.earned)) toasts.show(...drop.toast);
+        Account.saveProgress(save);
+      }
       setProgress(save);
       try {
         setChoice({ ...DEFAULT_CHOICE, ...JSON.parse(await AsyncStorage.getItem(CHOICE_KEY)) });
