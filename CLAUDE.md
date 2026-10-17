@@ -115,6 +115,7 @@ await page.addInitScript((pr) => { if (!sessionStorage.getItem('s')) { sessionSt
   | Master | d12 weighted to the player's weak facts |
   | Legend | half teen × 2–9 (11–19), half Tricky facts; needs a board ≥ 12 and uses split explanations |
 
+  `rollForBoard` prefers rolls with no 1 and not already rolled that game (`bag.seen`, shapes like `3x4`, saved with a live class's bag), rolling again, then falls back: no 1 even if repeated, then anything that fits.
   Tricky, Master and Legend use pair dice (`createPairDice`) and virtual dice only. Pair dice make big rectangles rarer on smaller boards (`PAIR_ROOM`), and near the end they fall back to small facts that fit, so games last about as long as on Hard (a test checks this). Classroom stays on Easy, Medium and Hard.
 - **Classroom games are unlock-free:** every lobby setting is free and cheats are off.
 - **Bonuses** are in `@blockout/progress` (`answerBonus`, `timerBonus`, `boardFinishBonus`, `practiceFinishBonus`). Tell the player about them in the menu hints and the unlock dialogs.

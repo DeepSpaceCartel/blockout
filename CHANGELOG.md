@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Better rolls: no 1 × N (like 1 × 1 or 1 × 7) while a roll without a 1 fits, and no repeats of a rectangle already rolled that game while a new one fits (3 × 4 and 4 × 3 count as the same). The dice roll again, in every game from single player to live classes. A 1 × N or a repeat still comes when it's all that fits, like the last 1-wide gaps. Real dice rolled at the table are left as they are. Games are about a fifth shorter: fewer tiny rectangles.
+
 ## [0.9.1] - 2026-10-17
 
 ### Changed

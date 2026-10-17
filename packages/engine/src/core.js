@@ -187,6 +187,7 @@ function createPairDice(boardSize, rng = Math.random, difficulty = 'tricky', wei
   return {
     sides: DIFFICULTY_SIDES[difficulty],
     pairs,
+    seen: [], // this game's rolls, as shapes ('3x4'): see rollForBoard
     // a weighted pick from `from` (default: every pair)
     rollPair(from = pairs) {
       const total = from.reduce((sum, [a, b]) => sum + w(a, b), 0);
@@ -237,7 +238,7 @@ const RARE_TOTAL_CHANCE = 1 / 6;
 function diceState(boardSize, sides = 6) {
   const profile = diceProfile(boardSize, sides);
   const remaining = { ...profile.rare };
-  return { sides, common: profile.common, remaining, perFace: RARE_TOTAL_CHANCE / Math.max(1, Object.keys(remaining).length) };
+  return { sides, common: profile.common, remaining, perFace: RARE_TOTAL_CHANCE / Math.max(1, Object.keys(remaining).length), seen: [] };
 }
 
 // A bag that rolls from a saved state: bag.roll() gives one die, and uses up
@@ -245,9 +246,11 @@ function diceState(boardSize, sides = 6) {
 function diceFromState(state, rng = Math.random) {
   const { sides, remaining, perFace } = state;
   const [lo, hi] = state.common;
+  if (!state.seen) state.seen = []; // (a bag saved before rolls were remembered)
   return {
     sides,
     remaining,
+    seen: state.seen, // this game's rolls, as shapes ('3x4'): see rollForBoard
     roll() {
       for (const face of Object.keys(remaining)) {
         if (remaining[face] > 0 && rng() < perFace) {
@@ -302,10 +305,43 @@ function fittingRolls(board, sides = 6) {
   return out;
 }
 
+// Rolls worth asking: none with a 1 (1 × 1 is no question, 1 × 7 barely one)
+// and none already rolled this game (3 × 4 and 4 × 3 are the same rectangle).
+// Roll again until one is both; failing that, one without a 1 even if it's a
+// repeat; failing that, whatever the bag rolls. Each preference only holds
+// while some roll the dice can make fits that way (the last 1-wide gaps still
+// get their 1 × N). The bag remembers its rolls in bag.seen.
+const PREFERENCE_REROLLS = 20;
+const hasOne = ([a, b]) => a === 1 || b === 1;
+const shape = ([a, b]) => (a <= b ? `${a}x${b}` : `${b}x${a}`);
+function rollForBoard(board, bag, rng = Math.random, mode = 'end') {
+  const seen = bag.seen || (bag.seen = []);
+  const options = (bag.rollPair ? bag.pairs : fittingRolls(board, bag.sides || 6)).filter(([a, b]) => canFit(board, a, b));
+  const fresh = (r) => !hasOne(r) && !seen.includes(shape(r));
+  const preferences = [fresh, (r) => !hasOne(r)].filter((good) => options.some(good));
+  let roll = null;
+  for (const good of preferences) {
+    for (let i = 0; i < PREFERENCE_REROLLS && !roll; i++) {
+      const saved = bag.remaining ? { ...bag.remaining } : null;
+      const r = rollOnce(board, bag, rng, mode);
+      if (good(r)) roll = r;
+      else if (saved) Object.assign(bag.remaining, saved); // (a rejected roll doesn't use up rare faces)
+    }
+    if (!roll) {
+      const list = options.filter(good);
+      roll = bag.rollPair ? bag.rollPair(list) : list[Math.floor(rng() * list.length)];
+    }
+    break;
+  }
+  roll = roll || rollOnce(board, bag, rng, mode);
+  seen.push(shape(roll));
+  return roll;
+}
+
 // Roll two dice from the bag. When fitOnlyNow() says so, re-roll until the
 // result fits (without using up rare faces on rejected rolls); if the bag
 // can't produce a fitting roll, pick one of the fitting rolls at random.
-function rollForBoard(board, bag, rng = Math.random, mode = 'end') {
+function rollOnce(board, bag, rng, mode) {
   const sides = bag.sides || 6;
   if (bag.rollPair) {
     // pair dice: near the end (or always), only pairs that fit

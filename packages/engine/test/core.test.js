@@ -164,12 +164,12 @@ test('"never" keeps the original rules (passes are possible)', () => {
   assert.ok(seen.size > 1, 'rolls that do not fit should still come up');
 });
 
-test('with plenty of room, rolls are not filtered', () => {
+test('with plenty of room, rolls are not filtered (but 1s are avoided while bigger rolls fit)', () => {
   const b = Core.createBoard(12);
   const bag = Core.createDice(12);
   const seen = new Set();
   for (let i = 0; i < 2000; i++) for (const v of Core.rollForBoard(b, bag)) seen.add(v);
-  assert.deepEqual([...seen].sort(), [1, 2, 3, 4, 5, 6]);
+  assert.deepEqual([...seen].sort(), [2, 3, 4, 5, 6]);
 });
 
 test('square rolls have a single orientation', () => {
@@ -277,4 +277,43 @@ test('tiny dice roll every face evenly', () => {
   for (let i = 0; i < 300; i++) seen.add(bag.roll());
   assert.deepEqual([...seen].sort(), [1, 2, 3]);
   assert.deepEqual(Core.diceFaces('easy', 4), { a: [1, 2, 3, 4], b: [1, 2, 3, 4] });
+});
+
+test('no 1 × 1 while something bigger fits; a 1 × 1 when nothing else does', () => {
+  const ones = (board, bag, n = 2000) => {
+    let count = 0;
+    for (let i = 0; i < n; i++) if (key(Core.rollForBoard(board, bag)) === key([1, 1])) count++;
+    return count;
+  };
+  assert.equal(ones(Core.createBoard(6), Core.createDice(6)), 0, '6×6, d6');
+  assert.equal(ones(Core.createBoard(2), Core.createDice(2, Math.random, 2)), 0, '2×2, d2 (a 1 × 1 a quarter of the time before)');
+  assert.equal(ones(Core.createBoard(12), Core.createPairDice(12, Math.random, 'master')), 0, 'Master’s pair dice');
+  // only single squares left: 1 × 1 it is
+  assert.deepEqual(Core.rollForBoard(boardWithHoles([[0, 0], [5, 5]]), Core.createDice(12)), [1, 1]);
+  // a 1-sided die can't roll anything else
+  assert.deepEqual(Core.rollForBoard(Core.createBoard(1), Core.createDice(1, Math.random, 1)), [1, 1]);
+});
+
+test('no 1 × N while something without a 1 fits, and no repeats until every shape has come up', () => {
+  const board = Core.createBoard(24); // (room for anything a d6 rolls)
+  const bag = Core.createDice(24);
+  const shapes = [];
+  for (let i = 0; i < 15; i++) {
+    const [a, b] = Core.rollForBoard(board, bag);
+    assert.ok(a > 1 && b > 1, `${a} × ${b}`);
+    shapes.push(a <= b ? `${a}x${b}` : `${b}x${a}`);
+  }
+  assert.equal(new Set(shapes).size, 15, 'the 15 shapes from 2 × 2 to 6 × 6, each once');
+  const [a, b] = Core.rollForBoard(board, bag);
+  assert.ok(a > 1 && b > 1, 'then a repeat, still without a 1');
+  assert.equal(bag.seen.length, 16);
+  // a 1-wide gap: 1 × N it is
+  const strip = boardWithHoles([[0, 0], [1, 0], [2, 0]]);
+  const [x, y] = Core.rollForBoard(strip, Core.createDice(12));
+  assert.ok(x === 1 || y === 1);
+  // a saved bag (a live class) remembers its rolls across rolls
+  const state = Core.diceState(12, 6);
+  Core.rollForBoard(Core.createBoard(12), Core.diceFromState(state));
+  assert.equal(JSON.parse(JSON.stringify(state)).seen.length, 1);
+  assert.deepEqual(Core.diceFromState({ ...state, seen: undefined }).seen, [], 'bags saved before still roll');
 });
