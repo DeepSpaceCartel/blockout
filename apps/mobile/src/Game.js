@@ -704,7 +704,7 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
     if (Rewards.countsForStats(match)) recordGame(setup.journeyLevel ? { ...match, level: setup.journeyLevel } : match, results); // (two players on one phone: just for fun)
     if (rewards.boardBonus) toast(`🏁 Finished ${article(match.size)} ${match.size}×${match.size} game!`, `+${rewards.boardBonus} bonus points`);
     award(rewards.earned);
-    const daily = match.mode === 'single' && Daily.complete(progress, { kind: 'game', size: match.size, difficulty: match.difficulty, won: results.humanWon }); // (today's practice?)
+    const daily = match.mode === 'single' && Daily.complete(progress, { kind: 'game', size: match.size, difficulty: match.difficulty, won: results.humanWon, level: setup.journeyLevel }); // (today's practice?)
     if (daily) {
       toast(...daily.toast);
       award(daily.earned);

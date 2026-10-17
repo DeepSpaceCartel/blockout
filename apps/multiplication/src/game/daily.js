@@ -1,51 +1,76 @@
-// Today's practice: part of the multiplication game. One small task a day,
-// picked from the player's own Times Table (@blockout/progress/daily, shared
-// with the phone app), with a reward that grows with a streak. It's shown at
-// the top of Homework (../accounts.js), for guests too.
+// Today's practice: part of the multiplication game. Three small tasks a day
+// to pick from, from the player's own Times Table and Journey
+// (@blockout/progress/daily, shared with the phone app), with a reward that
+// grows with a streak, and new cards for points. It's shown at the top of
+// Homework (../accounts.js), for guests too.
 
 import * as Daily from '@blockout/progress/daily';
 import { refreshHomeworkBadge } from '../accounts.js';
-import { celebrate, progress, saveProgress, toast } from './wallet.js';
+import { celebrate, progress, renderWallet, saveProgress, toast } from './wallet.js';
 import { make } from './play.js';
 import { startPractice } from './practice.js';
 import { tap } from './shop.js';
 
-// Today's card: the task, why, its reward or streak, and Play › (onPlay: before it starts)
+// Today's practice: three cards to pick from, like a level-up's (each plays
+// its task), the reward or the streak, and new cards for points. onPlay: before
+// one starts (Homework closes).
 function dailyCard(onPlay = () => {}) {
   const c = Daily.card(progress);
-  const box = make('div', 'daily-card' + (c.done ? ' done' : ''));
+  const box = make('div', 'daily' + (c.done ? ' done' : ''));
   box.id = 'daily-card';
-  const text = make('div', 'daily-text');
-  const title = make('span', 'daily-title', `${c.title} `);
-  if (c.reward) title.append(make('span', 'daily-reward', c.reward));
-  text.append(title, make('span', 'daily-task', c.text));
-  if (!c.done) text.append(make('span', 'daily-why', c.why));
-  if (c.streak) text.append(make('span', 'daily-streak', c.streak));
-  box.append(text);
-  if (!c.done) {
-    const play = make('button', 'btn btn-small btn-primary', 'Play ›');
-    play.type = 'button';
-    play.setAttribute('aria-label', `Play today’s practice: ${c.text}`);
-    play.addEventListener('click', () => {
-      onPlay();
-      playDaily();
-    });
-    box.append(play);
+  const head = make('p', 'daily-head');
+  head.append(make('span', 'daily-title', c.title));
+  if (c.reward) head.append(' ', make('span', 'daily-reward', c.reward));
+  if (c.streak) head.append(' ', make('span', 'daily-streak', c.streak));
+  box.append(head);
+  if (c.done) {
+    box.append(make('p', 'daily-done', c.doneText));
+    return box;
   }
+  const cards = make('div', 'daily-cards');
+  c.cards.forEach((card, i) => {
+    const pick = make('button', 'daily-pick');
+    pick.type = 'button';
+    pick.setAttribute('aria-label', `Play: ${card.text}. ${card.why}`);
+    const body = make('span', 'daily-body');
+    body.append(make('span', 'daily-task', card.text), make('span', 'daily-why', card.why));
+    pick.append(make('span', 'daily-icon', card.icon), body, make('span', 'daily-go', 'Play ›'));
+    pick.addEventListener('click', () => {
+      onPlay();
+      playDaily(i);
+    });
+    cards.append(pick);
+  });
+  box.append(cards);
+  const again = make('button', 'btn btn-small daily-reroll', c.reroll.label);
+  again.type = 'button';
+  again.disabled = !c.reroll.can;
+  again.addEventListener('click', () => {
+    if (!Daily.reroll(progress).ok) return;
+    saveProgress();
+    renderWallet();
+    box.replaceWith(dailyCard(onPlay));
+  });
+  box.append(again);
   return box;
 }
 
 // Still to do today? (Homework's badge counts it)
 const dailyOpen = () => !Daily.today(progress).done;
 
-// Its round straight away (a taste of the next table too, though it's still
-// locked), or the menu set up for its game, then Start
-function playDaily() {
-  const p = Daily.playFor(Daily.today(progress).task);
+// A card's task: its round straight away (a taste of the next table too,
+// though it's still locked), or the menu set up for its game (the Journey's
+// level, or a board in Free play), then Start
+function playDaily(i) {
+  const p = Daily.playFor(Daily.today(progress).choices[i]);
   if (p.practice) return startPractice('You', p.practice.count, p.practice.tables, false, 0, p.practice.difficulty);
   tap('[data-mode="single"]');
-  tap(`[data-setting="difficulty"] [data-value="${p.game.difficulty}"]`);
-  tap(`#board-size [data-size="${p.game.size}"]`);
+  if (p.game.journey) tap('#play-kind [data-play="journey"]');
+  else {
+    tap('#play-kind [data-play="free"]');
+    tap(`[data-setting="difficulty"] [data-value="${p.game.difficulty}"]`);
+    tap(`#board-size [data-size="${p.game.size}"]`);
+  }
   const start = document.getElementById('start-btn');
   if (!start.disabled) start.click();
 }

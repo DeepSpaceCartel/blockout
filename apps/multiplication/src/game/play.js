@@ -766,7 +766,7 @@ function renderRewards(winners, empty) {
   // for class stats and homework ("beat the CPU on 8×8", "finish 5 games")
   Progress.noteActivity(progress, { kind: 'game', mode: game.mode, difficulty: game.difficulty, size: game.size, won: game.mode === 'single' && humanWon });
   if (humanWon && game.mode === 'single') Progress.recordBoardWin(progress, game.size);
-  if (game.mode === 'single') completeDaily({ kind: 'game', size: game.size, difficulty: game.difficulty, won: humanWon }); // (today's practice?)
+  if (game.mode === 'single') completeDaily({ kind: 'game', size: game.size, difficulty: game.difficulty, won: humanWon, level: game.level }); // (today's practice?)
   const asked = (p) => p.answered + p.stats.timeouts;
   const perfect = humans.some((p) => asked(p) >= 5 && p.firstTry === asked(p));
   const noHelp = humans.some((p) => asked(p) >= 5 && p.stats.helped === 0);

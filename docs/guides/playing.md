@@ -55,7 +55,7 @@ The **Wardrobe** has looks: colours, dice, board themes, keypads and titles.
 
 ## Accounts
 
-Tap **👤 Sign in** at the top of the menu. A student's progress then follows them to any device, and the first time an account is used on a device, that device's guest progress is added to it. Signed-in students see **📚 Homework** on the menu; **Play ›** on a homework starts that game, set up and ready.
+Tap **👤 Sign in** at the top of the menu. A student's progress then follows them to any device, and the first time an account is used on a device, that device's guest progress is added to it. Signed-in students see **📚 Homework** on the menu; **Play ›** on a homework starts that game, set up and ready. At the top of Homework (for guests too) is **⭐ Today's practice**: three cards to pick from, each a small task from your own Times Table or Journey. Doing any one earns the day's reward, and new cards cost a few points.
 
 ![A signed-in student's menu with the Homework button and a tournament banner](../assets/screenshots/student-menu.png)
 

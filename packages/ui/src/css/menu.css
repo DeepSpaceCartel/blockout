@@ -237,11 +237,39 @@ kbd {
 }
 
 /* Today's practice: one small task a day (@blockout/progress/daily), at the top of Homework */
-.daily-card { display: flex; align-items: center; gap: 12px; margin: 4px 0 12px; padding: 10px 14px; border: 2px solid var(--gold-line); background: var(--gold-bg); border-radius: 14px; text-align: left; }
-.daily-card.done { border-color: var(--line); background: var(--surface); }
-.daily-card .daily-text { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.daily-card .daily-title { font-weight: 900; }
-.daily-card .daily-reward { color: var(--gold-ink); }
-.daily-card .daily-task { font-weight: 700; }
-.daily-card .daily-why, .daily-card .daily-streak { color: var(--muted); font-size: 0.85rem; font-weight: 600; }
-.daily-card.done .daily-task { color: var(--muted); }
+/* Today's practice: three cards to pick from, like a level-up's */
+.daily { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 12px; text-align: left; }
+.daily-head { margin: 0; font-weight: 900; }
+.daily-reward { color: var(--gold-ink); }
+.daily-streak { color: var(--muted); font-size: 0.85rem; font-weight: 700; }
+.daily-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.daily-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 10px 12px;
+  border: 2px solid var(--gold-line);
+  border-radius: 14px;
+  background: var(--gold-bg);
+  color: var(--ink);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--gold-line);
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+.daily-pick:hover { transform: translateY(-3px); box-shadow: 0 6px 0 var(--gold-line); }
+.daily-pick:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--gold-line); }
+.daily-icon { font-size: 2rem; line-height: 1; }
+.daily-body { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.daily-task { font-weight: 800; }
+.daily-why { color: var(--muted); font-size: 0.85rem; font-weight: 600; }
+.daily-go { color: var(--gold-ink); font-weight: 900; }
+.daily-reroll { align-self: center; }
+.daily.done .daily-done { margin: 0; color: var(--muted); font-weight: 700; }
+@media (max-width: 560px) {
+  .daily-cards { grid-template-columns: 1fr; }
+  .daily-pick { flex-direction: row; gap: 12px; text-align: left; }
+  .daily-go { white-space: nowrap; }
+}

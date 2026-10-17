@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Today's practice deals three cards to pick from, like the cards of a level-up: a table that needs practice, one to learn, a taste of the next table, your Journey's level, or (from 6×6) a board to win. Doing any one of them counts. Don't like them? New cards cost 10 points, then 20, 40… that day.
+
 ## [0.10.0] - 2026-10-17
 
 ### Changed

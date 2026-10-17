@@ -14,7 +14,7 @@ function createProgress() {
     unlocks: ['practice', 'table1'], // shop item ids (Practice Level 1's come free)
     achievements: {}, // id -> time earned
     checkIn: { last: null, streak: 0 },
-    daily: { day: null, task: null, done: false, streak: 0, lastDone: null }, // today's practice (daily.js)
+    daily: { day: null, choices: [], done: false, streak: 0, lastDone: null, rerolls: 0 }, // today's practice (daily.js)
     facts: {}, // player key -> { name, facts: { '3 × 4': FactStats } }; 3 × 4 and 4 × 3 are separate
     factsOrdered: true,
     counters: { games: 0, classGames: 0, pairGames: 0, pairWins: 0, tournaments: 0, tournamentWins: 0 },

@@ -306,12 +306,14 @@ function Main({ onTheme }) {
     toasts.show('👋 Account deleted', 'Everything in it is gone.');
   }
 
-  // Today's practice: its round straight away (a taste of the next table
-  // too, though it's still locked), or the menu set up for its game
-  function playDaily() {
-    const p = Daily.playFor(Daily.today(progress).task);
+  // Today's practice, card i: its round straight away (a taste of the next
+  // table too, though it's still locked), or the menu set up for its game
+  // (the Journey's level, or a board in Free play)
+  function playDaily(i) {
+    const p = Daily.playFor(Daily.today(progress).choices[i]);
     if (p.practice) return setGame({ key: Date.now(), practice: p.practice });
-    const next = { ...choice, ...p.game };
+    const { journey, ...game } = p.game;
+    const next = { ...choice, ...game, play: journey ? 'journey' : 'free' };
     choose(next);
     play(next);
   }
@@ -389,9 +391,14 @@ function Main({ onTheme }) {
           progress={progress}
           student={Boolean(user && user.role === 'student')}
           onPlay={playHomework}
-          onDaily={() => {
+          onDaily={(i) => {
             setScreen('menu');
-            playDaily();
+            playDaily(i);
+          }}
+          onReroll={() => {
+            const ok = Daily.reroll(progress).ok;
+            if (ok) save();
+            return ok;
           }}
           onCount={setHomeworkCount}
           onClose={() => setScreen('menu')}
