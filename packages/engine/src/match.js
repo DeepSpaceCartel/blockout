@@ -16,13 +16,14 @@ const PHASES = ['roll', 'place', 'stuck', 'answer', 'scored', 'cpu', 'over'];
 const noBonus = () => ({ total: 0, parts: [] });
 
 // players: [{ name, cpu }]. mode: 'single' (you vs the CPU) or 'multi' (one screen).
-function createMatch({ size = 6, difficulty = 'easy', players, mode = 'single', expert = false, bonusMultiplier = 1, firstInCorner = false, fitMode = 'end', weight = null, rng = Math.random, answerBonus = noBonus } = {}) {
+function createMatch({ size = 6, difficulty = 'easy', players, mode = 'single', expert = false, bonusMultiplier = 1, firstInCorner = false, fitMode = 'end', weight = null, rng = Math.random, answerBonus = noBonus, now = Date.now } = {}) {
   if (!players || !players.length) throw new Error('a match needs players');
   const pairDice = Core.usesPairDice(difficulty);
   return {
     size,
     difficulty,
     mode,
+    startedAt: now(), // (for the history: how long it took)
     expert, // no "Help me count"
     bonusMultiplier, // Expert doubles bonus points
     answerBonus,

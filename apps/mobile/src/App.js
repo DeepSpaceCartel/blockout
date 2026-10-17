@@ -13,6 +13,7 @@ import Home from './Home';
 import { BOARDS, DIFFICULTIES, boardOpen, difficultyOpen, modeOpen } from './rewards';
 import { ShopScreen, UnlockSheet } from './Shop';
 import { AchievementsScreen, StickersScreen } from './Collection';
+import StatsScreen from './StatsScreen';
 import { useTheme } from './theme';
 
 const CHOICE_KEY = 'blockout.mobile.choice';
@@ -42,7 +43,7 @@ function Main() {
   const [progress, setProgress] = useState(null);
   const [choice, setChoice] = useState(DEFAULT_CHOICE);
   const [game, setGame] = useState(null); // { key, setup }
-  const [screen, setScreen] = useState('menu'); // 'menu' | 'shop' | 'achievements' | 'stickers' (a game is on top)
+  const [screen, setScreen] = useState('menu'); // 'menu' | 'shop' | 'stats' | 'achievements' | 'stickers' (a game is on top)
   const [offer, setOffer] = useState(null); // the unlock sheet: Shop.unlockOffer's answer
   const [signingIn, setSigningIn] = useState(false);
   const [accountError, setAccountError] = useState(null);
@@ -147,6 +148,8 @@ function Main() {
         <Game key={game.key} setup={game.setup} progress={progress} onSave={save} toast={toasts.show} onEarned={celebrate} onExit={() => setGame(null)} onAgain={play} />
       ) : screen === 'shop' ? (
         <ShopScreen progress={progress} onAsk={ask} onClose={() => setScreen('menu')} />
+      ) : screen === 'stats' ? (
+        <StatsScreen progress={progress} onClose={() => setScreen('menu')} />
       ) : screen === 'achievements' ? (
         <AchievementsScreen progress={progress} onClose={() => setScreen('menu')} />
       ) : screen === 'stickers' ? (
@@ -178,6 +181,7 @@ function Main() {
           onLocked={ask}
           onShop={() => setScreen('shop')}
           onAchievements={() => setScreen('achievements')}
+          onStats={() => setScreen('stats')}
           onStickers={() => setScreen('stickers')}
         />
       )}

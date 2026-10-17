@@ -141,3 +141,7 @@ test('two players on one screen take turns; a CPU first starts with its turn', (
   assert.equal(m.phase, 'roll');
   assert.equal(Match.createMatch({ players: [{ name: 'CPU', cpu: true }, { name: 'Ann' }] }).phase, 'cpu');
 });
+
+test('a match notes when it started (for the history)', () => {
+  assert.equal(Match.createMatch({ players: [{ name: 'Ann' }], now: () => 1234 }).startedAt, 1234);
+});

@@ -17,6 +17,7 @@ import * as Progress from '@blockout/progress';
 import Board, { RectPicture } from './Board';
 import { dragRect, drawnMessage } from './boardMath';
 import * as Rewards from './rewards';
+import { recordGame } from './history';
 import { PLAYER_COLORS, useTheme } from './theme';
 import { Button, Die, Keypad } from './ui';
 
@@ -330,6 +331,7 @@ export default function Game({ setup, progress, onSave, toast, onEarned, onExit,
 
   function finish(results) {
     const rewards = Rewards.onGameOver(progress, match, results);
+    if (Rewards.countsForStats(match)) recordGame(match, results); // (two players on one phone: just for fun)
     if (rewards.boardBonus) toast(`🏁 Finished ${article(match.size)} ${match.size}×${match.size} game!`, `+${rewards.boardBonus} bonus points`);
     award(rewards.earned);
     onSave();

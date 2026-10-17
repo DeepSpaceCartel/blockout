@@ -12,7 +12,7 @@ const MODES = [
 ];
 
 // onLocked(itemId): a locked choice was tapped (offer it); onShop(): open the Shop
-export default function Home({ progress, user, choice, onChoose, onPlay, onSignIn, onSignOut, signingIn, accountError, onLocked, onShop, onAchievements, onStickers }) {
+export default function Home({ progress, user, choice, onChoose, onPlay, onSignIn, onSignOut, signingIn, accountError, onLocked, onShop, onAchievements, onStats, onStickers }) {
   const t = useTheme();
   const newUnlocks = Shop.affordableCount(progress);
   const stickerNews = Shop.newStickers(progress) + Shop.spareStickers(progress);
@@ -53,7 +53,8 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onSignI
         {accountError ? <Text style={[styles.error, { color: t.bad }]}>{accountError}</Text> : null}
 
         <View style={styles.more}>
-          <MenuButton testID="achievements" label="🏆 Achievements" onPress={onAchievements} />
+          <MenuButton testID="stats" label="📊 Stats" onPress={onStats} />
+          <MenuButton testID="achievements" label="🏆 Awards" onPress={onAchievements} />
           <MenuButton testID="stickers" label="🎁 Stickers" badge={stickerNews} onPress={onStickers} />
         </View>
 
@@ -144,7 +145,7 @@ function MenuButton({ label, badge = 0, onPress, testID }) {
         {label}
       </Text>
       {badge ? (
-        <View style={[styles.badge, { backgroundColor: t.bad }]}>
+        <View style={[styles.badge, styles.cornerBadge, { backgroundColor: t.bad }]}>
           <Text style={styles.badgeText}>{badge}</Text>
         </View>
       ) : null}
@@ -177,6 +178,8 @@ const styles = StyleSheet.create({
   shopBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 7, paddingHorizontal: 12, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth * 2 },
   badge: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, alignItems: 'center', justifyContent: 'center' },
   badgeText: { color: '#fff', fontSize: 12, fontWeight: '800' },
+  // (on the corner, like an app's badge, so the label keeps its room)
+  cornerBadge: { position: 'absolute', top: -7, right: -5 },
   account: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth * 2 },
   accountText: { flex: 1, fontSize: 15 },
   bold: { fontWeight: '700' },
