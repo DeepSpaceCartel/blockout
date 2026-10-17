@@ -66,13 +66,8 @@ function dragRect() {
 }
 
 // How the rectangle being drawn compares to the roll.
-function judgeDrawn({ x, y, w, h }) {
-  const [a, b] = game.dice;
-  const rightSize = (w === a && h === b) || (w === b && h === a);
-  const fits = Core.fits(game.board, x, y, w, h);
-  const corner = !Core.mustUseCorner(game.board) || (x === 0 && y === 0);
-  return { rightSize, fits, corner, ok: rightSize && fits && corner };
-}
+// (the game's state is shaped like a match: the rule is shared with the phone app)
+const judgeDrawn = (rect) => Match.judge(game, rect);
 
 function finishDrag() {
   const r = dragRect();

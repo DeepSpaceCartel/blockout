@@ -1,6 +1,7 @@
 // Game state: part of the multiplication game (split from the old js/game.js).
 
 import * as Core from '@blockout/engine';
+import * as Match from '@blockout/engine/match';
 import * as Cosmetics from '@blockout/progress/cosmetics';
 import * as Progress from '@blockout/progress';
 import * as Views from '@blockout/progress/views';
@@ -338,18 +339,9 @@ function placeRect(x, y, w, h) {
   return rect;
 }
 
-function awardPoints(rect, firstTry, bonus = 0) {
-  const p = currentPlayer();
-  rect.solved = true;
-  p.squares += rect.area;
-  p.bonus += bonus;
-  p.score = p.squares + p.bonus;
-  p.answered++;
-  if (firstTry) p.firstTry++;
-  p.stats.placed++;
-  if (!p.stats.biggest || rect.area > p.stats.biggest.area) p.stats.biggest = rect;
-  p.log.push({ a: rect.a, b: rect.b, area: rect.area, bonus, star: !p.cpu && firstTry });
-}
+
+// Points for a solved rectangle, as the shared rules count them
+const awardPoints = (rect, firstTry, bonus = 0) => Match.award(game, rect, firstTry, bonus);
 
 // ---- human: work out the points
 
@@ -387,9 +379,8 @@ function showStreak(node, n) {
   node.dataset.level = level;
 }
 
-function answerDecided(entry, answer) {
-  return entry !== '' && (Number(entry) >= answer || entry.length >= String(answer).length);
-}
+
+const answerDecided = Match.answerDecided;
 
 function typeKey(key) {
   const pend = game && game.phase === 'answer' && game.pending;
@@ -472,14 +463,9 @@ async function checkAnswer() {
 
 // Legend: a teen times a one-digit number, split into tens and ones
 // (14 × 7 = 10 × 7 + 4 × 7). Null for anything else.
-function legendSplit(rect) {
-  if (!game || game.difficulty !== 'legend') return null;
-  const teen = Math.max(rect.a, rect.b);
-  const other = Math.min(rect.a, rect.b);
-  if (teen < 11) return null;
-  const ones = teen - 10;
-  return { teen, other, ones, tens: 10 * other, rest: ones * other };
-}
+
+// Legend: a teen times a one-digit number, split into tens and ones; null for anything else
+const legendSplit = (rect) => (game ? (Match.legendSplit(rect, game.difficulty) || {}).split || null : null);
 
 async function helpCount() {
   const pend = game.pending;
@@ -519,14 +505,11 @@ async function helpCount() {
 // A fact goes on the "to practise" list the first time it's missed in a turn.
 // Record a missed fact once per turn, with every wrong answer given for it.
 // Entries look like { fact: '6 × 7', answers: [48, 36], timeout: false }.
-function noteMiss(pend, { answer = null, timeout = false } = {}) {
-  if (!pend.miss) {
-    pend.miss = { fact: `${pend.rect.a} × ${pend.rect.b}`, answers: [], timeout: false };
-    currentPlayer().stats.missed.push(pend.miss);
-  }
-  if (answer !== null) pend.miss.answers.push(answer);
-  if (timeout) pend.miss.timeout = true;
-}
+
+// Record a missed fact once per turn, with every wrong answer given for it.
+// (The shared rule reads the pending answer from the game; a timeout has
+// already cleared it, so it's handed over.)
+const noteMiss = (pend, how) => Match.noteMiss({ ...game, pending: pend }, how);
 
 // ---- answer timer (paused while "Help me count" is animating)
 
@@ -598,10 +581,9 @@ async function answerTimeout() {
 // ---- skip counting, shared by the help button and the computer's explanation
 
 // Count a × b as "a rows (or columns) of b", matching the order of the dice.
-function countPlan(rect) {
-  const byRows = rect.w === rect.b;
-  return { byRows, group: rect.b, steps: rect.a, unit: byRows ? 'row' : 'column' };
-}
+
+// Count a × b as "a rows (or columns) of b", matching the order of the dice
+const countPlan = Match.countPlan;
 
 async function skipCount(rect, plan, stepMs, onStep) {
   game.counting = { rect, byRows: plan.byRows, group: plan.group, shown: 0 };
@@ -668,9 +650,8 @@ async function explainComputerMove(rect) {
 
 let continueResolve = null;
 
-function gameEndsAfterThisTurn() {
-  return game.passes >= game.players.length || Core.emptyCount(game.board) === 0;
-}
+
+const gameEndsAfterThisTurn = () => Match.isOver(game);
 
 async function finishComputerTurn(autoDelay) {
   if (game.cpuEnd !== 'button' || gameEndsAfterThisTurn()) {
@@ -702,7 +683,7 @@ function cancelContinue() {
 
 function endTurn() {
   if (game.mode === 'class' || game.mode === 'pair') return beginTurn(); // the server ends these games
-  if (game.passes >= game.players.length || Core.emptyCount(game.board) === 0) {
+  if (Match.isOver(game)) {
     finishGame();
     return;
   }

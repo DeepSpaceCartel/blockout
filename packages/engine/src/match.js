@@ -33,6 +33,7 @@ function createMatch({ size = 6, difficulty = 'easy', players, mode = 'single', 
     faces: Core.diceFaces(difficulty),
     diceBag: pairDice ? Core.createPairDice(size, rng, difficulty, weight) : Core.createDice(size, rng, Core.DIFFICULTY_SIDES[difficulty] || 6),
     players: players.map((p) => ({
+      ...p, // (a client's own fields: colours, avatars, the name stats go under)
       name: p.name,
       cpu: Boolean(p.cpu),
       score: 0, // squares + bonus
@@ -286,4 +287,4 @@ function results(m) {
   };
 }
 
-export { PHASES, createMatch, currentPlayer, mustUseCorner, roll, judge, previewAt, startRotated, autoSpot, place, answer, answerDecided, help, countPlan, legendSplit, timeout, pass, cpuTurn, isOver, endTurn, results };
+export { PHASES, createMatch, currentPlayer, mustUseCorner, roll, judge, previewAt, startRotated, autoSpot, award, noteMiss, place, answer, answerDecided, help, countPlan, legendSplit, timeout, pass, cpuTurn, isOver, endTurn, results };
