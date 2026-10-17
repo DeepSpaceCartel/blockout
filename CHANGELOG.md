@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The secrets only a person has can come from the environment, for example from 1Password with `op run --env-file=deploy/blockout/.env.1password -- deploy/blockout/install.sh <version>`. They reach Helm on its standard input, never its command line.
 - Development signs in with the workspace's Keycloak at `https://id.deepspacecartel.com`, and `npm run services` forwards the chart's development release (`values-dev.yaml`).
 
+### Fixed
+- A student's long poll is no longer answered with the version of the class it already has (a late message about an older change answered it): it waits for the next change.
+- CI's tests with MongoDB stay on Ubuntu 24.04: MongoDB 8 doesn't start on the kernels of Ubuntu 26's runners (6.19 to 7.0.13).
+
 ## [0.4.1] - 2026-10-16
 
 ### Added

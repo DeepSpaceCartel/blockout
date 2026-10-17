@@ -144,6 +144,23 @@ function suite(name, backends) {
     stop();
   });
 
+  test(`live (${name}): a held poll waits for a newer version, not news of one it has`, async () => {
+    const { backend, all } = await servers();
+    const [a] = all;
+    const room = await a.createRoom({ type: 'class' });
+    const who = await a.withRoom(room.code, (r) => rJoin(r, 'Ben'));
+    await a.openPoll(room.code, 'student', who.id, -1, () => {}, () => {}); // (Ben is here: who's-here settles)
+    const v = await settled(a, room.code);
+    let polled = null;
+    await a.openPoll(room.code, 'student', who.id, v, (body) => (polled = body), () => {});
+    // a late message about a change the poll has already seen
+    await backend.publish(room.code, { t: 'v', v });
+    await wait(FAST.coalesceMs * 10);
+    assert.strictEqual(polled, null, 'still held');
+    await a.withRoom(room.code, (r) => rStart(r));
+    assert.ok(await until(() => polled && polled.v > v), 'answered with the new version');
+  });
+
   test(`live (${name}): when the owning server dies, another takes over its timers`, async () => {
     const { all, stop } = await servers();
     const [a, b] = all;

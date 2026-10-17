@@ -73,6 +73,10 @@ Keycloak: `pg_restore --clean -h … -U keycloak -d keycloak keycloak-<date>.dum
 - **Valkey:** live classes and rate limits stop: class requests fail, and the rest of the game still works (rate limits let requests through). Valkey keeps nothing on disk, so classes running at the time are lost: teachers start new ones.
 - **Keycloak:** nobody can sign in. People already signed in keep going while their token lasts (15 minutes) and can't renew it.
 
+### MongoDB and the Linux kernel
+
+Every MongoDB 8 refuses to start on Linux kernels 6.19 to 7.0.13 ("MongoDB cannot start: Linux kernel versions 6.19 and newer has a known incompatibility", [SERVER-121912](https://jira.mongodb.org/browse/SERVER-121912)); 7.0.14 and later are fine. The workspace cluster's Talos nodes run 6.18. **Check the kernel before upgrading Talos** (or moving to new nodes): on an affected one, MongoDB stops and nobody can sign in.
+
 ## Accounts
 
 - **Make someone an admin:** the `admin` realm role in Keycloak ([how](set-up-keycloak.md#make-someone-an-admin)).

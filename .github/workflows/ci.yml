@@ -16,7 +16,9 @@ concurrency:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # Not ubuntu-latest: from Ubuntu 26 its kernel (6.19 to 7.0.13) stops every
+    # MongoDB 8 at start-up (SERVER-121912). Move on once runners have 7.0.14+.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     # The stores' tests also run against real MongoDB and Valkey (Redis)
     services:

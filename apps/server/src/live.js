@@ -238,7 +238,7 @@ function createLive({ backend, log = silentLogger, replicaId = crypto.randomByte
     const e = entry(code);
     await e.ready;
     const room = await load(code, { withLive: true });
-    const w = { role, id: playerId, send, done: false, timer: null };
+    const w = { role, id: playerId, version, send, done: false, timer: null };
     if (!room || version !== room.version) {
       drop(code);
       if (!room) throw noRoom();
@@ -271,7 +271,8 @@ function createLive({ backend, log = silentLogger, replicaId = crypto.randomByte
           const room = await load(code, { withLive: true });
           if (!room) return;
           for (const s of e.streams) push(room, s);
-          for (const w of [...e.polls]) answer(room, w);
+          // (a message about a change the poll has already seen leaves it held)
+          for (const w of [...e.polls]) if (room.version !== w.version) answer(room, w);
           if (owned.has(code)) reconcile(room);
         } catch (err) {
           log.error('live.update_failed', exception(err));
