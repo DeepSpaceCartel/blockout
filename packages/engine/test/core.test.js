@@ -269,3 +269,12 @@ test('Tricky, Master and Legend games last about as long as Hard (not 3 rectangl
     assert.ok(total / 20 >= 16, `${difficulty} on 24×24: ${total / 20} rectangles`);
   }
 });
+
+test('tiny dice roll every face evenly', () => {
+  assert.deepEqual(Core.diceProfile(2, 2), { sides: 2, common: [1, 2], rare: {} });
+  const bag = Core.createDice(3, Math.random, 3);
+  const seen = new Set();
+  for (let i = 0; i < 300; i++) seen.add(bag.roll());
+  assert.deepEqual([...seen].sort(), [1, 2, 3]);
+  assert.deepEqual(Core.diceFaces('easy', 4), { a: [1, 2, 3, 4], b: [1, 2, 3, 4] });
+});

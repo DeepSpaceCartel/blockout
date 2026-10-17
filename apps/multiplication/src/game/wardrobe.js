@@ -12,6 +12,7 @@ import { game, make, startGame } from './play.js';
 import { confirmUnlock, filterNote, markSeen, refreshOpenNudges, renderWalletBar, seenList, wardrobeKeys } from './shop.js';
 import { practiceLevel, practiceRoundSize, practiceTableList, practiceTimerSecs, startPractice, updatePracticePreview } from './practice.js';
 import { checkClassroom } from './classroom.js';
+import { journeyDifficulty, renderJourney } from './journey.js';
 import { drawBoard, render, renderDie } from './render.js';
 
 // settings.cosmetics: { dice, pips, roll, colors, pattern, board, place, confetti,
@@ -224,6 +225,9 @@ function icon(name) {
 function setLockBadge(btn, itemId) {
   const locked = !Progress.isUnlocked(progress, itemId);
   const hidden = locked && Progress.isHidden(progress, itemId);
+  // boards and difficulties the Journey hasn't reached yet aren't shown at all
+  const item = itemId && Progress.shopItem(itemId);
+  if (item && item.journey) btn.hidden = locked;
   btn.classList.toggle('locked', locked);
   btn.classList.toggle('skeleton', hidden);
   btn.dataset.unlock = locked ? itemId : '';
@@ -342,6 +346,7 @@ function renderSetupSections() {
   el.startBtn.hidden = classroom; // Join / Host instead
   el.startBtn.textContent = setup.mode === 'practice' ? 'Start practice' : 'Start game';
   if (classroom) checkClassroom();
+  renderJourney(); // (single player: the Journey picks the board and dice)
 }
 
 function selectMultiKind(kind) {
@@ -362,6 +367,7 @@ function syncBoardLocks() {
   for (const btn of el.boardSize.querySelectorAll('button')) setLockBadge(btn, BOARD_UNLOCK[btn.dataset.size]);
   renderBoardHint();
   renderGameLevel(); // (difficulty or purchases change it too)
+  renderJourney();
 }
 
 // ---- single player: Level (Learn / Expert) and Expert's timer, per difficulty, like Practice
@@ -371,7 +377,7 @@ const GAME_LEVEL_HELP = Setup.GAME_LEVEL_HELP;
 
 function renderGameLevel() {
   if (!el.gameLevel) return;
-  const d = settings.difficulty;
+  const d = journeyDifficulty() || settings.difficulty; // a Journey level has its own
   const expertId = Progress.gameExpertId(d);
   if (!Progress.isUnlocked(progress, expertId)) setup.level = 'learn';
   for (const btn of el.gameLevel.querySelectorAll('button')) {
@@ -673,4 +679,4 @@ export function run() {
   });
 }
 
-export { GAME_EXPERT_BONUS, applySettingsForTurn, applyTheme, chooseCosmetic, clampCustom, enforceLocks, icon, look, openSettings, openStickers, openWardrobe, renderBoardHint, renderGameLevel, renderWardrobe, saveNameInputs, selectIn, setLockBadge, setWardrobeFilter, syncBoardLocks, syncModeLocks, syncSettingsUI, wardrobeAvailable, wardrobeFilter };
+export { GAME_EXPERT_BONUS, applySettingsForTurn, applyTheme, chooseCosmetic, clampCustom, enforceLocks, icon, look, openSettings, openStickers, openWardrobe, renderBoardHint, renderGameLevel, renderSetupSections, renderWardrobe, saveNameInputs, selectIn, setLockBadge, setWardrobeFilter, syncBoardLocks, syncModeLocks, syncSettingsUI, wardrobeAvailable, wardrobeFilter };

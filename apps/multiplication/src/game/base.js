@@ -29,8 +29,7 @@ const SETTINGS_KEY = 'blockout.settings';
 
 const DEFAULT_SETTINGS = Settings.DEFAULT_SETTINGS; // (shared with the phone app: @blockout/progress/settings)
 
-// Board sizes other than the small one are bought in the shop.
-// Only the smallest board is free; every other size is bought in the shop.
+// Board sizes other than 6×6 are unlocked by the Journey (levels.js).
 const BOARD_UNLOCK = { 6: null, 8: 'board8', 10: 'board10', 12: 'board12', 16: 'board16', 20: 'board20', 24: 'board24', custom: 'boardCustom' };
 
 const PASS_DELAY = 1600;
@@ -47,7 +46,8 @@ const $ = (id) => document.getElementById(id);
 // names start empty: multiplayer players type their own ("Player N" is only a placeholder)
 // multiKind: 'local' (one screen) or 'classroom' (not built yet)
 // level/timer: single player's Learn / Expert and Expert's answer timer (seconds)
-const setup = { mode: 'single', multiKind: 'local', level: 'learn', timer: 0, count: 2, size: 6, names: ['', '', '', ''], types: ['human', 'human', 'human', 'human'] };
+// play: single player's 'journey' (level by level) or 'free' (pick the board)
+const setup = { mode: 'single', play: 'journey', multiKind: 'local', level: 'learn', timer: 0, count: 2, size: 6, names: ['', '', '', ''], types: ['human', 'human', 'human', 'human'] };
 
 // What this part does when the page loads (main.js runs every part in order)
 export function run() {
@@ -150,6 +150,13 @@ export function run() {
     gameTimer: $('game-timer'),
     gameTimerHelp: $('game-timer-help'),
     boardSizeHelp: $('board-size-help'),
+    journeyCard: $('journey-card'),
+    playKind: $('play-kind'),
+    journeyInfo: $('journey-info'),
+    journeyLevel: $('journey-level'),
+    journeyLine: $('journey-line'),
+    journeyGoal: $('journey-goal'),
+    journeySteps: $('journey-steps'),
     customSize: $('custom-size'),
     customSizeInput: $('custom-size-input'),
     customSizeEcho: $('custom-size-echo'),

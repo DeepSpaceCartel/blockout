@@ -36,6 +36,20 @@
       </div>
 
       <form id="setup-form" autocomplete="off">
+        <!-- Single player: the Journey (level by level) or Free play (pick a board), see game/journey.js -->
+        <div class="journey-card" id="journey-card">
+          <div class="segmented" id="play-kind" role="radiogroup" aria-label="What to play" hidden>
+            <button type="button" data-play="journey" class="selected" role="radio" aria-checked="true">🧗 Journey <small>level by level</small></button>
+            <button type="button" data-play="free" role="radio" aria-checked="false">🎲 Free play <small>pick a board</small></button>
+          </div>
+          <div class="journey-info" id="journey-info">
+            <p class="journey-level" id="journey-level"></p>
+            <p class="journey-line" id="journey-line"></p>
+            <p class="setting-help" id="journey-goal"></p>
+            <ol class="journey-steps" id="journey-steps" aria-label="Your Journey"></ol>
+          </div>
+        </div>
+
         <div class="field" id="difficulty-field">
           <span>Difficulty</span>
           <div class="segmented" data-setting="difficulty">

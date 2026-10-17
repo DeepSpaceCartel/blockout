@@ -6,7 +6,7 @@ Everything here works without an account. Progress is saved in the browser; [sig
 
 ## Single player
 
-Pick **Single player**, a difficulty and a board, and tap **Start game**. Roll, draw the rectangle (drag it out, or click to drop it once *Click to place* is unlocked), and answer. The CPU takes its turn and shows its working.
+Pick **Single player** and tap **Play Level 1**. The [Journey](../concepts/progression.md) picks the board and the dice: Level 1 is a 1×1 board with a 1-sided die, and Level *n* an *n*×*n* board with an *n*-sided die, up to 12×12 and beyond. Beat the CPU with 4 out of 5 answers right first try to move up a level. From Level 6, **Free play** lets you pick any difficulty and board you've reached. Roll, draw the rectangle (drag it out, or click to drop it once *Click to place* is unlocked), and answer. The CPU takes its turn and shows its working.
 
 ![A single-player game: the board, the roll and the scores](../assets/screenshots/single-player.png)
 
@@ -33,11 +33,11 @@ When the board is full, or nobody can place anything, the game ends. The results
 | Master | The dice go after your weakest facts |
 | Legend | Half the rolls are teens like 14 × 7 (split into 10 × 7 and 4 × 7), half Tricky facts; needs a 12×12 board or bigger |
 
-Each difficulty unlocks when most of the Times Table below it is mastered.
+Each difficulty unlocks when the Journey reaches it: Medium at Level 7, Hard at 9, then Tricky, Master and Legend among the challenge levels.
 
 ## Points, shop and Wardrobe
 
-Right answers earn points: more for first-try answers, streaks, quick answers on a timer, and finishing bigger boards. Points buy things in the **Shop**: new boards, difficulties, times tables for practice, and settings like auto roll. Unlocks come as a skill tree: only the next step shows its price.
+Right answers earn points: more for first-try answers, streaks, quick answers on a timer, and finishing bigger boards. Points buy things in the **Shop**: practice and its times tables, Expert and its timers, multiplayer, and settings like auto roll. (Boards and difficulties come from the Journey.) Unlocks come as a skill tree: only the next step shows its price.
 
 ![The shop: unlocks grouped by kind, with the wallet at the bottom](../assets/screenshots/shop.png)
 

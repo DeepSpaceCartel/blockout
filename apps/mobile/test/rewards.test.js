@@ -60,3 +60,15 @@ test('only unlocked difficulties and boards can be picked', () => {
   assert.equal(difficultyOpen(progress, 'medium'), true);
   assert.equal(tableSize(progress), 8);
 });
+
+test('a Journey game won with right answers moves you up a level', () => {
+  const progress = Progress.createProgress();
+  const match = Match.createMatch({ size: 2, sides: 2, players: [{ name: 'You' }, { name: 'CPU', cpu: true }], rng: seeded(3), answerBonus: Progress.answerBonus });
+  const results = playOut(match, progress);
+  const { journey } = onGameOver(progress, match, results, 3);
+  assert.equal(journey.current, false, 'not the level the save is on: nothing moves');
+  progress.journey.level = 2;
+  const again = onGameOver(progress, match, results, 2);
+  assert.equal(again.journey.advanced, results.humanWon);
+  assert.equal(onGameOver(progress, match, results).journey, null, 'Free play: no Journey');
+});

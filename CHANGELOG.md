@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- The Journey: single player now climbs one level at a time, from a 1×1 board with a 1-sided die to 12×12 with a 12-sided die, then challenge levels (16×16, Tricky, 20×20, Master, Legend, 24×24). Beat the CPU with 4 out of 5 answers right first try to move up; each level up earns points, and reaching Level 6, Level 12 and the end earn achievements. The menu shows one card and "Play Level N"; Free play (pick a difficulty and board) opens at Level 6. In the web game and the phone app ([ADR-0010](https://github.com/DeepSpaceCartel/blockout/blob/main/docs/decisions/0010-journey-progression.md)).
 - In the phone app, bonuses, achievements and stickers no longer pop up during a game or practice round: they're listed on its results, the same kind stacked into one ("⚡ Speedy ×3 · +9 bonus points"). Pop-ups elsewhere stack repeats too.
 - Today's practice: one small task a day at the top of Homework (now there for guests too, its badge counting today's task), picked from the player's own Times Table (facts that need practice, the next table to master, a taste of the next table, or a game that stretches a little), worth 30 points and 10 more for each day in a row. In the web game and the phone app, for guests too.
 - Blockout for phones and tablets (`apps/mobile`): a React Native app, built with Expo, that runs in Expo Go. You against the CPU or two players on one phone, Easy to Hard, drawing by dragging, a keypad, "Help me count", points and achievements, and signing in with Google, with the save synced with the web game.
@@ -20,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Keycloak's admin console can be public (`keycloak.httpRoute.adminConsole`; on in the workspace cluster, at `https://id.deepspacecartel.com/admin`). Its `master` realm gets brute-force protection either way.
 
 ### Changed
+- Boards and difficulties are no longer bought in the Shop or gated by Times Table mastery: the Journey unlocks them. Existing players start on the level their boards, difficulties and wins reach (Level 6 at least once they've played) and keep everything they had.
 - After “Help me count”, a right answer earns its squares (or practice point) but no bonus points: no first-try, speedy, streak or timer bonus, and the streak ends. Speedy, Big block and Twelve times now need the answer right first time too.
 - The phone app's backspace key is red, like the web game's.
 

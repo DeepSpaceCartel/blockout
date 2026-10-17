@@ -143,10 +143,11 @@ const TRICKY_FACES = [3, 4, 6, 7, 8, 9, 12];
 const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
 
 // The faces of each die: { a: [...], b: [...] } (the same for both except Legend).
-function diceFaces(difficulty) {
+// sides: numbered dice other than the difficulty's (a Journey level's).
+function diceFaces(difficulty, sides = null) {
   if (difficulty === 'tricky') return { a: TRICKY_FACES, b: TRICKY_FACES };
   if (difficulty === 'legend') return { a: range(11, 19), b: range(2, 9) };
-  const n = DIFFICULTY_SIDES[difficulty] || 6;
+  const n = sides || DIFFICULTY_SIDES[difficulty] || 6;
   return { a: range(1, n), b: range(1, n) };
 }
 
@@ -211,6 +212,9 @@ const fitsDifficulty = (difficulty, boardSize) => (difficulty === 'legend' ? boa
 function diceProfile(boardSize, sides = 6) {
   const rare = {};
   let common;
+  // A tiny die (a Journey's first levels) rolls every face evenly: loading a
+  // d2 would almost never show its 2.
+  if (sides <= 4) return { sides, common: [1, sides], rare };
   if (boardSize <= 13) {
     common = [1, Math.round((sides * 2) / 3)];
     for (let f = common[1] + 1; f <= sides; f++) rare[f] = f === sides ? 1 : 2;

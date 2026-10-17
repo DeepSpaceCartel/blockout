@@ -4,6 +4,7 @@
 // An ES module (@blockout/progress), used by the games and the server.
 
 import * as Core from '@blockout/engine';
+import { LEVELS, DONE, levelGranting, grantsUpTo } from './levels.js';
 
 function createProgress() {
   return {
@@ -22,6 +23,8 @@ function createProgress() {
     practiceTimersV1: true, // …or from before Expert practice had its own timers
     placeAutoV1: true, // …or from before Auto placing was a separate unlock
     gameExpertV1: true, // …or from before single player had Learn / Expert
+    journeyV1: true, // …or from before boards and difficulties were Journey levels
+    journey: { level: 1 }, // the Journey level reached (see levels.js)
     stickers: {}, // sticker id -> how many
     boardWins: {}, // board size -> wins against the CPU on it
     helpedFacts: {}, // '6 × 7' -> true after "Help me count" on it, until it's answered right first time
@@ -83,6 +86,7 @@ function normalize(saved) {
     facts: saved.facts || {},
     stickers: saved.stickers || {},
     boardWins: saved.boardWins || {},
+    journey: { level: 1, ...(saved.journey || {}) },
     helpedFacts: saved.helpedFacts || {},
     cheats: saved.cheats || {},
     activity: Array.isArray(saved.activity) ? saved.activity : [],
@@ -129,6 +133,14 @@ function normalize(saved) {
     if (played && !state.unlocks.includes('board12')) state.unlocks.push('board12');
     state.boardsV2 = true;
   }
+  // Boards and difficulties became Journey levels: an older save starts on the
+  // highest level what it owns or has won reaches (6, today's Easy 6×6, at
+  // least once it has played), and gets everything up to it.
+  if (!saved.journeyV1) {
+    state.journey.level = Math.max(state.journey.level, startLevel(state));
+    state.journeyV1 = true;
+  }
+  grantJourney(state);
   // The old all-in-one timer unlock (10/20/30 s) becomes the 30 s and 10 s unlocks.
   if (state.unlocks.includes('answerTime')) {
     state.unlocks = state.unlocks.filter((id) => id !== 'answerTime');
@@ -271,22 +283,21 @@ const SHOP = [
   { id: 'practice', group: 'Modes', name: 'Practice mode (5 questions)', price: 100 },
   // Skill-tree chains: each one needs the one before it (`requires`); the UI only
   // shows the next step, the rest are locked placeholders.
-  // Boards: you also have to win a game on the board before (`winOn`) to see the next one.
-  { id: 'board8', group: 'Boards', name: 'Board 8×8', price: 50, winOn: 6, perk: `Finish a game against the CPU on it for +${boardFinishBonus(8)} bonus points.` },
-  { id: 'board10', group: 'Boards', name: 'Board 10×10', price: 80, requires: 'board8', winOn: 8, perk: `Finish a game against the CPU on it for +${boardFinishBonus(10)} bonus points.` },
-  { id: 'board12', group: 'Boards', name: 'Board 12×12', price: 120, requires: 'board10', winOn: 10, perk: `Finish a game against the CPU on it for +${boardFinishBonus(12)} bonus points.` },
-  { id: 'board16', group: 'Boards', name: 'Medium board (16×16)', price: 150, requires: 'board12', winOn: 12, perk: `Finish a game against the CPU on it for +${boardFinishBonus(16)} bonus points.` },
-  { id: 'board20', group: 'Boards', name: 'Large board (20×20)', price: 300, requires: 'board16', winOn: 16, perk: `Finish a game against the CPU on it for +${boardFinishBonus(20)} bonus points.` },
-  { id: 'board24', group: 'Boards', name: 'Huge board (24×24)', price: 450, requires: 'board20', winOn: 20, perk: `Finish a game against the CPU on it for +${boardFinishBonus(24)} bonus points.` },
-  { id: 'boardCustom', group: 'Boards', name: 'Custom board size', price: 400, requires: 'board24', winOn: 24, perk: `Any size from 6 to 30. Its finishing bonus matches the biggest standard board it reaches (+${boardFinishBonus(24)} from 24×24 up).` },
-  // Difficulties: you also have to master most of the times table the one before
-  // asks (`masterUpTo`, see tableReady) to see the next one.
-  { id: 'difficulty.medium', group: 'Difficulty', name: 'Medium: 8-sided dice', price: 250, masterUpTo: 6 },
-  { id: 'difficulty.hard', group: 'Difficulty', name: 'Hard: 12-sided dice', price: 500, requires: 'difficulty.medium', masterUpTo: 8 },
+  // Boards and difficulties aren't bought: reaching a Journey level unlocks them
+  // (`journey`, see levels.js), for Free play and everything keyed on them.
+  { id: 'board8', group: 'Boards', name: 'Board 8×8', price: 0, journey: levelGranting('board8') },
+  { id: 'board10', group: 'Boards', name: 'Board 10×10', price: 0, journey: levelGranting('board10') },
+  { id: 'board12', group: 'Boards', name: 'Board 12×12', price: 0, journey: levelGranting('board12') },
+  { id: 'board16', group: 'Boards', name: 'Medium board (16×16)', price: 0, journey: levelGranting('board16') },
+  { id: 'board20', group: 'Boards', name: 'Large board (20×20)', price: 0, journey: levelGranting('board20') },
+  { id: 'board24', group: 'Boards', name: 'Huge board (24×24)', price: 0, journey: levelGranting('board24') },
+  { id: 'boardCustom', group: 'Boards', name: 'Custom board size', price: 0, journey: levelGranting('boardCustom') },
+  { id: 'difficulty.medium', group: 'Difficulty', name: 'Medium: 8-sided dice', price: 0, journey: levelGranting('difficulty.medium') },
+  { id: 'difficulty.hard', group: 'Difficulty', name: 'Hard: 12-sided dice', price: 0, journey: levelGranting('difficulty.hard') },
   // After Hard: harder facts rather than bigger numbers (see Core.diceFaces)
-  { id: 'difficulty.tricky', group: 'Difficulty', name: 'Tricky: no easy facts (no ×1, ×2, ×5, ×10, ×11)', price: 700, requires: 'difficulty.hard', mastery: { size: 12, share: 0.75 } },
-  { id: 'difficulty.master', group: 'Difficulty', name: 'Master: the dice go after your weakest facts', price: 900, requires: 'difficulty.tricky', mastery: { faces: Core.TRICKY_FACES, share: 0.75 } },
-  { id: 'difficulty.legend', group: 'Difficulty', name: 'Legend: two-digit × one-digit (like 14 × 7) mixed with Tricky facts', price: 1200, requires: 'difficulty.master', mastery: { size: 12, share: 0.9 } },
+  { id: 'difficulty.tricky', group: 'Difficulty', name: 'Tricky: no easy facts (no ×1, ×2, ×5, ×10, ×11)', price: 0, journey: levelGranting('difficulty.tricky') },
+  { id: 'difficulty.master', group: 'Difficulty', name: 'Master: the dice go after your weakest facts', price: 0, journey: levelGranting('difficulty.master') },
+  { id: 'difficulty.legend', group: 'Difficulty', name: 'Legend: two-digit × one-digit (like 14 × 7) mixed with Tricky facts', price: 0, journey: levelGranting('difficulty.legend') },
   // Placing rectangles: Click first, then Auto (drawing is free)
   { id: 'placeMode', group: 'Settings', name: 'Placing: click to place', price: 40 },
   { id: 'placeAuto', group: 'Settings', name: 'Placing: auto (placed for you)', price: 60, requires: 'placeMode' },
@@ -346,12 +357,8 @@ function canBuy(state, id, now = new Date()) {
   if (!item) return { ok: false, reason: 'unknown' };
   if (isUnlocked(state, id)) return { ok: false, reason: 'owned' };
   if (item.available && !item.available(now)) return { ok: false, reason: 'season', when: item.seasonLabel };
+  if (item.journey) return { ok: false, reason: 'journey', level: item.journey };
   if (item.requires && !isUnlocked(state, item.requires)) return { ok: false, reason: 'requires', requires: item.requires };
-  if (item.winOn && !hasWonOn(state, item.winOn)) return { ok: false, reason: 'win', size: item.winOn };
-  if (item.masterUpTo || item.mastery) {
-    const ready = tableReady(state, item.mastery || item.masterUpTo);
-    if (!ready.ok) return { ok: false, reason: 'master', ...ready };
-  }
   if (state.wallet < item.price) return { ok: false, reason: 'points', missing: item.price - state.wallet };
   return { ok: true };
 }
@@ -364,7 +371,7 @@ function nextInChain(state, id) {
   return item ? item.id : id;
 }
 
-// Wins against the CPU, per board size: winning on a board reveals the next one.
+// Wins against the CPU, per board size (stats, and an old save's Journey level).
 const hasWonOn = (state, size) => (state.boardWins[size] || 0) > 0;
 function recordBoardWin(state, size) {
   state.boardWins[size] = (state.boardWins[size] || 0) + 1;
@@ -393,15 +400,63 @@ function tableReady(state, spec, name = 'You') {
   return { ok: mastered >= need && practice === 0, size: size || Math.max(...list), ...(faces ? { faces } : {}), mastered, need, total, practice };
 }
 
-// Locked and not next in line (or not earned yet, by a win or by knowing the
-// times table): shown as a locked placeholder with no name or price.
+// Locked and not next in line (or a Journey unlock not reached yet): shown as a
+// locked placeholder with no name or price.
 function isHidden(state, id) {
   if (!id || isUnlocked(state, id)) return false;
-  if (nextInChain(state, id) !== id) return true;
   const item = shopItem(id);
-  if (!item) return false;
-  if (item.winOn && !hasWonOn(state, item.winOn)) return true;
-  return Boolean((item.masterUpTo || item.mastery) && !tableReady(state, item.mastery || item.masterUpTo).ok);
+  if (item && item.journey) return true;
+  return nextInChain(state, id) !== id;
+}
+
+// ---------------------------------------------------------------- the Journey
+// One path through boards and dice (levels.js). Beating the CPU on your level
+// with most answers right first try moves you up a level.
+
+const LEVEL_GOAL = { firstTry: 0.8 };
+const levelUpReward = (level) => 10 * level;
+const journeyLevel = (state) => Math.min(DONE, Math.max(1, Number(state.journey && state.journey.level) || 1));
+
+// Unlock every board and difficulty the level reached gives (idempotent)
+function grantJourney(state) {
+  for (const id of grantsUpTo(journeyLevel(state))) if (!state.unlocks.includes(id)) state.unlocks.push(id);
+}
+
+// An older save's level: the highest one its boards, difficulties and wins
+// reach (a win on n×n up to 12 passes level n), at least 6 once it has played.
+function startLevel(state) {
+  const played = (state.counters.games || 0) > 0 || Object.keys(state.facts).length > 0;
+  let level = played ? 6 : 1;
+  for (const id of state.unlocks) level = Math.max(level, levelGranting(id) || 0);
+  for (const [size, wins] of Object.entries(state.boardWins)) if (wins > 0 && Number(size) <= 12) level = Math.max(level, Number(size) + 1);
+  return Math.min(level, DONE);
+}
+
+// How a game on a level went: { won, answered, firstTry } (the human's) →
+// { won, accuracy, passed, missing: null | 'win' | 'accuracy' }
+function levelResult({ won, answered = 0, firstTry = 0 }) {
+  const accuracy = answered ? firstTry / answered : 0;
+  const good = accuracy >= LEVEL_GOAL.firstTry;
+  return { won: Boolean(won), accuracy, passed: Boolean(won) && good, missing: !won ? 'win' : good ? null : 'accuracy' };
+}
+
+// A finished single-player game on Journey `level`. Only your current level
+// moves you up: { ...levelResult, current, advanced, from, to, grants, reward, earned }.
+function recordLevelGame(state, level, game) {
+  const result = levelResult(game);
+  const from = journeyLevel(state);
+  const out = { ...result, current: level === from && from < DONE, advanced: false, from, to: from, grants: [], reward: 0, earned: [] };
+  if (!out.current || !result.passed) return out;
+  const before = new Set(state.unlocks);
+  state.journey = { ...state.journey, level: from + 1 };
+  grantJourney(state);
+  out.advanced = true;
+  out.to = from + 1;
+  out.grants = state.unlocks.filter((id) => !before.has(id));
+  out.reward = levelUpReward(from);
+  addPoints(state, out.reward);
+  out.earned = awardAchievements(state, { event: 'level', level: out.to });
+  return out;
 }
 
 function buy(state, id, now = new Date()) {
@@ -632,6 +687,13 @@ const SCORE_TIERS = [
   { score: 250, icon: '💎', name: 'Diamond score', reward: 50 },
   { score: 400, icon: '👑', name: 'Champion score', reward: 100 },
 ];
+// Climbing the Journey (see recordLevelGame)
+const JOURNEY_ACHIEVEMENTS = [
+  { id: 'journey_6', icon: '🧗', name: 'On your way', desc: 'Reach Level 6 on your Journey.', reward: 30, check: (c) => c.event === 'level' && c.level >= 6 },
+  { id: 'journey_12', icon: '⛰️', name: 'Twelve by twelve', desc: 'Reach Level 12 on your Journey.', reward: 100, check: (c) => c.event === 'level' && c.level >= 12 },
+  { id: 'journey_done', icon: '🏔️', name: 'Top of the mountain', desc: 'Finish every level of your Journey.', reward: 300, check: (c) => c.event === 'level' && c.level >= DONE },
+].map((a) => ({ ...a, group: 'Journey' }));
+
 const SCORE_ACHIEVEMENTS = SCORE_TIERS.map((t) => ({
   id: `score${t.score}`,
   icon: t.icon,
@@ -682,7 +744,7 @@ const SECRET_ACHIEVEMENTS = [
   { id: 'cheat_fivemoreminutesmom', icon: '🛏️', name: 'ETA 5 MINUTES TO BEDTIME BOYS', desc: 'Every timer is 5 minutes. Just five more minutes, Mom!', reward: 1, check: (c) => c.event === 'cheat' && c.code === 'fivemoreminutesmom' },
 ].map((a) => ({ ...a, group: 'Secrets', hidden: true }));
 
-const ACHIEVEMENTS = [...GENERAL_ACHIEVEMENTS, ...CLASS_ACHIEVEMENTS, ...SCORE_ACHIEVEMENTS, ...TABLE_ACHIEVEMENTS, ...FACT_SPEED_ACHIEVEMENTS, ...SECRET_ACHIEVEMENTS];
+const ACHIEVEMENTS = [...GENERAL_ACHIEVEMENTS, ...JOURNEY_ACHIEVEMENTS, ...CLASS_ACHIEVEMENTS, ...SCORE_ACHIEVEMENTS, ...TABLE_ACHIEVEMENTS, ...FACT_SPEED_ACHIEVEMENTS, ...SECRET_ACHIEVEMENTS];
 
 // Award every achievement this event completes; returns the new ones.
 function awardAchievements(state, ctx) {
@@ -751,6 +813,8 @@ function mergeProgress(a, b) {
   out.counters = maxOf(x.counters, y.counters);
   out.stickers = maxOf(x.stickers, y.stickers);
   out.boardWins = maxOf(x.boardWins, y.boardWins);
+  out.journey = { ...out.journey, level: Math.max(journeyLevel(x), journeyLevel(y)) };
+  grantJourney(out);
   out.checkIn = (x.checkIn.last || '') >= (y.checkIn.last || '') ? x.checkIn : y.checkIn;
   // today's practice: the later day's, and on the same day the one that's done
   const dx = x.daily || {};
@@ -938,6 +1002,13 @@ export {
   isHidden,
   hasWonOn,
   recordBoardWin,
+  LEVELS,
+  DONE as JOURNEY_DONE,
+  LEVEL_GOAL,
+  levelUpReward,
+  journeyLevel,
+  levelResult,
+  recordLevelGame,
   tableReady,
   noteHelp,
   learnedAfterHelp,

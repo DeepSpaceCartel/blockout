@@ -8,12 +8,6 @@ const fresh = (points = 0) => {
   Progress.addPoints(s, points);
   return s;
 };
-// a player who has won on 6×6, so Board 8×8 is revealed
-const won6 = (points = 0) => {
-  const s = fresh(points);
-  Progress.recordBoardWin(s, 6);
-  return s;
-};
 const row = (state, id) => Shop.shopGroups(state).flatMap((g) => g.rows).find((r) => r.item.id === id);
 
 test('the Shop lists items in groups, without the Wardrobe looks', () => {
@@ -22,60 +16,59 @@ test('the Shop lists items in groups, without the Wardrobe looks', () => {
   assert.ok(groups.every((g) => g.rows.length && g.rows.every((r) => !r.item.cosmetic && r.item.group === g.name)));
 });
 
-test('a board stays blurred until a win on the one before reveals it', () => {
-  const s = fresh(1000);
-  assert.equal(row(s, 'board8').hidden, true);
-  assert.equal(row(s, 'board8').why, 'Win a game on 6×6 to reveal it');
-  assert.equal(Shop.unlockOffer(s, 'board8').kind, 'earn');
-  assert.match(Shop.unlockOffer(s, 'board8').message, /Win a game against the CPU on the 6×6 board/);
+test('boards and difficulties are Journey unlocks: not in the Shop, tapping one says which level', () => {
+  const s = fresh(10000);
+  assert.equal(row(s, 'board8'), undefined);
+  assert.equal(row(s, 'difficulty.medium'), undefined);
+  assert.equal(Shop.availableIds(s).has('board8'), false);
+  const offer = Shop.unlockOffer(s, 'board8');
+  assert.equal(offer.kind, 'earn');
+  assert.match(offer.message, /Reach Level 8 on your Journey/);
+  assert.match(Shop.unlockOffer(s, 'difficulty.hard').message, /Level 9/);
 });
 
 test('the next step shows its name and price; the one after is blurred', () => {
-  const s = won6();
-  const board8 = row(s, 'board8');
-  assert.equal(board8.hidden, false);
-  assert.equal(board8.canBuy, false);
-  assert.equal(board8.why, 'Need 50 more');
-  assert.equal(row(s, 'board10').hidden, true);
-  assert.match(row(s, 'board10').why, /reveal it|before it/);
+  const s = fresh();
+  const multi = row(s, 'multiplayer');
+  assert.equal(multi.hidden, false);
+  assert.equal(multi.canBuy, false);
+  assert.equal(multi.why, 'Need 150 more');
+  assert.equal(row(s, 'players4').hidden, true);
+  assert.match(row(s, 'players4').why, /before it/);
 });
 
 test('with the points, it can be bought; afterwards it is owned', () => {
-  const s = won6(1000);
-  assert.equal(row(s, 'board8').canBuy, true);
-  assert.ok(Shop.availableIds(s).has('board8'));
-  const r = Shop.purchase(s, 'board8');
+  const s = fresh(1000);
+  assert.equal(row(s, 'multiplayer').canBuy, true);
+  assert.ok(Shop.availableIds(s).has('multiplayer'));
+  const r = Shop.purchase(s, 'multiplayer');
   assert.equal(r.ok, true);
-  assert.deepEqual(r.toast, ['🔓 Unlocked: Board 8×8', '-50 points']);
-  assert.equal(row(s, 'board8').owned, true);
-  assert.equal(Shop.purchase(s, 'board8').ok, false, 'not twice');
+  assert.deepEqual(r.toast, ['🔓 Unlocked: Multiplayer (2 players)', '-150 points']);
+  assert.equal(row(s, 'multiplayer').owned, true);
+  assert.equal(Shop.purchase(s, 'multiplayer').ok, false, 'not twice');
 });
 
-test('tapping a locked thing offers it, or what has to come first, or says how to reveal it', () => {
-  const rich = won6(10000);
-  const offer = Shop.unlockOffer(rich, 'board8');
+test('tapping a locked thing offers it, or what has to come first', () => {
+  const rich = fresh(10000);
+  const offer = Shop.unlockOffer(rich, 'multiplayer');
   assert.equal(offer.kind, 'offer');
-  assert.equal(offer.item.id, 'board8');
+  assert.equal(offer.item.id, 'multiplayer');
   assert.equal(offer.same, true);
-  assert.match(offer.title, /^Unlock Board 8×8\?/);
-  // an item whose step before is for sale (no win or mastery needed): offering that one first
-  const gated = (i) => i.winOn || i.masterUpTo || i.mastery || i.available;
+  assert.match(offer.title, /^Unlock Multiplayer/);
+  // an item whose step before is for sale: offering that one first
+  const gated = (i) => i.journey || i.available;
   const pair = Progress.SHOP.find((i) => i.requires && !gated(i) && !gated(Progress.shopItem(i.requires)) && !Progress.shopItem(i.requires).requires && !i.cosmetic);
   assert.ok(pair, 'the catalogue has such a chain');
   const first = Shop.unlockOffer(rich, pair.id);
   assert.equal(first.kind, 'offer');
   assert.equal(first.item.id, pair.requires);
   assert.equal(first.same, false);
-  // difficulties are revealed by knowing the table, not bought straight away
-  const hard = Shop.unlockOffer(rich, 'difficulty.hard');
-  assert.equal(hard.kind, 'earn');
-  assert.match(hard.message, /Master 27 of the 36 facts up to 6 × 6/);
-  const poor = Shop.unlockOffer(won6(10), 'board8');
+  const poor = Shop.unlockOffer(fresh(10), 'multiplayer');
   assert.equal(poor.kind, 'info');
-  assert.match(poor.message, /You need 40 more points/);
-  const hidden = Shop.unlockOffer(won6(10000), 'board10');
-  assert.ok(['earn', 'offer', 'info'].includes(hidden.kind));
-  if (hidden.kind === 'earn') assert.match(hidden.message, /to reveal the next/);
+  assert.match(poor.message, /You need 140 more points/);
+  const hidden = Shop.unlockOffer(rich, 'players4');
+  assert.equal(hidden.kind, 'offer');
+  assert.equal(hidden.item.id, 'multiplayer');
 });
 
 test('what is new: affordable unlocks and looks, new and spare stickers', () => {

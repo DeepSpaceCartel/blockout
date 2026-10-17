@@ -23,25 +23,18 @@ export function buyReason(r) {
       return `Need ${formatPoints(r.missing)} more`;
     case 'requires':
       return `Unlock ${Progress.shopItem(r.requires).name.split(':')[0]} first`;
-    case 'win':
-      return `Win a game on ${r.size}×${r.size} first`;
-    case 'master':
-      return `Master your Times Table up to ${r.size} × ${r.size} first`;
+    case 'journey':
+      return `Reach Level ${r.level} on your Journey`;
     default:
       return '';
   }
 }
 
-// What to do to reveal a hidden board or difficulty (a win, or knowing the table)
-export function revealHint(r) {
-  if (r.reason === 'win') return `Win a game against the CPU on the ${r.size}×${r.size} board to reveal the next board.`;
-  const extra = r.practice ? ` and get the ${r.practice} ${r.practice === 1 ? 'fact' : 'facts'} that need practice back on track` : '';
-  const which = r.faces ? `using ${tablesLabel(r.faces)}` : `up to ${r.size} × ${r.size}`;
-  return `Master ${r.need} of the ${r.total} facts ${which} on your Times Table${extra} to reveal the next difficulty. You have ${r.mastered} so far. Practice helps!`;
-}
+// What unlocks a board or difficulty: a level of the Journey
+export const revealHint = (r) => `Reach Level ${r.level} on your Journey to unlock it. Play › moves you up a level when you beat the CPU.`;
 
-// Shop items that aren't Wardrobe looks
-const shopItems = () => Progress.SHOP.filter((item) => !item.cosmetic);
+// Shop items that are bought (not Wardrobe looks, not Journey unlocks)
+const shopItems = () => Progress.SHOP.filter((item) => !item.cosmetic && !item.journey);
 
 // What can be bought right now (ids)
 export const availableIds = (state) => new Set(shopItems().filter((i) => Progress.canBuy(state, i.id).ok).map((i) => i.id));
@@ -60,7 +53,7 @@ export function shopGroups(state, only = null) {
     const check = owned ? null : Progress.canBuy(state, item.id);
     let why = null;
     if (hidden) {
-      why = check.reason === 'win' ? `Win a game on ${check.size}×${check.size} to reveal it` : check.reason === 'master' ? `Master your Times Table up to ${check.size} × ${check.size} to reveal it (${check.mastered} of ${check.need})` : 'Unlock the one before it first';
+      why = 'Unlock the one before it first';
     } else if (check && !check.ok) why = buyReason(check);
     group.rows.push({ item, owned, hidden, canBuy: Boolean(check && check.ok), why });
   }
@@ -71,11 +64,12 @@ export function shopGroups(state, only = null) {
 // about what has to come first. Returns:
 //   { kind: 'offer', item, title, price, message }   "Unlock X?" with a buy button
 //   { kind: 'info', item, title, price, message }    can't be bought yet (OK only)
-//   { kind: 'earn', title, message }                 revealed by a win or by knowing the table
+//   { kind: 'earn', title, message }                 unlocked by the Journey, not bought
 // item is what a "yes" buys (maybe the prerequisite); same: it's what was tapped.
 export function unlockOffer(state, itemId) {
   let item = Progress.shopItem(itemId);
   const check = Progress.canBuy(state, itemId);
+  if (check.reason === 'journey') return { kind: 'earn', title: '🔒 Locked', message: revealHint(check) };
   let offer = check.ok;
   let message = null;
   let same = true;
@@ -83,7 +77,6 @@ export function unlockOffer(state, itemId) {
     // a locked placeholder: offer the next step, without saying what this one is
     item = Progress.shopItem(Progress.nextInChain(state, itemId));
     const next = Progress.canBuy(state, item.id);
-    if (next.reason === 'win' || next.reason === 'master') return { kind: 'earn', title: '🔒 Locked', message: revealHint(next) };
     offer = next.ok;
     message = 'Unlock this first to see what comes next.';
     if (next.reason === 'points') message += ` You need ${formatPoints(next.missing)} more points for it.`;

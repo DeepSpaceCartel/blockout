@@ -30,6 +30,7 @@ nav:
   - Application:
       - Architecture: concepts/architecture.md
       - Security: concepts/security.md
+      - Progression: concepts/progression.md
       - Privacy: privacy.md
       - Configuration: reference/CONFIGURATION.md
       - HTTP API: reference/HTTP-API.md
@@ -49,6 +50,7 @@ nav:
       - 0007. Live classes in Redis: decisions/0007-live-classes-in-redis.md
       - 0008. Roles kept by Blockout, changed by invites: decisions/0008-roles-in-blockout.md
       - 0009. One Helm chart for everything: decisions/0009-one-chart.md
+      - 0010. Boards and difficulties are Journey levels: decisions/0010-journey-progression.md
 
 theme:
   name: material

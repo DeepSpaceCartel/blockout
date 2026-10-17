@@ -25,20 +25,18 @@ function master(s, size, skip = new Set()) {
 test('shop: buying needs points, prerequisites, and only happens once', () => {
   const s = P.createProgress();
   assert.equal(P.isUnlocked(s, null), true);
-  assert.deepEqual(P.buy(s, 'board8'), { ok: false, reason: 'win', size: 6 });
-  P.recordBoardWin(s, 6);
-  assert.deepEqual(P.buy(s, 'board8'), { ok: false, reason: 'points', missing: 50 });
+  assert.deepEqual(P.buy(s, 'multiplayer'), { ok: false, reason: 'points', missing: 150 });
   s.wallet = 1000;
-  assert.deepEqual(P.buy(s, 'difficulty.hard'), { ok: false, reason: 'requires', requires: 'difficulty.medium' });
-  assert.deepEqual(P.buy(s, 'board8'), { ok: true });
-  assert.equal(s.wallet, 950);
-  assert.equal(P.isUnlocked(s, 'board8'), true);
-  assert.deepEqual(P.buy(s, 'board8'), { ok: false, reason: 'owned' });
-  master(s, 8); // difficulties are earned by knowing the times table
-  assert.equal(P.buy(s, 'difficulty.medium').ok, true);
-  assert.equal(P.buy(s, 'difficulty.hard').ok, true);
-  assert.equal(s.wallet, 1000 - 50 - 250 - 500);
-  assert.deepEqual(P.buy(s, 'goldenDice'), { ok: false, reason: 'points', missing: 10000 - 200 });
+  assert.deepEqual(P.buy(s, 'players3'), { ok: false, reason: 'requires', requires: 'multiplayer' });
+  assert.deepEqual(P.buy(s, 'multiplayer'), { ok: true });
+  assert.equal(s.wallet, 850);
+  assert.equal(P.isUnlocked(s, 'multiplayer'), true);
+  assert.deepEqual(P.buy(s, 'multiplayer'), { ok: false, reason: 'owned' });
+  // boards and difficulties come from the Journey, never the wallet
+  assert.deepEqual(P.buy(s, 'board8'), { ok: false, reason: 'journey', level: 8 });
+  assert.deepEqual(P.buy(s, 'difficulty.hard'), { ok: false, reason: 'journey', level: 9 });
+  assert.equal(s.wallet, 850);
+  assert.deepEqual(P.buy(s, 'goldenDice'), { ok: false, reason: 'points', missing: 10000 - 850 });
   s.wallet = 10000;
   assert.equal(P.buy(s, 'goldenDice').ok, true);
   assert.equal(s.wallet, 0);
@@ -191,8 +189,8 @@ test('practice can be limited to chosen times tables', () => {
 });
 
 test('old timer unlock becomes the 30 s and 10 s unlocks', () => {
-  const s = P.normalize({ unlocks: ['answerTime', 'board16'] });
-  assert.deepEqual(s.unlocks.sort(), ['answerTime10', 'answerTime30', 'board16']);
+  const s = P.normalize({ unlocks: ['answerTime', 'cpuSpeed'] });
+  assert.deepEqual(s.unlocks.sort(), ['answerTime10', 'answerTime30', 'cpuSpeed']);
   // now a chain: 30 s, then 10 s, then 5 s
   assert.equal(P.shopItem('answerTime10').requires, 'answerTime30');
   assert.equal(P.shopItem('answerTime5').requires, 'answerTime10');
@@ -201,45 +199,32 @@ test('old timer unlock becomes the 30 s and 10 s unlocks', () => {
 test('skill trees: only the next step in a chain shows; the rest are hidden', () => {
   const s = P.createProgress();
   s.wallet = 5000;
-  assert.equal(P.isHidden(s, 'board8'), true); // hidden until you win on 6×6
-  P.recordBoardWin(s, 6);
-  assert.equal(P.isHidden(s, 'board8'), false); // next after the free 6×6
-  assert.equal(P.isHidden(s, 'board10'), true);
-  assert.equal(P.nextInChain(s, 'boardCustom'), 'board8');
-  assert.equal(P.buy(s, 'board10').reason, 'requires');
-  P.buy(s, 'board8');
-  assert.equal(P.isHidden(s, 'board10'), true); // owning 8×8 isn't enough: win on it too
-  assert.deepEqual(P.canBuy(s, 'board10'), { ok: false, reason: 'win', size: 8 });
-  P.recordBoardWin(s, 8);
-  assert.equal(P.isHidden(s, 'board10'), false);
-  assert.equal(P.isHidden(s, 'board12'), true);
   assert.equal(P.isHidden(s, 'answerTime10'), true);
   assert.equal(P.isHidden(s, 'answerTime30'), false);
+  assert.equal(P.nextInChain(s, 'answerTime5'), 'answerTime30');
+  P.buy(s, 'answerTime30');
+  assert.equal(P.isHidden(s, 'answerTime10'), false);
+  assert.equal(P.isHidden(s, 'answerTime5'), true);
+  // Journey unlocks stay hidden until their level is reached
+  assert.equal(P.isHidden(s, 'board8'), true);
+  assert.equal(P.isHidden(P.normalize({ ...s, journey: { level: 8 } }), 'board8'), false);
 });
 
-test('difficulties: revealed by mastering most of the times table the one before asks', () => {
+test('Times Table readiness: most facts mastered and none needing practice', () => {
   const s = P.createProgress();
-  s.wallet = 5000;
-  assert.equal(P.isHidden(s, 'difficulty.medium'), true);
-  assert.deepEqual(P.canBuy(s, 'difficulty.medium'), { ok: false, reason: 'master', size: 6, mastered: 0, need: 27, total: 36, practice: 0 });
+  assert.deepEqual(P.tableReady(s, 6), { ok: false, size: 6, mastered: 0, need: 27, total: 36, practice: 0 });
   // 26 of 36 mastered: not yet
   const skip = new Set();
   for (let b = 1; b <= 6; b++) skip.add(P.factKey(6, b));
   for (let b = 1; b <= 4; b++) skip.add(P.factKey(5, b));
   master(s, 6, skip);
   assert.equal(P.tableReady(s, 6).mastered, 26);
-  assert.equal(P.isHidden(s, 'difficulty.medium'), true);
+  assert.equal(P.tableReady(s, 6).ok, false);
   // 27: yes, unless something needs practice
   master(s, 6, new Set([...skip].slice(1)));
-  assert.equal(P.isHidden(s, 'difficulty.medium'), false);
+  assert.equal(P.tableReady(s, 6).ok, true);
   s.facts[P.playerKey('You')].facts[P.factKey(6, 6)] = { asked: 4, firstTry: 1, wrong: 3, timeouts: 0, said: [], times: [] };
-  assert.equal(P.isHidden(s, 'difficulty.medium'), true);
-  master(s, 6);
-  assert.equal(P.buy(s, 'difficulty.medium').ok, true);
-  // Hard: the facts up to 8 × 8
-  assert.equal(P.isHidden(s, 'difficulty.hard'), true);
-  master(s, 8);
-  assert.equal(P.isHidden(s, 'difficulty.hard'), false);
+  assert.equal(P.tableReady(s, 6).ok, false);
 });
 
 test('practice: 5 questions come with it; 10, 20 and each times table are bought in order', () => {
@@ -291,10 +276,11 @@ test('fact speed tiers: mastered plus best time under 10, 5 and 1 seconds, per f
 });
 
 test('normalize fills in missing fields', () => {
-  const s = P.normalize({ wallet: 42, unlocks: ['board16'] });
+  const s = P.normalize({ wallet: 42, unlocks: ['cpuSpeed'] });
   assert.equal(s.wallet, 42);
-  assert.deepEqual(s.unlocks, ['board16']);
+  assert.deepEqual(s.unlocks, ['cpuSpeed']);
   assert.deepEqual(s.checkIn, { last: null, streak: 0 });
+  assert.deepEqual(s.journey, { level: 1 });
   assert.deepEqual(P.normalize(null), P.createProgress());
 });
 
@@ -377,7 +363,6 @@ test('board finishing bonus: nothing on 6×6, growing faster than the board; cus
   assert.deepEqual([8, 10, 12, 16, 20, 24].map(P.boardFinishBonus), [5, 10, 20, 40, 70, 100]);
   assert.equal(P.boardFinishBonus(14), 20); // custom: the biggest standard board it reaches
   assert.equal(P.boardFinishBonus(30), 100);
-  assert.match(P.shopItem('board16').perk, /\+40 bonus points/);
 });
 
 test('expert practice timers are unlocked separately for each difficulty', () => {
@@ -444,17 +429,9 @@ test('single player Expert and its timers are unlocked for each difficulty; old 
   assert.equal(P.isUnlocked(old, 'gameTimer5'), false);
 });
 
-test('difficulties after Hard: a chain gated by mastery, each with its own unlocks', () => {
-  const s = P.createProgress();
-  s.wallet = 100000;
-  s.unlocks.push('difficulty.medium', 'difficulty.hard');
-  assert.equal(P.isHidden(s, 'difficulty.tricky'), true);
-  assert.deepEqual(P.canBuy(s, 'difficulty.master'), { ok: false, reason: 'requires', requires: 'difficulty.tricky' });
-  master(s, 12);
-  assert.equal(P.buy(s, 'difficulty.tricky').ok, true);
-  assert.equal(P.buy(s, 'difficulty.master').ok, true); // Tricky's facts are within 12 × 12
-  assert.equal(P.canBuy(s, 'difficulty.legend').ok, true);
-  // Master's gate counts only Tricky's facts
+test('difficulties after Hard: Journey levels, each with its own unlocks', () => {
+  assert.deepEqual(['tricky', 'master', 'legend'].map((d) => P.shopItem(`difficulty.${d}`).journey), [14, 16, 17]);
+  // Master's dice weighting counts only Tricky's facts
   const t = P.createProgress();
   const ready = P.tableReady(t, { faces: [3, 4], share: 0.75 });
   assert.deepEqual([ready.total, ready.need, ready.ok], [4, 3, false]);

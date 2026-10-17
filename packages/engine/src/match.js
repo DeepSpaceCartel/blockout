@@ -16,7 +16,8 @@ const PHASES = ['roll', 'place', 'stuck', 'answer', 'scored', 'cpu', 'over'];
 const noBonus = () => ({ total: 0, parts: [] });
 
 // players: [{ name, cpu }]. mode: 'single' (you vs the CPU) or 'multi' (one screen).
-function createMatch({ size = 6, difficulty = 'easy', players, mode = 'single', expert = false, bonusMultiplier = 1, firstInCorner = false, fitMode = 'end', weight = null, rng = Math.random, answerBonus = noBonus, now = Date.now } = {}) {
+// sides: numbered dice other than the difficulty's (a Journey level's d1 … d12).
+function createMatch({ size = 6, difficulty = 'easy', sides = null, players, mode = 'single', expert = false, bonusMultiplier = 1, firstInCorner = false, fitMode = 'end', weight = null, rng = Math.random, answerBonus = noBonus, now = Date.now } = {}) {
   if (!players || !players.length) throw new Error('a match needs players');
   const pairDice = Core.usesPairDice(difficulty);
   return {
@@ -30,8 +31,9 @@ function createMatch({ size = 6, difficulty = 'easy', players, mode = 'single', 
     rng,
     fitMode,
     board: Core.createBoard(size, { firstInCorner }),
-    faces: Core.diceFaces(difficulty),
-    diceBag: pairDice ? Core.createPairDice(size, rng, difficulty, weight) : Core.createDice(size, rng, Core.DIFFICULTY_SIDES[difficulty] || 6),
+    faces: Core.diceFaces(difficulty, sides),
+    sides: pairDice ? null : sides || Core.DIFFICULTY_SIDES[difficulty] || 6,
+    diceBag: pairDice ? Core.createPairDice(size, rng, difficulty, weight) : Core.createDice(size, rng, sides || Core.DIFFICULTY_SIDES[difficulty] || 6),
     players: players.map((p) => ({
       ...p, // (a client's own fields: colours, avatars, the name stats go under)
       name: p.name,

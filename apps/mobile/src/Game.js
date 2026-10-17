@@ -28,6 +28,7 @@ import { dragRect, drawnMessage } from './boardMath';
 import * as Rewards from './rewards';
 import * as Live from '@blockout/progress/classroom';
 import * as Daily from '@blockout/progress/daily';
+import * as Journey from '@blockout/progress/journey';
 import { addToHistory, recordGame } from './history';
 import { useTheme } from './theme';
 import { usePlayerColors } from './looks';
@@ -749,8 +750,8 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
   // ---- the end
 
   function finish(results) {
-    const rewards = Rewards.onGameOver(progress, match, results);
-    if (Rewards.countsForStats(match)) recordGame(match, results); // (two players on one phone: just for fun)
+    const rewards = Rewards.onGameOver(progress, match, results, setup.journeyLevel);
+    if (Rewards.countsForStats(match)) recordGame(setup.journeyLevel ? { ...match, level: setup.journeyLevel } : match, results); // (two players on one phone: just for fun)
     if (rewards.boardBonus) toast(`🏁 Finished ${article(match.size)} ${match.size}×${match.size} game!`, `+${rewards.boardBonus} bonus points`);
     award(rewards.earned);
     const daily = match.mode === 'single' && Daily.complete(progress, { kind: 'game', size: match.size, difficulty: match.difficulty, won: results.humanWon }); // (today's practice?)
@@ -759,7 +760,7 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
       award(daily.earned);
     }
     onSave();
-    setOver({ results });
+    setOver({ results, journey: rewards.journey });
     setView('board');
     redraw();
   }
@@ -795,7 +796,7 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
               <View style={styles.picks}>
                 {[0, 1].map((i) => (
                   <View key={i} style={styles.pickRow} accessibilityRole="radiogroup" accessibilityLabel={i ? 'Second die' : 'First die'}>
-                    {Array.from({ length: Core.DIFFICULTY_SIDES[match.difficulty] || 6 }, (_, k) => k + 1).map((n) => (
+                    {Array.from({ length: match.sides || Core.DIFFICULTY_SIDES[match.difficulty] || 6 }, (_, k) => k + 1).map((n) => (
                       <Pressable
                         key={n}
                         testID={`pick-${i}-${n}`}
@@ -996,6 +997,9 @@ function Results({ over, match, who, earned, onAgain, onExit }) {
   const winner = results.winners[0];
   const title = results.tie ? "It's a tie!" : match.mode === 'single' ? (winner.cpu ? `${winner.name} wins!` : 'You win! 🎉') : `${winner.name} wins! 🎉`;
   const top = results.ranked[0].score;
+  // a Journey game: moved up a level, or what it still takes
+  const journey = over.journey ? Journey.resultMessage(over.journey) : null;
+  const up = Boolean(over.journey && over.journey.advanced);
   return (
     <View testID="results" style={[styles.results, { backgroundColor: t.paper, borderColor: t.line }]}>
       <Text style={[styles.resultTitle, { color: t.ink }]}>{title}</Text>
@@ -1012,9 +1016,15 @@ function Results({ over, match, who, earned, onAgain, onExit }) {
         </View>
       ))}
       <Earned notes={earned} />
+      {journey ? (
+        <View testID="journey-result" style={[styles.journeyResult, { borderColor: up ? t.good : t.line, backgroundColor: up ? t.goodBg : t.soft }]}>
+          <Text style={[styles.resultSub, { color: up ? t.goodInk : t.ink, fontWeight: '800' }]}>{journey.title}</Text>
+          <Text style={[styles.resultSub, { color: up ? t.goodInk : t.ink }]}>{journey.text}</Text>
+        </View>
+      ) : null}
       {match.mode === 'multi' ? <Text style={[styles.resultSub, { color: t.muted }]}>Multiplayer games are just for fun: they don’t count towards Stats or achievements.</Text> : null}
       <View style={styles.resultActions}>
-        <Button title="Play Again" onPress={onAgain} style={styles.flex} testID="again" />
+        <Button title={up && over.journey.to < Journey.DONE ? `Level ${over.journey.to} ›` : 'Play Again'} onPress={onAgain} style={styles.flex} testID="again" />
         <Button kind="secondary" title="Menu" onPress={onExit} style={styles.flex} />
       </View>
     </View>
@@ -1116,6 +1126,7 @@ const styles = StyleSheet.create({
   results: { alignSelf: 'stretch', padding: 14, borderRadius: 16, borderWidth: 2, gap: 8 },
   resultTitle: { fontSize: 26, fontWeight: '800', textAlign: 'center' },
   resultSub: { fontSize: 15, textAlign: 'center' },
+  journeyResult: { gap: 2, padding: 10, borderWidth: 2, borderRadius: 10 },
   resultRow: { gap: 4 },
   resultLine: { flexDirection: 'row', justifyContent: 'space-between' },
   resultName: { fontSize: 17, fontWeight: '700' },

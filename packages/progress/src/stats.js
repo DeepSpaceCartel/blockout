@@ -63,6 +63,7 @@ export function gameRecord(game, winners, now = Date.now()) {
     duration: now - game.startedAt,
     turns: game.turns,
     difficulty: game.difficulty,
+    ...(game.level ? { level: game.level } : {}), // a Journey game
     vsComputer: game.mode === 'single', // the "vs CPU" record counts single-player games only
     players: game.players.map((p, i) => ({
       name: p.name,

@@ -5,14 +5,16 @@ import * as Match from '@blockout/engine/match';
 import * as Progress from '@blockout/progress';
 import * as Views from '@blockout/progress/views';
 import * as Stats from '@blockout/progress/stats';
+import * as Journey from '@blockout/progress/journey';
 import * as Wardrobe from '@blockout/progress/wardrobe';
 import { AUTO_PLACE_MS, AUTO_ROLL_MS, COUNT_STEP, PASS_DELAY, TRY_AGAIN, el, seededRandom, setup } from './base.js';
 import { BONUS_TOASTS, capitalize, celebrate, celebrateWin, grantStickers, progress, queueAchievements, saveProgress, toast } from './wallet.js';
 import { cpuStep, settings } from './settings.js';
-import { GAME_EXPERT_BONUS, applySettingsForTurn, icon, look, syncBoardLocks } from './wardrobe.js';
+import { GAME_EXPERT_BONUS, applySettingsForTurn, icon, look, syncBoardLocks, syncSettingsUI } from './wardrobe.js';
 import { recordGame } from './stats.js';
 import { refreshNudges } from './shop.js';
 import { completeDaily } from './daily.js';
+import { journeyGame, renderJourney } from './journey.js';
 import { playerFacts, setPractice, stopPracticeTimer, timerText, weakFactWeight } from './practice.js';
 import { pairRoll, pairTurnOrWait, reportClass } from './classroom.js';
 import { buildDicePicks, setDetailsOpen } from './input.js';
@@ -38,7 +40,11 @@ function startGame(playerDefs, size, mode, invite = null, extra = null) {
   el.practiceScreen.hidden = true;
   el.practiceDone.hidden = true;
   gameId++;
-  const cfg = { ...settings, ...(invite ? invite.s : {}), ...(extra ? extra.cfg : {}) };
+  // On the Journey the level decides the board and the dice
+  const level = mode === 'single' && !invite && !extra ? journeyGame() : null;
+  const journey = level ? Journey.levelSetup(level) : null;
+  if (journey) size = journey.size;
+  const cfg = { ...settings, ...(invite ? invite.s : {}), ...(extra ? extra.cfg : {}), ...(journey ? { difficulty: journey.difficulty } : {}) };
   const rng = invite && invite.r !== undefined ? seededRandom(invite.r) : Math.random;
   game = {
     invite,
@@ -50,10 +56,11 @@ function startGame(playerDefs, size, mode, invite = null, extra = null) {
     showProgress: cfg.showProgress,
     id: gameId,
     size,
+    level, // the Journey level this game is (null: Free play, multiplayer, class)
     mode, // 'single' (you vs the CPU), 'multi' (one screen) or 'class' (dice from the teacher)
     board: Core.createBoard(size, { firstInCorner: cfg.firstInCorner }),
     difficulty: cfg.difficulty,
-    sides: Core.DIFFICULTY_SIDES[cfg.difficulty] || 6,
+    sides: (journey && journey.sides) || Core.DIFFICULTY_SIDES[cfg.difficulty] || 6,
     cpuInstant: cfg.cpuSteps === 'instant',
     autoRoll: cfg.autoRoll === 'auto',
     fitMode: cfg.fitRolls,
@@ -94,7 +101,7 @@ function startGame(playerDefs, size, mode, invite = null, extra = null) {
   // Loaded to suit board and difficulty. After Hard, the dice deal chosen
   // pairs: Tricky skips the easy facts, Master leans on your weakest facts,
   // Legend deals a teen × a one-digit number.
-  game.faces = Core.diceFaces(cfg.difficulty);
+  game.faces = Core.diceFaces(cfg.difficulty, game.sides);
   game.diceBag = Core.usesPairDice(cfg.difficulty)
     ? Core.createPairDice(size, rng, cfg.difficulty, cfg.difficulty === 'master' ? weakFactWeight(playerDefs.find((p) => !p.cpu)) : null)
     : Core.createDice(size, rng, game.sides);
@@ -108,6 +115,7 @@ function startGame(playerDefs, size, mode, invite = null, extra = null) {
   el.resultTournament.hidden = true;
   const classroomGame = mode === 'class' || mode === 'pair';
   el.againBtn.hidden = classroomGame; // the teacher starts the next class game
+  el.againBtn.textContent = 'Play again';
   el.toMenuBtn.textContent = !classroomGame ? 'Main menu' : extra.classroom.session.host ? 'Back to the class' : 'Leave class';
   el.startScreen.hidden = true;
   el.gameOver.hidden = true;
@@ -832,10 +840,7 @@ function renderRewards(winners, empty) {
   const humanWon = winners.length === 1 && !winners[0].cpu;
   // for class stats and homework ("beat the CPU on 8×8", "finish 5 games")
   Progress.noteActivity(progress, { kind: 'game', mode: game.mode, difficulty: game.difficulty, size: game.size, won: game.mode === 'single' && humanWon });
-  if (humanWon && game.mode === 'single') {
-    Progress.recordBoardWin(progress, game.size); // reveals the next board
-    syncBoardLocks();
-  }
+  if (humanWon && game.mode === 'single') Progress.recordBoardWin(progress, game.size);
   if (game.mode === 'single') completeDaily({ kind: 'game', size: game.size, difficulty: game.difficulty, won: humanWon }); // (today's practice?)
   const asked = (p) => p.answered + p.stats.timeouts;
   const perfect = humans.some((p) => asked(p) >= 5 && p.firstTry === asked(p));
@@ -851,9 +856,30 @@ function renderRewards(winners, empty) {
     difficulty: game.difficulty,
     bestScore: Math.max(...humans.map((p) => p.score)),
   });
+  if (game.level) earned.push(...renderLevelResult(humanWon));
   grantStickers(earned); // they show up behind the Stickers button
   saveProgress();
   showRewards(earned);
+}
+
+// A Journey game: moving up a level (its boards and dice unlock), or what it
+// still takes. Returns the achievements it earned.
+function renderLevelResult(humanWon) {
+  const you = game.players.find((p) => !p.cpu);
+  const r = Progress.recordLevelGame(progress, game.level, { won: humanWon, answered: you.answered + you.stats.timeouts, firstTry: you.firstTry });
+  const message = Journey.resultMessage(r);
+  if (message) {
+    const line = make('p', 'journey-result' + (r.advanced ? ' up' : ''));
+    line.append(make('strong', null, message.title), ' ', message.text);
+    el.rewards.append(line);
+  }
+  if (r.advanced) {
+    el.againBtn.textContent = r.to >= Journey.DONE ? 'Play again' : `Level ${r.to} ›`;
+    syncSettingsUI();
+    syncBoardLocks();
+    renderJourney();
+  }
+  return r.earned;
 }
 
 // End of a game: new achievements get their banners. Points and stickers go

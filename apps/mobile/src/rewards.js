@@ -39,9 +39,10 @@ export function onTimeout(progress, match, { rect, wrongAnswers }) {
 }
 
 // The end of a game: everyone's points into the wallet, then (single player)
-// the finishing bonus, the board win and the game achievements.
-// Returns { points, boardBonus, earned }.
-export function onGameOver(progress, match, results) {
+// the finishing bonus, the board win and the game achievements, and on a
+// Journey level (`level`) moving up. Returns { points, boardBonus, earned, journey }
+// (journey: Progress.recordLevelGame's answer, or null).
+export function onGameOver(progress, match, results, level = null) {
   const humans = match.players.filter((p) => !p.cpu);
   const points = humans.reduce((sum, p) => sum + p.score, 0);
   Progress.addPoints(progress, points);
@@ -62,11 +63,17 @@ export function onGameOver(progress, match, results) {
     difficulty: match.difficulty,
     bestScore: results.bestScore,
   });
-  return { points, boardBonus, earned };
+  let journey = null;
+  if (level && match.mode === 'single') {
+    const you = match.players.find((p) => !p.cpu);
+    journey = Progress.recordLevelGame(progress, level, { won: results.humanWon, answered: you.answered + you.stats.timeouts, firstTry: you.firstTry });
+    earned.push(...journey.earned);
+  }
+  return { points, boardBonus, earned, journey };
 }
 
 // What can be played here: Easy and the 6×6 board always, the rest once
-// unlocked in the Shop
+// the Journey reaches them
 export const DIFFICULTIES = Setup.DIFFICULTY_CHOICES;
 export const BOARDS = [6, 8, 10, 12, 16, 20, 24];
 export const PLAYER_COUNTS = [2, 3, 4];

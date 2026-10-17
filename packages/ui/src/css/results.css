@@ -162,3 +162,7 @@
   .results-actions .details-btn .icon { display: none; }
 }
 #stats:not([hidden]), #pd-body:not([hidden]) { margin-bottom: 16px; }
+
+/* A Journey game: moved up a level, or what it still takes */
+.journey-result { margin: 0.5rem 0; padding: 10px 12px; border: 2px solid var(--line); border-radius: 10px; background: var(--soft); text-align: center; }
+.journey-result.up { border-color: var(--good-line); background: var(--good-bg); color: var(--good-ink); }

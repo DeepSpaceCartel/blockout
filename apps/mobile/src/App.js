@@ -11,6 +11,7 @@ import * as Settings from '@blockout/progress/settings';
 import * as Wardrobe from '@blockout/progress/wardrobe';
 import * as Homework from '@blockout/progress/homework';
 import * as Daily from '@blockout/progress/daily';
+import * as Journey from '@blockout/progress/journey';
 import * as Account from './account';
 import Game from './Game';
 import Home from './Home';
@@ -38,16 +39,20 @@ import { ThemeSetting, useTheme } from './theme';
 
 const CHOICE_KEY = 'blockout.mobile.choice';
 const SETTINGS_KEY = 'blockout.settings'; // (on this phone only, like the web game's)
-const DEFAULT_CHOICE = { mode: 'single', difficulty: 'easy', size: 6, level: 'learn', timer: 0, players: 2 };
+// play: single player's 'journey' (level by level) or 'free' (pick the board)
+const DEFAULT_CHOICE = { mode: 'single', play: 'journey', difficulty: 'easy', size: 6, level: 'learn', timer: 0, players: 2 };
 
 // The game to start from the menu's choice (falling back to what's unlocked).
 // Single player has its Level (Expert: no help, bonus ×2) and Expert's timer;
 // Home multiplayer has the Settings' answer timer, as on the web. The players
-// wear the Wardrobe's looks: the CPU's character, your avatar and title.
+// wear the Wardrobe's looks: the CPU's character, your avatar and title. On
+// the Journey the level picks the board and the dice (journeyLevel, sides).
 function setupFor(choice, progress, settings, looks) {
-  const difficulty = difficultyOpen(progress, choice.difficulty) ? choice.difficulty : 'easy';
-  const size = boardOpen(progress, choice.size) ? choice.size : 6;
   const mode = modeOpen(progress, choice.mode) ? choice.mode : 'single';
+  const journeyLevel = mode === 'single' && Journey.onJourney(progress, choice.play) ? Journey.journeyLevel(progress) : null;
+  const journey = journeyLevel ? Journey.levelSetup(journeyLevel) : null;
+  const difficulty = journey ? journey.difficulty : difficultyOpen(progress, choice.difficulty) ? choice.difficulty : 'easy';
+  const size = journey ? journey.size : boardOpen(progress, choice.size) ? choice.size : 6;
   const count = mode === 'multi' && playersOpen(progress, choice.players) ? choice.players : 2;
   const people = mode === 'multi' ? Array.from({ length: count }, (_, i) => ({ name: `Player ${i + 1}` })) : [{ name: 'You' }, { name: 'CPU', cpu: true }];
   const players = people.map((p) => ({ ...p, statsName: p.name, ...Wardrobe.playerLook(looks, p, mode) }));
@@ -56,6 +61,7 @@ function setupFor(choice, progress, settings, looks) {
     mode,
     difficulty,
     size,
+    ...(journey ? { journeyLevel, sides: journey.sides } : {}),
     players,
     expert: level === 'expert',
     bonusMultiplier: level === 'expert' ? Setup.GAME_EXPERT_BONUS : 1,

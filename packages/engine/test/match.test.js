@@ -182,3 +182,29 @@ test('“Help me count” first: right, but not first time (no bonus, no streak)
   assert.equal(m.players[0].score, 6, 'just the squares');
   assert.equal(m.players[0].streak, 0);
 });
+
+test('Journey levels: tiny boards with an n-sided die play to the end', () => {
+  for (let n = 1; n <= 4; n++) {
+    for (let seed = 1; seed <= 20; seed++) {
+      const m = solo({ size: n, sides: n, rng: seeded(seed) });
+      assert.equal(m.sides, n);
+      assert.deepEqual(m.faces.a, Array.from({ length: n }, (_, i) => i + 1));
+      let res = null;
+      for (let step = 0; !res && step < 200; step++) {
+        if (m.phase === 'roll') {
+          const [a, b] = Match.roll(m);
+          assert.ok(a <= n && b <= n, `${a}×${b} on a d${n}`);
+        } else if (m.phase === 'place') placeAnywhere(m);
+        else if (m.phase === 'stuck') Match.pass(m);
+        else if (m.phase === 'answer') Match.answer(m, m.dice[0] * m.dice[1]);
+        else if (m.phase === 'cpu') Match.cpuTurn(m);
+        else if (m.phase === 'scored') res = Match.endTurn(m);
+      }
+      assert.ok(res, `the ${n}×${n} game ended`);
+      assert.equal(res.empty, 0, 'rolls that fit fill the board');
+    }
+  }
+  // level 1: one 1×1 and it's yours
+  const one = solo({ size: 1, sides: 1 });
+  assert.deepEqual(Match.roll(one), [1, 1]);
+});

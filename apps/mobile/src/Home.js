@@ -1,10 +1,12 @@
 // The menu, on one screen: points and who's signed in, what to play
-// (mode, difficulty, board, each one row of choices) and Play at the bottom.
+// (mode, then the Journey's level, or difficulty and board in Free play, each
+// one row of choices) and Play at the bottom.
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Progress from '@blockout/progress';
 import * as Shop from '@blockout/progress/shop';
 import * as Setup from '@blockout/progress/setup';
 import * as Practice from '@blockout/progress/practice';
+import * as Journey from '@blockout/progress/journey';
 import { BOARDS, DIFFICULTIES, PLAYER_COUNTS, boardOpen, difficultyOpen, itemFor, modeOpen, playersOpen } from './rewards';
 import { useTheme } from './theme';
 import { ROLE } from './AccountScreen';
@@ -26,14 +28,17 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onClass
   const newUnlocks = Shop.affordableCount(progress);
   const stickerNews = Shop.newStickers(progress) + Shop.spareStickers(progress);
   const wardrobeNews = Shop.newWardrobe(progress) + Shop.affordableLooks(progress);
-  const anyLocked = DIFFICULTIES.some((d) => !difficultyOpen(progress, d.id)) || BOARDS.some((n) => !boardOpen(progress, n));
-  const d = choice.difficulty;
+  // single player's Journey: the level picks the board and dice (and so the
+  // difficulty its Expert and timers go by)
+  const journeyLevel = choice.mode === 'single' && Journey.onJourney(progress, choice.play) ? Journey.journeyLevel(progress) : null;
+  const playSwitch = choice.mode === 'single' && Journey.freePlayOpen(progress) && !Journey.isDone(progress);
+  const d = journeyLevel ? Journey.levelSetup(journeyLevel).difficulty : choice.difficulty;
   const level = Setup.gameLevel(progress, d, choice); // (what's unlocked on this difficulty)
   const practicing = choice.mode === 'practice';
   const pr = Practice.practiceChoice(progress, d, choice.practice || {});
   const picked = (choice.practice && choice.practice.tables) || [];
   const prPreview = practicing ? Practice.preview(progress, d, picked) : null;
-  const warning = practicing ? null : Setup.boardWarning(d, choice.size);
+  const warning = practicing || journeyLevel ? null : Setup.boardWarning(d, choice.size);
   const setPractice = (part) => onChoose({ practice: { ...pr, tables: picked, ...part } });
   return (
     <View style={[styles.fill, { backgroundColor: t.bg }]}>
@@ -91,6 +96,19 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onClass
 
         <Section title="Play">
           <Segments items={MODES.map((x) => ({ id: x.id, label: x.label, open: modeOpen(progress, x.id) }))} value={choice.mode} onPick={(mode) => onChoose({ mode })} onLocked={(mode) => onLocked(itemFor.mode(mode))} />
+          {playSwitch ? (
+            <Segments
+              compact
+              prefix="play-"
+              items={[
+                { id: 'journey', label: '🧗 Journey', open: true },
+                { id: 'free', label: '🎲 Free play', open: true },
+              ]}
+              value={journeyLevel ? 'journey' : 'free'}
+              onPick={(play) => onChoose({ play })}
+            />
+          ) : null}
+          {choice.mode === 'single' && (journeyLevel || Journey.isDone(progress)) ? <JourneyCard progress={progress} /> : null}
           {practicing ? (
             <>
               <Segments
@@ -147,16 +165,18 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onClass
           ) : null}
         </Section>
 
-        <Section title="Difficulty">
-          <Segments
-            columns={3}
-            compact={practicing}
-            items={DIFFICULTIES.map((x) => ({ id: x.id, label: x.name, sub: practicing ? null : x.dice.replace(' dice', ''), open: difficultyOpen(progress, x.id) }))}
-            value={choice.difficulty}
-            onPick={(difficulty) => onChoose({ difficulty })}
-            onLocked={(id) => onLocked(itemFor.difficulty(id))}
-          />
-        </Section>
+        {journeyLevel ? null : (
+          <Section title="Difficulty">
+            {/* (only what the Journey has reached) */}
+            <Segments
+              columns={3}
+              compact={practicing}
+              items={DIFFICULTIES.filter((x) => difficultyOpen(progress, x.id)).map((x) => ({ id: x.id, label: x.name, sub: practicing ? null : x.dice.replace(' dice', ''), open: true }))}
+              value={choice.difficulty}
+              onPick={(difficulty) => onChoose({ difficulty })}
+            />
+          </Section>
+        )}
 
         {practicing ? (
           <Section title="Times tables">
@@ -183,14 +203,12 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onClass
               {prPreview || 'Unlock a times table to practice: tap ×1 to start.'}
             </Text>
           </Section>
-        ) : (
+        ) : journeyLevel ? null : (
           <Section title="Board">
-            <Segments compact items={BOARDS.map((n) => ({ id: n, label: `${n}`, open: boardOpen(progress, n) }))} value={choice.size} onPick={(size) => onChoose({ size })} onLocked={(n) => onLocked(itemFor.size(n))} />
+            <Segments compact items={BOARDS.filter((n) => boardOpen(progress, n)).map((n) => ({ id: n, label: `${n}`, open: true }))} value={choice.size} onPick={(size) => onChoose({ size })} />
             {warning ? <Text testID="board-warning" style={[styles.warning, { color: t.bad }]}>{warning}</Text> : null}
           </Section>
         )}
-
-        {anyLocked ? <Text style={[styles.note, { color: t.muted }]}>🔒 Tap a locked one to see how to unlock it.</Text> : null}
       </ScrollView>
       <View style={styles.bottom}>
         {/* a tournament your teacher scheduled, open now */}
@@ -204,8 +222,31 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onClass
         ))}
         <View style={styles.playRow}>
           <Button testID="class" kind="secondary" title="🏫 Class" onPress={() => onClass('')} style={styles.classBtn} />
-          <Button testID="play" title={practicing ? 'Practice' : 'Play'} onPress={onPlay} disabled={Boolean(warning) || (practicing && !prPreview)} style={styles.flex} />
+          <Button testID="play" title={practicing ? 'Practice' : journeyLevel ? `▶ Play Level ${journeyLevel}` : 'Play'} onPress={onPlay} disabled={Boolean(warning) || (practicing && !prPreview)} style={styles.flex} />
         </View>
+      </View>
+    </View>
+  );
+}
+
+// The level you're on, what it takes to move up, and the path so far
+function JourneyCard({ progress }) {
+  const t = useTheme();
+  const level = Journey.journeyLevel(progress);
+  const done = Journey.isDone(progress);
+  return (
+    <View testID="journey-card" style={[styles.journey, { backgroundColor: t.accentSoft, borderColor: t.accent }]}>
+      <Text testID="journey-level" style={[styles.journeyLevel, { color: t.ink }]}>
+        {Journey.levelName(level)}
+      </Text>
+      <Text style={[styles.journeyLine, { color: t.ink }]}>{done ? 'You finished every level. Pick any board and dice in Free play!' : Journey.levelLine(level)}</Text>
+      {done ? null : <Text style={[styles.preview, { color: t.muted, textAlign: 'center' }]}>🏁 {Journey.goalLine()} to move up.</Text>}
+      <View style={styles.steps} accessibilityLabel={`Level ${level} of ${Journey.LEVELS.length}`}>
+        {Journey.steps(progress).map((s) => (
+          <View key={s.level} style={[styles.step, { borderColor: s.done ? t.good : s.current ? t.accent : t.line, backgroundColor: s.done ? t.good : s.current ? t.accentButton : t.surface }]}>
+            <Text style={[styles.stepText, { color: s.done || s.current ? t.accentInk : t.muted }]}>{s.level}</Text>
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -344,7 +385,12 @@ const styles = StyleSheet.create({
   segment: { flex: 1, minHeight: 48, paddingVertical: 6, paddingHorizontal: 4, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   segmentText: { fontSize: 16, fontWeight: '700' },
   segmentSub: { fontSize: 12, marginTop: 2 },
-  note: { fontSize: 13, textAlign: 'center' },
+  journey: { alignItems: 'center', gap: 4, padding: 12, borderRadius: 12, borderWidth: 2 },
+  journeyLevel: { fontSize: 24, fontWeight: '900' },
+  journeyLine: { fontSize: 16, fontWeight: '700' },
+  steps: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 4, marginTop: 4 },
+  step: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  stepText: { fontSize: 10, fontWeight: '800' },
   bottom: { padding: 16, paddingTop: 8 },
   more: { flexDirection: 'row', gap: 8 },
   menuBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', height: 52, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth * 2 },
