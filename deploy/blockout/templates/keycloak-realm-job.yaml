@@ -16,6 +16,7 @@ metadata:
 data:
   realm.sh: |
     set -euo pipefail
+    set -f # (the addresses hold * wildcards: no file name expansion)
     REALM=blockout
     kc() { /opt/keycloak/bin/kcadm.sh "$@" --config /tmp/kcadm.config; }
 
@@ -38,6 +39,22 @@ data:
     kc update realms/master -s bruteForceProtected=true -s failureFactor=5 -s waitIncrementSeconds=60 -s maxFailureWaitSeconds=3600
     echo "master realm: brute-force protection"
 
+    # The phone app's client: public, with PKCE; its tokens name "blockout" as
+    # their audience, so the server takes them like the web game's
+    if [ -n "$MOBILE_URLS" ]; then
+      mid=$(kc get clients -r "$REALM" -q clientId=blockout-mobile --fields id --format csv --noquotes)
+      [ -n "$mid" ] || kc create clients -r "$REALM" -f /job/mobile-client.json
+      mid=$(kc get clients -r "$REALM" -q clientId=blockout-mobile --fields id --format csv --noquotes)
+      mredirects=$(printf '"%s",' $MOBILE_URLS)
+      kc update "clients/$mid" -r "$REALM" -s "redirectUris=[${mredirects%,}]" -s 'webOrigins=["+"]'
+      for mapper in audience identity-provider; do
+        name=$(sed -n 's/.*"name": *"\([^"]*\)".*/\1/p' "/job/mapper-$mapper.json" | head -1)
+        kc get "clients/$mid/protocol-mappers/models" -r "$REALM" --fields name --format csv --noquotes | grep -qx "$name" ||
+          kc create "clients/$mid/protocol-mappers/models" -r "$REALM" -f "/job/mapper-$mapper.json"
+      done
+      echo "client blockout-mobile: $MOBILE_URLS"
+    fi
+
     # Admins are the only role Keycloak keeps for Blockout (ADR-0008)
     kc get "roles/admin" -r "$REALM" >/dev/null 2>&1 || kc create roles -r "$REALM" -s name=admin -s 'description=Blockout admin: accounts and roles, teacher codes, schools.'
     echo "realm role admin"
@@ -57,6 +74,17 @@ data:
       kc update "realms/$REALM" -s verifyEmail=false -s resetPasswordAllowed=false
       echo "no mail: no address checks or password resets (nothing could send the mail)"
     fi
+  mobile-client.json: |
+    { "clientId": "blockout-mobile", "name": "Blockout app", "enabled": true, "publicClient": true, "protocol": "openid-connect",
+      "standardFlowEnabled": true, "implicitFlowEnabled": false, "directAccessGrantsEnabled": false,
+      "attributes": { "pkce.code.challenge.method": "S256" } }
+  mapper-audience.json: |
+    { "name": "blockout audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper",
+      "config": { "included.client.audience": "blockout", "access.token.claim": "true", "id.token.claim": "false", "introspection.token.claim": "true" } }
+  mapper-identity-provider.json: |
+    { "name": "identity provider", "protocol": "openid-connect", "protocolMapper": "oidc-usersessionmodel-note-mapper",
+      "config": { "user.session.note": "identity_provider", "claim.name": "identity_provider", "jsonType.label": "String",
+                  "id.token.claim": "true", "access.token.claim": "false", "userinfo.token.claim": "false", "introspection.token.claim": "false" } }
 ---
 apiVersion: batch/v1
 kind: Job
@@ -87,6 +115,7 @@ spec:
           env:
             - { name: KEYCLOAK, value: "http://{{ .Release.Name }}-keycloakx-http" }
             - { name: URLS, value: {{ join " " $urls | quote }} }
+            - { name: MOBILE_URLS, value: {{ join " " .Values.keycloak.mobile.redirectUrls | quote }} }
             - name: ADMIN_USER
               valueFrom: { secretKeyRef: { name: {{ .Release.Name }}-keycloak-admin, key: username } }
             - name: ADMIN_PASSWORD

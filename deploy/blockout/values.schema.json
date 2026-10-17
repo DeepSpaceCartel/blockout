@@ -145,6 +145,18 @@
         },
         "realmJob": {
           "type": "object"
+        },
+        "mobile": {
+          "type": "object",
+          "properties": {
+            "redirectUrls": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
         }
       }
     },

@@ -185,6 +185,11 @@ keycloak:
   # More addresses sign-in may send people back to (e.g. http://localhost:8080
   # for development); publicUrl is always one
   extraRedirectUrls: []
+  # The phone app (apps/mobile): its own public client, blockout-mobile, whose
+  # tokens name "blockout" as their audience. The addresses it may come back
+  # to, e.g. blockout://* (empty: no app client)
+  mobile:
+    redirectUrls: []
   # The Google OAuth client's secret (its id is in files/realm-blockout.json)
   google:
     clientSecret: ""

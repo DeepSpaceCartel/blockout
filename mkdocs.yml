@@ -21,6 +21,7 @@ nav:
       - Parents: guides/parents.md
       - Admins: guides/admins.md
       - Share through a tunnel: guides/share-through-a-tunnel.md
+      - Run the phone app: guides/run-the-phone-app.md
       - Switch sign-in to Keycloak: guides/set-up-keycloak.md
       - Set up MongoDB and Valkey: guides/set-up-the-databases.md
       - Deploy to a cluster: guides/deploy.md
