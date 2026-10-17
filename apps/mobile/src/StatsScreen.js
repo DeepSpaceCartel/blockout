@@ -11,7 +11,8 @@ import { useTheme } from './theme';
 import { ScreenHeader } from './ui';
 
 // The fact statuses' colours (the web grid's)
-const STATUS = { mastered: '#2a9d5c', learning: '#f2c94c', practice: '#d64533', unseen: null };
+// The Times Table's colours (also the grown-ups' mastery bars)
+export const STATUS = { mastered: '#2a9d5c', learning: '#f2c94c', practice: '#d64533', unseen: null };
 
 export default function StatsScreen({ progress, settings = Settings.DEFAULT_SETTINGS, onClose }) {
   const t = useTheme();
@@ -102,29 +103,11 @@ export default function StatsScreen({ progress, settings = Settings.DEFAULT_SETT
 function PlayerTable({ progress, player, showTime }) {
   const t = useTheme();
   const facts = Stats.playerFacts(progress, player.name);
-  const grid = Stats.factGrid(facts, { unlocked: Views.tableSize(progress), showTime });
   const practice = Stats.factsToPractice(facts);
   return (
     <View style={styles.player}>
       {player.label ? <Text style={[styles.cardTitle, { color: t.ink }]}>{player.label}</Text> : null}
-      <View style={styles.grid} accessibilityLabel={`Times Table up to ${grid.max} × ${grid.max}`}>
-        <View style={styles.gridRow}>
-          <Cell text="×" t={t} />
-          {grid.heads.map((h) => (
-            <Cell key={h.n} text={h.mastered ? `★${h.n}` : String(h.n)} t={t} gold={h.mastered} />
-          ))}
-        </View>
-        {grid.cells.map((row, r) => (
-          <View key={r} style={styles.gridRow}>
-            <Cell text={grid.heads[r].mastered ? `★${r + 1}` : String(r + 1)} t={t} gold={grid.heads[r].mastered} />
-            {row.map((c) => (
-              <View key={c.b} accessibilityLabel={c.detail} style={[styles.cell, styles.fact, { backgroundColor: STATUS[c.status] || t.soft }]}>
-                <Text style={styles.cellMark}>{c.mark}</Text>
-              </View>
-            ))}
-          </View>
-        ))}
-      </View>
+      <FactGrid facts={facts} unlocked={Views.tableSize(progress)} showTime={showTime} />
       <Text style={[styles.cardTitle, { color: t.ink }]}>{player.label ? `${player.label}: facts to practice` : 'Facts to practice'}</Text>
       {practice.length ? (
         practice.map((f) => (
@@ -141,6 +124,34 @@ function PlayerTable({ progress, player, showTime }) {
       ) : (
         <Text style={[styles.small, { color: t.muted }]}>{Object.keys(facts).length ? 'Nothing missed so far! 🌟' : 'No answers yet.'}</Text>
       )}
+    </View>
+  );
+}
+
+// A Times Table: each fact's colour (mastered, learning, needs practice, not
+// seen), with a ★ on a line that's all mastered. size: a fixed size (a
+// grown-up's view: 12), else up to what's unlocked.
+export function FactGrid({ facts, size = null, unlocked = 12, showTime = () => false }) {
+  const t = useTheme();
+  const grid = Stats.factGrid(facts, { size, unlocked, showTime });
+  return (
+    <View style={styles.grid} accessibilityLabel={`Times Table up to ${grid.max} × ${grid.max}`}>
+      <View style={styles.gridRow}>
+        <Cell text="×" t={t} />
+        {grid.heads.map((h) => (
+          <Cell key={h.n} text={h.mastered ? `★${h.n}` : String(h.n)} t={t} gold={h.mastered} />
+        ))}
+      </View>
+      {grid.cells.map((row, r) => (
+        <View key={r} style={styles.gridRow}>
+          <Cell text={grid.heads[r].mastered ? `★${r + 1}` : String(r + 1)} t={t} gold={grid.heads[r].mastered} />
+          {row.map((c) => (
+            <View key={c.b} accessibilityLabel={c.detail} style={[styles.cell, styles.fact, { backgroundColor: STATUS[c.status] || t.soft }]}>
+              <Text style={styles.cellMark}>{c.mark}</Text>
+            </View>
+          ))}
+        </View>
+      ))}
     </View>
   );
 }

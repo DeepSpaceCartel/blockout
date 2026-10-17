@@ -8,6 +8,7 @@ import { createClient } from '@blockout/classroom/core';
 import * as Account from './account';
 
 const SESSION_KEY = 'blockout.class';
+const HOST_KEY = 'blockout.classHost'; // (a class this phone is hosting)
 const NAME_KEY = 'blockout.className'; // a guest's name last time (like the web game's)
 
 // (the client reads its storage synchronously: a copy in memory, written through)
@@ -27,13 +28,15 @@ const storage = {
 
 export const client = createClient({ base: Constants.expoConfig.extra.server, token: Account.freshToken, EventSource: null, storage });
 
-// At start: the class this phone was in, if any
-export async function loadSession() {
-  try {
-    const v = await AsyncStorage.getItem(SESSION_KEY);
-    if (v) kept.set(SESSION_KEY, v);
-  } catch (_) {}
-  return client.session();
+// At start: the class this phone was in or hosting, if any: { session, host }
+export async function loadSaved() {
+  for (const key of [SESSION_KEY, HOST_KEY]) {
+    try {
+      const v = await AsyncStorage.getItem(key);
+      if (v) kept.set(key, v);
+    } catch (_) {}
+  }
+  return { session: client.session(), host: client.host() };
 }
 
 export const lastName = async () => (await AsyncStorage.getItem(NAME_KEY).catch(() => null)) || '';

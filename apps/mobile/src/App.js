@@ -25,6 +25,10 @@ import WardrobeScreen from './Wardrobe';
 import AccountScreen, { redeemCode } from './AccountScreen';
 import HomeworkScreen from './HomeworkScreen';
 import ClassScreen from './ClassScreen';
+import HostScreen from './HostScreen';
+import MyClassesScreen from './MyClassesScreen';
+import MyKidsScreen from './MyKidsScreen';
+import AdminScreen from './AdminScreen';
 import * as Classroom from './classroom';
 import { parseLink } from './links';
 import { DEFAULT_LOOKS, Looks } from './looks';
@@ -83,6 +87,7 @@ function Main({ onTheme }) {
   const [homeworkCount, setHomeworkCount] = useState(0); // (a student's homework still to do)
   const [inClass, setInClass] = useState(null); // a live class: { code } to join, or { resume } (a session from last time)
   const [liveClasses, setLiveClasses] = useState([]); // (a student's scheduled tournaments, open now)
+  const [hosting, setHosting] = useState(null); // a live class this teacher hosts: { host } (null in it: setting one up)
   const pendingLink = useRef(null); // (a code's link that came before signing in)
   const live = useRef({}); // (the latest user, for link events)
   live.current.user = user;
@@ -121,8 +126,9 @@ function Main({ onTheme }) {
       const s = Settings.enforce(saved, save); // (anything not unlocked back to its default)
       setSettings(s);
       onTheme(s.theme);
-      const resume = await Classroom.loadSession(); // (the app was closed in the middle of a class)
-      if (resume) setInClass({ resume });
+      const left = await Classroom.loadSaved(); // (the app was closed in the middle of a class)
+      if (left.host) setHosting({ host: left.host });
+      else if (left.session) setInClass({ resume: left.session });
       setReady(true);
     })();
   }, []);
@@ -137,7 +143,7 @@ function Main({ onTheme }) {
 
   // A student's tournaments open now (scheduled by their teacher), while on the menu
   useEffect(() => {
-    if (!ready || !user || user.role !== 'student' || game || inClass || screen !== 'menu') return setLiveClasses([]);
+    if (!ready || !user || user.role !== 'student' || game || inClass || hosting || screen !== 'menu') return setLiveClasses([]);
     const look = () =>
       Account.api('GET', '/api/me/live')
         .then(({ live }) => setLiveClasses(live))
@@ -145,7 +151,7 @@ function Main({ onTheme }) {
     look();
     const every = setInterval(look, 20 * 1000);
     return () => clearInterval(every);
-  }, [ready, user, game, inClass, screen]);
+  }, [ready, user, game, inClass, hosting, screen]);
 
   // Links into the app: a one-time code, or a class to join (links.js)
   useEffect(() => {
@@ -318,7 +324,16 @@ function Main({ onTheme }) {
     <Looks.Provider value={looks}>
     <SafeAreaView style={[styles.fill, { backgroundColor: t.bg }]}>
       <StatusBar style="auto" />
-      {inClass ? (
+      {hosting ? (
+        <HostScreen
+          host={hosting.host}
+          toast={toasts.show}
+          onExit={() => {
+            setHosting(null);
+            setScreen(user && user.role === 'teacher' ? 'classes' : 'menu');
+          }}
+        />
+      ) : inClass ? (
         <ClassScreen
           key={inClass.code || 'class'}
           user={user}
@@ -341,6 +356,12 @@ function Main({ onTheme }) {
         <AccountScreen user={user} toast={toasts.show} onUser={setUser} onSignOut={signOut} onDeleted={deleted} onClose={() => setScreen('menu')} />
       ) : screen === 'homework' && user ? (
         <HomeworkScreen onPlay={playHomework} onCount={setHomeworkCount} onClose={() => setScreen('menu')} />
+      ) : screen === 'classes' && user ? (
+        <MyClassesScreen user={user} toast={toasts.show} onHost={() => setHosting({ host: null })} onOpenLobby={(host) => setHosting({ host })} onClose={() => setScreen('menu')} />
+      ) : screen === 'admin' && user ? (
+        <AdminScreen user={user} onClose={() => setScreen('menu')} />
+      ) : screen === 'kids' && user ? (
+        <MyKidsScreen user={user} toast={toasts.show} onClose={() => setScreen('menu')} />
       ) : screen === 'wardrobe' ? (
         <WardrobeScreen progress={progress} newKeys={wardrobeNew} onWear={wear} onAsk={ask} onClose={() => setScreen('menu')} />
       ) : screen === 'stats' ? (
@@ -376,6 +397,9 @@ function Main({ onTheme }) {
           onSignIn={signIn}
           onAccount={() => setScreen('account')}
           onHomework={() => setScreen('homework')}
+          onClasses={() => setScreen('classes')}
+          onKids={() => setScreen('kids')}
+          onAdmin={() => setScreen('admin')}
           homeworkCount={homeworkCount}
           signingIn={signingIn}
           accountError={accountError}

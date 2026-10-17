@@ -4,15 +4,17 @@
 
 `apps/mobile` is Blockout as a React Native app, built with Expo, for phones and tablets. It's not the web page in a frame: the board, dice and keypad are native. It plays by the same rules as the web game (`@blockout/engine/match`), and keeps the same save (`@blockout/progress`), synced with the account when you sign in.
 
-**What's in it so far:**
+**What's in it:** everything in the web game's multiplication, except the other games (addition, fractions and the rest):
 
-- you against the CPU, or two players on one phone
-- Easy, Medium and Hard, on boards from 6 × 6 to 16 × 16
-- drawing a rectangle by dragging, answering on a keypad, and "Help me count"
-- points, bonuses and achievements
+- you against the CPU, or 2 to 4 players on one phone; every difficulty, Expert levels and timers, boards up to 24 × 24, real dice, and drawing, tapping or auto placing
+- practice, with its tables, question counts and timers
+- the Shop, achievements, stickers, stats, the daily check-in, settings and the Wardrobe
 - signing in with Google (through Keycloak), with the save synced with the web game
+- for a student: homework, joining a class, grown-up codes, and live classes (the whole class's games, pairs and tournaments)
+- for a teacher: My classes (roster, homework, planned tournaments, teacher codes) and hosting a live class
+- for a grown-up: My kids; for an admin, the admin page
 
-The shop, practice, classes and the other games are still to come. Difficulties and boards unlocked on the web show up in the app. Until the app has its own shop, they're unlocked in the web game's Shop.
+The rules, words and rewards are shared with the web game (`@blockout/engine`, `@blockout/progress`), so both play the same.
 
 ## Try it in Expo Go
 

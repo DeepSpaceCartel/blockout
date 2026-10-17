@@ -21,7 +21,7 @@ const LEVELS = [
 ];
 
 // onLocked(itemId): a locked choice was tapped (offer it); onShop(): open the Shop
-export default function Home({ progress, user, choice, onChoose, onPlay, onClass, liveClasses = [], onSignIn, onAccount, onHomework, homeworkCount = 0, signingIn, accountError, onLocked, onShop, onWardrobe, onAchievements, onStats, onStickers, onSettings }) {
+export default function Home({ progress, user, choice, onChoose, onPlay, onClass, liveClasses = [], onSignIn, onAccount, onHomework, onClasses, onKids, onAdmin, homeworkCount = 0, signingIn, accountError, onLocked, onShop, onWardrobe, onAchievements, onStats, onStickers, onSettings }) {
   const t = useTheme();
   const newUnlocks = Shop.affordableCount(progress);
   const stickerNews = Shop.newStickers(progress) + Shop.spareStickers(progress);
@@ -65,6 +65,9 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onClass
                 {(ROLE[user.role] || ROLE.student).emoji} <Text style={styles.bold}>{user.name || user.firstName || 'You'}</Text>
               </Text>
               {user.role === 'student' ? <SmallButton testID="homework" title="📚 Homework" badge={homeworkCount} onPress={onHomework} /> : null}
+              {user.role === 'teacher' ? <SmallButton testID="my-classes" title="🏫 My classes" onPress={onClasses} /> : null}
+              {user.role === 'parent' ? <SmallButton testID="my-kids" title="👪 My kids" onPress={onKids} /> : null}
+              {user.isAdmin ? <SmallButton testID="admin" title="🛠" onPress={onAdmin} /> : null}
               <SmallButton testID="account" title="Account" onPress={onAccount} />
             </>
           ) : (
