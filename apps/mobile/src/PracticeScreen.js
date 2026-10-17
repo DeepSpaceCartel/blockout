@@ -298,8 +298,15 @@ function Done({ end, progress, round, settings, onAgain, onExit }) {
         )}
         <Text style={[styles.groupTitle, { color: t.muted }]}>Times table</Text>
         <View style={styles.grid}>
+          <View style={styles.gridRow}>
+            <Head text="×" t={t} />
+            {grid.heads.map((h) => (
+              <Head key={h.n} text={h.mastered ? `★${h.n}` : String(h.n)} t={t} gold={h.mastered} />
+            ))}
+          </View>
           {grid.cells.map((row, i) => (
             <View key={i} style={styles.gridRow}>
+              <Head text={grid.heads[i].mastered ? `★${i + 1}` : String(i + 1)} t={t} gold={grid.heads[i].mastered} />
               {row.map((c) => (
                 <View key={c.b} accessibilityLabel={c.detail} style={[styles.cell, { backgroundColor: STATUS[c.status] || t.soft }]}>
                   <Text style={styles.cellMark}>{c.mark}</Text>
@@ -313,6 +320,17 @@ function Done({ end, progress, round, settings, onAgain, onExit }) {
         <Button testID="pd-again" title="Again" onPress={onAgain} style={styles.flex} />
         <Button kind="secondary" title="Menu" onPress={onExit} style={styles.flex} />
       </View>
+    </View>
+  );
+}
+
+// A row or column number on the edge of the grid (★ when the whole line is mastered)
+function Head({ text, t, gold = false }) {
+  return (
+    <View style={styles.cell}>
+      <Text style={[styles.head, { color: gold ? t.goldInk : t.muted }]} numberOfLines={1} adjustsFontSizeToFit>
+        {text}
+      </Text>
     </View>
   );
 }
@@ -350,5 +368,6 @@ const styles = StyleSheet.create({
   gridRow: { flexDirection: 'row', gap: 2 },
   cell: { flex: 1, aspectRatio: 1, borderRadius: 3, alignItems: 'center', justifyContent: 'center' },
   cellMark: { color: '#fff', fontSize: 11, fontWeight: '900' },
+  head: { fontSize: 12, fontWeight: '800' },
   actions: { flexDirection: 'row', gap: 12, padding: 16, paddingTop: 8 },
 });
