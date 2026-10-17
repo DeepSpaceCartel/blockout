@@ -79,7 +79,62 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
   const pausedMs = useRef(0);
   const turnId = useRef(0); // (so a late "on by itself" doesn't skip a turn)
 
-  useEffect(() => () => (alive.current = false), []);
+  useEffect(
+    () => () => {
+      alive.current = false;
+      stopClock();
+    },
+    []
+  );
+
+  // ---- the answer timer (Expert's, or Home multiplayer's from Settings). It
+  // pauses while counting; when it runs out the rectangle comes off.
+  const clock = useRef(null); // { total, remaining, last, paused, interval }
+  const [timeLeft, setTimeLeft] = useState(null);
+  const [answering, setAnswering] = useState(null); // the rectangle on the answer screen
+  function startClock() {
+    stopClock();
+    if (!setup.timerMs) return;
+    const c = { total: setup.timerMs, remaining: setup.timerMs, last: Date.now(), paused: false };
+    c.interval = setInterval(() => {
+      const now = Date.now();
+      if (!c.paused) c.remaining -= now - c.last;
+      c.last = now;
+      setTimeLeft(Math.max(0, c.remaining));
+      if (c.remaining <= 0) {
+        stopClock();
+        answerTimeout();
+      }
+    }, 100);
+    clock.current = c;
+    setTimeLeft(c.total);
+  }
+  function stopClock() {
+    if (clock.current) clearInterval(clock.current.interval);
+    clock.current = null;
+  }
+  function pauseClock(paused) {
+    if (!clock.current) return;
+    clock.current.paused = paused;
+    clock.current.last = Date.now();
+  }
+
+  // Out of time: the answer shows, the rectangle comes off, no points
+  async function answerTimeout() {
+    if (!alive.current || match.phase !== 'answer') return;
+    const res = Match.timeout(match);
+    Rewards.onTimeout(progress, match, res);
+    onSave();
+    setBusy(true);
+    setView('answer');
+    setEntry(String(res.rect.area));
+    setFeedback({ kind: 'try', text: `⏰ Time's up! ${res.rect.a} × ${res.rect.b} = ${res.rect.area}. No points this turn.` });
+    redraw();
+    await wait(3000 * pace);
+    setBusy(false);
+    setTimeLeft(null);
+    return nextTurn();
+  }
   // Resolves after ms, or never once the game is left
   const wait = useCallback((ms) => new Promise((resolve) => setTimeout(() => alive.current && resolve(), ms)), []);
 
@@ -178,7 +233,9 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
     setFeedback(null);
     answerStart.current = Date.now();
     pausedMs.current = 0;
+    setAnswering(res.rect);
     setView('answer');
+    startClock();
   }
 
   // ---- answering
@@ -196,8 +253,12 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
   async function check(value) {
     if (value === '' || match.phase !== 'answer') return;
     const ms = Date.now() - answerStart.current - pausedMs.current;
-    const res = Match.answer(match, value, { ms });
+    // the timer bonus goes by how much time was left
+    const c = clock.current;
+    const timer = c && setup.timer ? { secs: setup.timer, left: c.remaining / c.total } : null;
+    const res = Match.answer(match, value, { ms, timer });
     if (res.correct) {
+      stopClock();
       setBusy(true);
       const squares = `+${res.rect.area} ${res.rect.area === 1 ? 'square' : 'squares'}`;
       setFeedback({ text: res.firstTry ? `Correct! ${squares} 🎉` : `You got it! ${squares}`, kind: 'good' });
@@ -208,6 +269,7 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
       await wait(SCORED_MS);
       setBusy(false);
       setCounting(null);
+      setTimeLeft(null);
       return nextTurn();
     }
     setEntry('');
@@ -236,6 +298,7 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
     }
     if (!h) return;
     helpStarted.current = Date.now();
+    pauseClock(true);
     setHelpDone(false);
     setCounting(null);
     setView('help');
@@ -261,6 +324,7 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
   // From counting back to the answer (the time spent counting doesn't count against them)
   function backToAnswer() {
     pausedMs.current += Date.now() - helpStarted.current;
+    pauseClock(false);
     setFeedback(null);
     setEntry('');
     setView('answer');
@@ -446,7 +510,9 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
           <HelpScreen area={area} rect={match.pending.rect} color={PLAYER_COLORS[current % PLAYER_COLORS.length]} counting={counting} text={feedback ? feedback.text : ''} done={helpDone} onBack={backToAnswer} />
         ) : (
           <AnswerScreen
-            rect={match.pending ? match.pending.rect : match.lastRect}
+            rect={answering}
+            timeLeft={timeLeft}
+            timeTotal={setup.timerMs}
             entry={entry}
             feedback={feedback}
             busy={busy}
@@ -489,8 +555,8 @@ function Header({ match, who, over, onExit, showProgress }) {
       {match.players.map((p, i) => (
         <View key={i} style={[styles.score, { borderColor: i === match.current && !over ? PLAYER_COLORS[i] : t.line, backgroundColor: t.surface }]}>
           <View style={[styles.swatch, { backgroundColor: PLAYER_COLORS[i] }]} />
-          <Text style={[styles.scoreName, { color: t.ink }]} numberOfLines={1}>
-            {who(p)}
+          <Text style={[styles.scoreName, { color: t.ink }]} numberOfLines={1} accessibilityLabel={who(p)}>
+            {match.players.length > 2 ? who(p).replace(/^Player /, 'P') : who(p)}
           </Text>
           <Text style={[styles.scorePts, { color: t.ink }]}>{p.score}</Text>
         </View>
@@ -512,11 +578,23 @@ function Header({ match, who, over, onExit, showProgress }) {
 
 // The question and the keypad
 // help: 'first' ("Help me count"), 'again' ("Count again") or null (Expert)
-function AnswerScreen({ rect, entry, feedback, busy, help, onKey, onHelp }) {
+// timeLeft / timeTotal (ms): the answer timer, when there is one
+function AnswerScreen({ rect, entry, feedback, busy, help, onKey, onHelp, timeLeft = null, timeTotal = 0 }) {
   const t = useTheme();
   if (!rect) return null;
+  const low = timeLeft !== null && timeLeft <= 5000;
   return (
     <View style={styles.answerScreen}>
+      {timeLeft !== null && timeTotal ? (
+        <View style={styles.timer} accessibilityLabel={`${Math.ceil(timeLeft / 1000)} seconds left`}>
+          <Text testID="timer" style={[styles.timerText, { color: low ? t.bad : t.ink }]}>
+            ⏱️ {Math.ceil(timeLeft / 1000)} s
+          </Text>
+          <View style={[styles.timerBar, { backgroundColor: t.soft }]}>
+            <View style={{ width: `${(timeLeft / timeTotal) * 100}%`, height: '100%', backgroundColor: low ? t.bad : t.good, borderRadius: 5 }} />
+          </View>
+        </View>
+      ) : null}
       <View style={styles.questionRow}>
         <Text style={[styles.question, { color: t.ink }]}>
           {rect.a} × {rect.b} =
@@ -555,7 +633,7 @@ function Results({ over, match, who, onAgain, onExit }) {
           </View>
         </View>
       ))}
-      {match.mode === 'multi' ? <Text style={[styles.resultSub, { color: t.muted }]}>Two-player games are just for fun: they don’t count towards stats or achievements.</Text> : null}
+      {match.mode === 'multi' ? <Text style={[styles.resultSub, { color: t.muted }]}>Multiplayer games are just for fun: they don’t count towards Stats or achievements.</Text> : null}
       <View style={styles.resultActions}>
         <Button title="Play Again" onPress={onAgain} style={styles.flex} testID="again" />
         <Button kind="secondary" title="Menu" onPress={onExit} style={styles.flex} />
@@ -589,6 +667,9 @@ const styles = StyleSheet.create({
   steps: { alignSelf: 'stretch', padding: 12, borderRadius: 12, borderWidth: 2, gap: 4 },
   step: { fontSize: 16, lineHeight: 22 },
   stepBig: { fontSize: 22, fontWeight: '800' },
+  timer: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  timerText: { fontSize: 18, fontWeight: '800', minWidth: 70 },
+  timerBar: { flex: 1, height: 10, borderRadius: 5, overflow: 'hidden' },
   answerScreen: { flex: 1, justifyContent: 'center', gap: 14, paddingHorizontal: 16, paddingBottom: 16 },
   questionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
   question: { fontSize: 44, fontWeight: '800' },

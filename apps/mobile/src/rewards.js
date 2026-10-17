@@ -5,6 +5,7 @@
 // Each function changes the save and returns the achievements it earned.
 import * as Progress from '@blockout/progress';
 import * as Views from '@blockout/progress/views';
+import * as Setup from '@blockout/progress/setup';
 
 export const STATS_NAME = 'You'; // whose times tables the single player's answers count towards
 
@@ -64,18 +65,16 @@ export function onGameOver(progress, match, results) {
 }
 
 // What can be played here: Easy and the 6×6 board always, the rest once
-// unlocked (they're bought in the web game's Shop)
-export const DIFFICULTIES = [
-  { id: 'easy', name: 'Easy', dice: '6-sided dice' },
-  { id: 'medium', name: 'Medium', dice: '8-sided dice' },
-  { id: 'hard', name: 'Hard', dice: '12-sided dice' },
-];
-export const BOARDS = [6, 8, 10, 12, 16];
+// unlocked in the Shop
+export const DIFFICULTIES = Setup.DIFFICULTY_CHOICES;
+export const BOARDS = [6, 8, 10, 12, 16, 20, 24];
+export const PLAYER_COUNTS = [2, 3, 4];
 
-export const difficultyOpen = (progress, id) => id === 'easy' || Progress.isUnlocked(progress, `difficulty.${id}`);
+export const difficultyOpen = Setup.difficultyOpen;
+export const playersOpen = (progress, n) => n === 2 || Progress.isUnlocked(progress, `players${n}`);
 export const boardOpen = (progress, size) => size === 6 || Progress.isUnlocked(progress, `board${size}`);
 // Two players on one phone is the Shop's "Multiplayer", as on the web
 export const modeOpen = (progress, mode) => mode === 'single' || Progress.isUnlocked(progress, 'multiplayer');
 
 // The Shop item a locked menu choice stands for (to offer it when tapped)
-export const itemFor = { mode: () => 'multiplayer', difficulty: (id) => `difficulty.${id}`, size: (n) => `board${n}` };
+export const itemFor = { mode: () => 'multiplayer', difficulty: (id) => `difficulty.${id}`, size: (n) => `board${n}`, players: (n) => `players${n}` };

@@ -11,7 +11,8 @@ import * as Settings from '@blockout/progress/settings';
 import * as Account from './account';
 import Game from './Game';
 import Home from './Home';
-import { BOARDS, DIFFICULTIES, boardOpen, difficultyOpen, modeOpen } from './rewards';
+import * as Setup from '@blockout/progress/setup';
+import { BOARDS, DIFFICULTIES, boardOpen, difficultyOpen, modeOpen, playersOpen } from './rewards';
 import { ShopScreen, UnlockSheet } from './Shop';
 import { AchievementsScreen, StickersScreen } from './Collection';
 import StatsScreen from './StatsScreen';
@@ -20,15 +21,29 @@ import { ThemeSetting, useTheme } from './theme';
 
 const CHOICE_KEY = 'blockout.mobile.choice';
 const SETTINGS_KEY = 'blockout.settings'; // (on this phone only, like the web game's)
-const DEFAULT_CHOICE = { mode: 'single', difficulty: 'easy', size: 6 };
+const DEFAULT_CHOICE = { mode: 'single', difficulty: 'easy', size: 6, level: 'learn', timer: 0, players: 2 };
 
-// The game to start from the menu's choice (falling back to what's unlocked)
-function setupFor(choice, progress) {
+// The game to start from the menu's choice (falling back to what's unlocked).
+// Single player has its Level (Expert: no help, bonus ×2) and Expert's timer;
+// Home multiplayer has the Settings' answer timer, as on the web.
+function setupFor(choice, progress, settings) {
   const difficulty = difficultyOpen(progress, choice.difficulty) ? choice.difficulty : 'easy';
   const size = boardOpen(progress, choice.size) ? choice.size : 6;
   const mode = modeOpen(progress, choice.mode) ? choice.mode : 'single';
-  const players = mode === 'multi' ? [{ name: 'Player 1' }, { name: 'Player 2' }] : [{ name: 'You' }, { name: 'CPU', cpu: true }];
-  return { mode, difficulty, size, players };
+  const count = mode === 'multi' && playersOpen(progress, choice.players) ? choice.players : 2;
+  const players = mode === 'multi' ? Array.from({ length: count }, (_, i) => ({ name: `Player ${i + 1}` })) : [{ name: 'You' }, { name: 'CPU', cpu: true }];
+  const { level, timer } = mode === 'single' ? Setup.gameLevel(progress, difficulty, choice) : { level: 'learn', timer: Number(settings.answerTime) || 0 };
+  return {
+    mode,
+    difficulty,
+    size,
+    players,
+    expert: level === 'expert',
+    bonusMultiplier: level === 'expert' ? Setup.GAME_EXPERT_BONUS : 1,
+    timer, // seconds to answer (0: none); the bonus goes by it, the clock by timerMs
+    timerMs: Setup.timerMs(progress, timer),
+    weight: difficulty === 'master' ? Setup.masterWeight(progress, players.find((p) => !p.cpu).name) : null,
+  };
 }
 
 export default function App() {
@@ -165,7 +180,7 @@ function Main({ onTheme }) {
     );
   }
 
-  const play = () => setGame({ key: Date.now(), setup: setupFor(choice, progress) });
+  const play = () => setGame({ key: Date.now(), setup: setupFor(choice, progress, settings) });
 
   return (
     <SafeAreaView style={[styles.fill, { backgroundColor: t.bg }]}>

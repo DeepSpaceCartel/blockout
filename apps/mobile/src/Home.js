@@ -1,14 +1,20 @@
 // The menu, on one screen: points and who's signed in, what to play
 // (mode, difficulty, board, each one row of choices) and Play at the bottom.
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import * as Progress from '@blockout/progress';
 import * as Shop from '@blockout/progress/shop';
-import { BOARDS, DIFFICULTIES, boardOpen, difficultyOpen, itemFor, modeOpen } from './rewards';
+import * as Setup from '@blockout/progress/setup';
+import { BOARDS, DIFFICULTIES, PLAYER_COUNTS, boardOpen, difficultyOpen, itemFor, modeOpen, playersOpen } from './rewards';
 import { useTheme } from './theme';
 import { Button } from './ui';
 
 const MODES = [
   { id: 'single', label: 'You vs CPU' },
-  { id: 'multi', label: 'Two players' },
+  { id: 'multi', label: 'Friends' },
+];
+const LEVELS = [
+  { id: 'learn', label: 'Learn' },
+  { id: 'expert', label: 'Expert ×2' },
 ];
 
 // onLocked(itemId): a locked choice was tapped (offer it); onShop(): open the Shop
@@ -17,6 +23,9 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onSignI
   const newUnlocks = Shop.affordableCount(progress);
   const stickerNews = Shop.newStickers(progress) + Shop.spareStickers(progress);
   const anyLocked = DIFFICULTIES.some((d) => !difficultyOpen(progress, d.id)) || BOARDS.some((n) => !boardOpen(progress, n));
+  const d = choice.difficulty;
+  const level = Setup.gameLevel(progress, d, choice); // (what's unlocked on this difficulty)
+  const warning = Setup.boardWarning(d, choice.size);
   return (
     <View style={[styles.fill, { backgroundColor: t.bg }]}>
       <ScrollView contentContainerStyle={styles.page} bounces={false}>
@@ -63,11 +72,38 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onSignI
 
         <Section title="Play">
           <Segments items={MODES.map((x) => ({ id: x.id, label: x.label, open: modeOpen(progress, x.id) }))} value={choice.mode} onPick={(mode) => onChoose({ mode })} onLocked={() => onLocked(itemFor.mode())} />
+          {choice.mode === 'single' ? (
+            <Segments
+              compact
+              items={LEVELS.map((l) => ({ id: l.id, label: l.label, open: isOpen(progress, Setup.levelItem(d, l.id)) }))}
+              value={level.level}
+              onPick={(lv) => onChoose({ level: lv })}
+              onLocked={(lv) => onLocked(Setup.levelItem(d, lv))}
+            />
+          ) : (
+            <Segments
+              compact
+              items={PLAYER_COUNTS.map((n) => ({ id: n, label: `${n} players`, open: playersOpen(progress, n) }))}
+              value={choice.players || 2}
+              onPick={(players) => onChoose({ players })}
+              onLocked={(n) => onLocked(itemFor.players(n))}
+            />
+          )}
+          {choice.mode === 'single' && level.level === 'expert' ? (
+            <Segments
+              compact
+              items={Setup.GAME_TIMERS.map((secs) => ({ id: secs, label: secs ? `⏱️ ${secs} s` : 'No timer', open: !secs || isOpen(progress, Setup.timerItem(d, secs)) }))}
+              value={level.timer}
+              onPick={(timer) => onChoose({ timer })}
+              onLocked={(secs) => onLocked(Setup.timerItem(d, secs))}
+            />
+          ) : null}
         </Section>
 
         <Section title="Difficulty">
           <Segments
-            items={DIFFICULTIES.map((d) => ({ id: d.id, label: d.name, sub: d.dice.replace(' dice', ''), open: difficultyOpen(progress, d.id) }))}
+            columns={3}
+            items={DIFFICULTIES.map((x) => ({ id: x.id, label: x.name, sub: x.dice.replace(' dice', ''), open: difficultyOpen(progress, x.id) }))}
             value={choice.difficulty}
             onPick={(difficulty) => onChoose({ difficulty })}
             onLocked={(id) => onLocked(itemFor.difficulty(id))}
@@ -75,13 +111,14 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onSignI
         </Section>
 
         <Section title="Board">
-          <Segments items={BOARDS.map((n) => ({ id: n, label: `${n}`, sub: `× ${n}`, open: boardOpen(progress, n) }))} value={choice.size} onPick={(size) => onChoose({ size })} onLocked={(n) => onLocked(itemFor.size(n))} />
+          <Segments compact items={BOARDS.map((n) => ({ id: n, label: `${n}`, open: boardOpen(progress, n) }))} value={choice.size} onPick={(size) => onChoose({ size })} onLocked={(n) => onLocked(itemFor.size(n))} />
+          {warning ? <Text testID="board-warning" style={[styles.warning, { color: t.bad }]}>{warning}</Text> : null}
         </Section>
 
         {anyLocked ? <Text style={[styles.note, { color: t.muted }]}>🔒 Tap a locked one to see how to unlock it.</Text> : null}
       </ScrollView>
       <View style={styles.bottom}>
-        <Button testID="play" title="Play" onPress={onPlay} />
+        <Button testID="play" title="Play" onPress={onPlay} disabled={Boolean(warning)} />
       </View>
     </View>
   );
@@ -97,11 +134,14 @@ function Section({ title, children }) {
   );
 }
 
-// One row of equal choices; a locked one shows 🔒, and tapping it offers it (onLocked)
-function Segments({ items, value, onPick, onLocked }) {
+const isOpen = (progress, itemId) => !itemId || Progress.isUnlocked(progress, itemId);
+
+// One row of equal choices (or rows of `columns`); a locked one shows 🔒, and
+// tapping it offers it (onLocked). compact: shorter, for the second rows.
+function Segments({ items, value, onPick, onLocked, columns = 0, compact = false }) {
   const t = useTheme();
   return (
-    <View style={styles.segments} accessibilityRole="radiogroup">
+    <View style={[styles.segments, columns ? styles.wrap : null]} accessibilityRole="radiogroup">
       {items.map((it) => {
         const on = it.id === value;
         return (
@@ -114,6 +154,8 @@ function Segments({ items, value, onPick, onLocked }) {
             onPress={() => (it.open ? onPick(it.id) : onLocked(it.id))}
             style={({ pressed }) => [
               styles.segment,
+              compact ? styles.compact : null,
+              columns ? { flexBasis: `${100 / columns - 3}%`, flexGrow: 1 } : null,
               { backgroundColor: on ? t.accentSoft : t.surface, borderColor: on ? t.accent : t.line, opacity: it.open ? 1 : 0.5, transform: [{ scale: pressed ? 0.97 : 1 }] },
             ]}
           >
@@ -173,7 +215,7 @@ function SmallButton({ title, onPress, disabled, testID }) {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  page: { flexGrow: 1, padding: 16, gap: 16 },
+  page: { flexGrow: 1, padding: 16, paddingTop: 10, paddingBottom: 8, gap: 10 },
   top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { fontSize: 28, fontWeight: '900' },
   gear: { width: 38, height: 38, borderRadius: 19, borderWidth: StyleSheet.hairlineWidth * 2, alignItems: 'center', justifyContent: 'center' },
@@ -185,20 +227,23 @@ const styles = StyleSheet.create({
   badgeText: { color: '#fff', fontSize: 12, fontWeight: '800' },
   // (on the corner, like an app's badge, so the label keeps its room)
   cornerBadge: { position: 'absolute', top: -7, right: -5 },
-  account: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth * 2 },
+  account: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth * 2 },
   accountText: { flex: 1, fontSize: 15 },
   bold: { fontWeight: '700' },
   error: { fontSize: 14, textAlign: 'center' },
-  section: { gap: 8 },
+  section: { gap: 6 },
   sectionTitle: { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
   segments: { flexDirection: 'row', gap: 8 },
-  segment: { flex: 1, minHeight: 52, paddingVertical: 8, paddingHorizontal: 4, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  wrap: { flexWrap: 'wrap' },
+  compact: { minHeight: 36, paddingVertical: 2 },
+  warning: { fontSize: 14, lineHeight: 19, fontWeight: '600' },
+  segment: { flex: 1, minHeight: 48, paddingVertical: 6, paddingHorizontal: 4, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   segmentText: { fontSize: 16, fontWeight: '700' },
   segmentSub: { fontSize: 12, marginTop: 2 },
   note: { fontSize: 13, textAlign: 'center' },
   bottom: { padding: 16, paddingTop: 8 },
   more: { flexDirection: 'row', gap: 8 },
-  menuBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 44, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth * 2 },
+  menuBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 40, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth * 2 },
   small: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth * 2 },
   smallText: { fontSize: 15, fontWeight: '700' },
 });
