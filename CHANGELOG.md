@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-17
+
 ### Changed
 - Practice's second mode is **Auto** instead of Free practice: no tables or difficulty to pick, the game asks what you need from every table you've reached (your facts to practice, then the ones that need practice, then Learning and new facts mixed; mastered facts only once everything else is), with the length, level and timer you choose.
 
@@ -158,7 +160,8 @@ The first release since 0.2.0 (0.3.0 wasn't released on its own): accounts and h
 - The first playable Blockout: roll two dice, draw the rectangle, answer the multiplication, against the CPU.
 
 <!-- No release tags yet: the links point at the release commits (tag them v0.1.0 and v0.2.0 to switch to compare/v0.1.0...v0.2.0). -->
-[Unreleased]: https://github.com/DeepSpaceCartel/blockout/compare/v0.9.2...HEAD
+[Unreleased]: https://github.com/DeepSpaceCartel/blockout/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/DeepSpaceCartel/blockout/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/DeepSpaceCartel/blockout/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/DeepSpaceCartel/blockout/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/DeepSpaceCartel/blockout/compare/v0.8.0...v0.9.0

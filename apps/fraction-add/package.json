@@ -1,6 +1,6 @@
 {
   "name": "@blockout/fraction-add",
-  "version": "0.9.2",
+  "version": "0.10.0",
   "private": true,
   "type": "module",
   "description": "Blockout: adding fractions, one of the games under More games (built on @blockout/game-kit).",
