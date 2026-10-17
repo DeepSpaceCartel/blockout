@@ -25,7 +25,14 @@ The shop, practice, classes and the other games are still to come. Difficulties 
 
 Changes to the code reload the app on the phone by themselves.
 
-The tunnel (ngrok, through `@expo/ngrok`) needs no Expo account.
+**An Expo account on both ends:** Expo Go only opens a project from a tunnel when the dev server signs its manifest, so sign in once with the same free account (expo.dev) on both:
+
+- **Expo CLI:** `npx expo login`, in `apps/mobile`. It's kept in `~/.expo/state.json`, so do it again after the dev container is rebuilt. Or set `EXPO_TOKEN` to an access token from expo.dev.
+- **Expo Go:** its **Settings** tab.
+
+Without them, Expo Go says "You need to be signed in to Expo Go and Expo CLI to open your project". With them, the tunnel's address carries the account's name (`exp://<id>-<account>-8081.exp.direct`).
+
+The "React Native DevTools" error when the dev server starts is about the desktop debugger, which needs GTK libraries the dev container doesn't have. It doesn't affect the app.
 
 ## Signing in
 
