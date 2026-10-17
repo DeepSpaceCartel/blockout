@@ -1,42 +1,35 @@
 // Practice mode: part of the multiplication game (split from the old js/game.js).
 
-import * as Core from '@blockout/engine';
 import * as Progress from '@blockout/progress';
 import * as Shop from '@blockout/progress/shop';
 import * as Setup from '@blockout/progress/setup';
+import * as Practice from '@blockout/progress/practice';
 import { COUNT_STEP, TRY_AGAIN, el } from './base.js';
 import { BONUS_TOASTS, capitalize, celebrate, progress, saveProgress, toast } from './wallet.js';
 import { settings } from './settings.js';
 import { icon, openSettings, selectIn, setLockBadge } from './wardrobe.js';
-import { FACT_STATUS, answerDecided, cancelContinue, gameId, make, renderFactGrid, renderFactLegend, setGame, setGameId, showStreak, stopTimer, unlockedTableSize, waitInGame } from './play.js';
+import { FACT_STATUS, answerDecided, cancelContinue, gameId, make, renderFactGrid, renderFactLegend, setGame, setGameId, showStreak, stopTimer, waitInGame } from './play.js';
 import { recordPracticeRound } from './stats.js';
 import { confirmUnlock, refreshNudges } from './shop.js';
 
 let practiceTables;
 
-const PRACTICE_BASE_POINTS = 1; // per correct answer, before bonuses
-
-// For "what changed": moving right is progress (so a new fact landing in
-// "needs practice" shows as a step down, not an improvement).
-const STATUS_ORDER = { practice: 0, unseen: 1, learning: 2, mastered: 3 };
+// (a round's rules, words and setup are shared with the phone app: @blockout/progress/practice)
 
 let practiceRoundSize = 5;
 
 // 5 comes with Practice mode; 10 and 20 are unlocked for each difficulty
-const countUnlock = (count) => Progress.practiceCountId(Number(count), settings.difficulty);
+const countUnlock = (count) => Practice.countItem(settings.difficulty, count);
 
 let practiceLevel = 'learn'; // 'expert' (shop unlock): no picture, no help button until 2 misses, ×2 bonus
 
-const EXPERT_BONUS = 2;
+const EXPERT_BONUS = Practice.PRACTICE_EXPERT_BONUS;
 
-const LEVEL_HELP = {
-  learn: 'Learn: see each fact as a rectangle and get help counting.',
-  expert: 'Expert: no picture and no help. First-try bonus points are doubled!',
-};
+const LEVEL_HELP = Practice.LEVEL_HELP;
 
 function renderPracticeLevel() {
   // Expert is unlocked for each difficulty
-  const expertId = Progress.practiceExpertId(settings.difficulty);
+  const expertId = Practice.levelItem(settings.difficulty, 'expert');
   if (!Progress.isUnlocked(progress, expertId) && practiceLevel === 'expert') practiceLevel = 'learn';
   for (const btn of el.practiceLevel.querySelectorAll('button')) {
     btn.classList.toggle('selected', btn.dataset.level === practiceLevel);
@@ -50,7 +43,7 @@ function renderPracticeLevel() {
 // unlocked separately for each difficulty
 let practiceTimerSecs = 0;
 
-const timerUnlock = (secs) => (Number(secs) ? Progress.practiceTimerId(Number(secs), settings.difficulty) : null);
+const timerUnlock = (secs) => Practice.timerItem(settings.difficulty, secs);
 
 function renderPracticeTimer() {
   el.practiceTimerField.hidden = practiceLevel !== 'expert';
@@ -60,10 +53,7 @@ function renderPracticeTimer() {
     setLockBadge(btn, timerUnlock(btn.dataset.secs));
   }
   // The timer bonus (Expert doubles it): all of it for an instant answer, none when time runs out
-  const top = (secs) => Progress.TIMER_BONUS_MAX[secs] * EXPERT_BONUS;
-  el.practiceTimerHelp.textContent = practiceTimerSecs
-    ? `⏱️ Answer fast for a timer bonus of up to +${top(practiceTimerSecs)} a question: the quicker, the more. If time runs out, it counts as missed.`
-    : `⏱️ A timer earns a bonus for quick answers: up to +${top(30)} a question with 30 s, +${top(10)} with 10 s, +${top(5)} with 5 s.`;
+  el.practiceTimerHelp.textContent = Practice.timerHelp(practiceTimerSecs);
 }
 
 let practice = null;
@@ -81,13 +71,9 @@ function playerFacts(name) {
 const weakFactWeight = (player) => Setup.masterWeight(progress, player ? player.name : 'You');
 
 // Practice table size follows Difficulty: Easy 6, Medium 8, Hard 12 (and
-// Tricky, Master and Legend, whose facts are within 12 or one teen × 2–9).
-function practiceMax() {
-  return Math.min(Core.DIFFICULTY_SIDES[settings.difficulty] || 6, 12);
-}
 
 // The difficulty's table chips: ×1 … ×max, Tricky's hard tables, Legend's ×2 … ×9
-const practiceChips = () => Progress.practiceSet(settings.difficulty).tables.filter((n) => n <= 12);
+const practiceChips = () => Practice.tableChoices(settings.difficulty);
 
 // Chips for the difficulty's tables; choices it doesn't have are dropped.
 function renderPracticeTables() {
@@ -110,8 +96,7 @@ const tablesLabel = Shop.tablesLabel;
 
 // The tables a round asks about: the ones picked, or else every unlocked one.
 function practiceTableList() {
-  if (practiceTables.size) return [...practiceTables];
-  return practiceChips().filter(tableUnlocked);
+  return Practice.roundTables(progress, settings.difficulty, [...practiceTables]);
 }
 
 function updatePracticePreview() {
@@ -119,26 +104,9 @@ function updatePracticePreview() {
   renderPracticeLevel();
   renderPracticeCount();
   renderPracticeTables();
-  const tables = practiceTableList();
-  el.startBtn.disabled = !tables.length;
-  if (!tables.length) {
-    el.practicePreview.textContent = 'Unlock a times table to practice: tap ×1 to start.';
-    return;
-  }
-  const facts = playerFacts(el.practiceName.value.trim() || 'You');
-  const set = Progress.practiceSet(settings.difficulty);
-  const upTo = settings.difficulty === 'legend' ? '11–19' : `up to ${practiceMax()}`;
-  const counts = { practice: 0, learning: 0, unseen: 0, mastered: 0 };
-  let total = 0;
-  for (const [a, b] of set.pairs) {
-    if (!(set.bSideOnly ? tables.includes(b) : tables.includes(a) || tables.includes(b))) continue;
-    counts[Progress.factStatus(facts[Progress.factKey(a, b)])]++;
-    total++;
-  }
-  const what = practiceTables.size ? `${tablesLabel(practiceTables)} ${upTo} (${total} facts)` : `All your unlocked tables (${tablesLabel(tables)}), ${upTo}`;
-  el.practicePreview.textContent =
-    `${what}: ${counts.practice} need practice, ${counts.learning} learning, ` +
-    `${counts.unseen} not seen yet, ${counts.mastered} mastered.`;
+  const text = Practice.preview(progress, settings.difficulty, [...practiceTables], el.practiceName.value.trim() || 'You');
+  el.startBtn.disabled = !text;
+  el.practicePreview.textContent = text || 'Unlock a times table to practice: tap ×1 to start.';
 }
 
 function renderPracticeCount() {
@@ -148,16 +116,11 @@ function renderPracticeCount() {
     setLockBadge(btn, countUnlock(btn.dataset.count));
   }
   // The finishing bonus for the chosen length (doubled on Expert)
-  const expert = practiceLevel === 'expert';
-  const bonus = Progress.practiceFinishBonus(practiceRoundSize, expert);
-  const next = practiceRoundSize === 5 ? Progress.practiceFinishBonus(10, expert) : 0;
-  el.practiceCountHelp.textContent = bonus
-    ? `🏁 Finish all ${practiceRoundSize} for +${bonus} bonus points${expert ? ' (doubled on Expert)' : ''}.`
-    : `🏁 Longer rounds earn a finishing bonus: +${next} for 10 questions, +${Progress.practiceFinishBonus(20, expert)} for 20.`;
+  el.practiceCountHelp.textContent = Practice.countHelp(practiceRoundSize, practiceLevel === 'expert');
 }
 
 // Times tables are unlocked one by one (×1, then ×2, …)
-const tableUnlocked = (n) => Progress.isUnlocked(progress, `table${n}`);
+const tableUnlocked = (n) => Practice.tableOpen(progress, n);
 
 function startPractice(name, count, tables = [], expert = false, timer = 0) {
   stopPracticeTimer();
@@ -165,12 +128,8 @@ function startPractice(name, count, tables = [], expert = false, timer = 0) {
   stopTimer();
   setGameId(gameId + 1); // cancels anything still waiting from a game
   setGame(null);
-  const max = practiceMax();
-  const facts = playerFacts(name);
-  const queue = Progress.pickPracticeFacts(facts, Progress.practiceSet(settings.difficulty), count, Math.random, tables);
-  const before = {};
-  for (const [a, b] of queue) before[Progress.factKey(a, b)] = Progress.factStatus(facts[Progress.factKey(a, b)]);
-  practice = { name, max, count, tables, expert, timer, difficulty: settings.difficulty, startedAt: Date.now(), times: [], queue, index: 0, requeued: new Set(), before, firstTry: 0, answered: 0, streak: 0, bestStreak: 0, points: 0, earned: [], current: null };
+  practice = Practice.createRound(progress, { name, difficulty: settings.difficulty, count, tables, level: expert ? 'expert' : 'learn', timer });
+  practice.earned = [];
   el.startScreen.hidden = true;
   el.gameScreen.hidden = true;
   el.practiceDone.hidden = true;
@@ -180,14 +139,11 @@ function startPractice(name, count, tables = [], expert = false, timer = 0) {
 
 function nextPracticeQuestion() {
   stopPracticeTimer();
-  if (practice.index >= practice.queue.length) return finishPractice();
-  const [a, b] = practice.queue[practice.index];
-  // retry: a missed fact asked again at the end; it doesn't count towards the score
-  practice.current = { a, b, area: a * b, retry: practice.index >= practice.count, entry: '', attempts: 0, wrong: [], helped: false, counting: false, startedAt: performance.now(), pausedMs: 0, done: false };
-  const focus =
-    (practice.tables.length ? ` · ${practice.tables.sort((x, y) => x - y).map((n) => `×${n}`).join(' ')}` : '') +
-    (practice.expert ? ' · 🧠 Expert' : '');
-  el.prCounter.textContent = `Question ${practice.index + 1} of ${practice.queue.length}${focus}`;
+  if (!practice.current) return finishPractice();
+  const { a, b } = practice.current;
+  // (what only the screen needs: the typing, the clock, the counting)
+  Object.assign(practice.current, { entry: '', counting: false, startedAt: performance.now(), pausedMs: 0 });
+  el.prCounter.textContent = Practice.counter(practice);
   showStreak(el.prStreak, practice.streak);
   el.prBar.style.width = `${(practice.index / practice.queue.length) * 100}%`;
   el.prQ.textContent = `${a} × ${b}`;
@@ -238,65 +194,40 @@ function practiceLocked(on) {
   el.prHelp.disabled = on;
 }
 
-// A missed fact comes back once, later in the round.
-function requeue(q) {
-  const key = Progress.factKey(q.a, q.b);
-  if (practice.requeued.has(key)) return;
-  practice.requeued.add(key);
-  practice.queue.push([q.a, q.b]);
-}
-
 async function checkPractice() {
   const q = practice.current;
   if (!q || q.done || q.entry === '') return;
-  if (Number(q.entry) === q.area) {
-    q.done = true;
-    const timerLeft = prTimer && practice.timer ? { secs: practice.timer, left: prTimer.remaining / prTimer.total } : null;
+  const timerLeft = prTimer && practice.timer ? { secs: practice.timer, left: prTimer.remaining / prTimer.total } : null;
+  const ms = performance.now() - q.startedAt - q.pausedMs;
+  const res = Practice.answer(progress, practice, q.entry, { ms, timer: timerLeft });
+  if (res.correct) {
     stopPracticeTimer();
     practiceLocked(true);
-    const ms = performance.now() - q.startedAt - q.pausedMs;
-    const firstTry = q.attempts === 0;
-    practice.answered++;
-    if (firstTry && !q.retry) practice.firstTry++;
-    practice.times.push(Math.round(ms));
-    practice.streak = firstTry ? practice.streak + 1 : 0;
-    practice.bestStreak = Math.max(practice.bestStreak, practice.streak);
-    const bonus = Progress.answerBonus({ firstTry, ms, streak: practice.streak, timer: timerLeft });
-    const multiplier = practice.expert ? EXPERT_BONUS : 1;
-    const points = PRACTICE_BASE_POINTS + bonus.total * multiplier;
-    practice.points += points;
-    Progress.addPoints(progress, points);
-    for (const part of bonus.parts) {
+    for (const part of res.bonus.parts) {
       const extra = practice.expert ? ` (×${EXPERT_BONUS} Expert)` : '';
-      toast(`${BONUS_TOASTS[part.label.split(' ')[0]]} ${capitalize(part.label)}`, `+${part.points * multiplier} bonus points${extra}`);
+      toast(`${BONUS_TOASTS[part.label.split(' ')[0]]} ${capitalize(part.label)}`, `+${part.points} bonus points${extra}`);
     }
-    Progress.recordAnswer(progress, practice.name, { a: q.a, b: q.b, firstTry, correct: true, wrongAnswers: q.wrong, ms });
-    const learned = Progress.learnedAfterHelp(progress, q.a, q.b, firstTry);
-    practice.earned.push(...celebrate(Progress.awardAchievements(progress, { event: 'answer', correct: true, firstTry, ms, streak: practice.streak, a: q.a, b: q.b, facts: playerFacts(practice.name), size: unlockedTableSize(), learned })));
+    practice.earned.push(...celebrate(res.earned));
     saveProgress();
     el.prAnswer.className = 'answer-box right';
     el.prFeedback.className = 'math-feedback good';
-    el.prFeedback.textContent = firstTry ? `Correct! +${points} points 🎉` : `You got it! +${points} point${points === 1 ? '' : 's'}`;
+    el.prFeedback.textContent = res.text;
     showStreak(el.prStreak, practice.streak);
     await waitInGame(1100);
-    practice.index++;
+    Practice.next(practice);
     nextPracticeQuestion();
     return;
   }
-  q.attempts++;
-  q.wrong.push(Number(q.entry));
   q.entry = '';
-  practice.streak = 0;
   showStreak(el.prStreak, 0);
-  requeue(q);
   el.prAnswer.className = 'answer-box';
   void el.prAnswer.offsetWidth; // restart the shake
   el.prAnswer.className = 'answer-box wrong';
   el.prAnswer.textContent = '';
   el.prFeedback.className = 'math-feedback try';
-  el.prFeedback.textContent = TRY_AGAIN[(q.attempts - 1) % TRY_AGAIN.length];
+  el.prFeedback.textContent = TRY_AGAIN[(res.attempts - 1) % TRY_AGAIN.length];
   // Learn: count it out after two misses. Expert: no help at all.
-  if (q.attempts >= 2 && !q.helped && !practice.expert) {
+  if (res.helpNow) {
     el.prFeedback.textContent = "Let's count them together!";
     practiceHelp();
   }
@@ -306,9 +237,9 @@ async function checkPractice() {
 async function practiceHelp() {
   const q = practice && practice.current;
   if (!q || q.done || q.helped || practice.expert) return; // Expert gets no help
-  q.helped = true;
-  Progress.noteHelp(progress, q.a, q.b);
-  practice.earned.push(...celebrate(Progress.awardAchievements(progress, { event: 'help' })));
+  const h = Practice.help(progress, practice);
+  if (!h) return;
+  practice.earned.push(...celebrate(h.earned));
   saveProgress();
   q.counting = true;
   el.prHelp.disabled = true;
@@ -372,19 +303,16 @@ function stopPracticeTimer() {
 async function practiceTimeout() {
   stopPracticeTimer();
   const q = practice.current;
-  if (!q || q.done) return;
-  q.done = true;
+  const out = Practice.timeout(progress, practice);
+  if (!out) return;
   practiceLocked(true);
-  practice.streak = 0;
-  Progress.recordAnswer(progress, practice.name, { a: q.a, b: q.b, firstTry: false, correct: false, wrongAnswers: q.wrong, timeout: true });
   saveProgress();
-  requeue(q);
   el.prAnswer.textContent = q.area;
   el.prAnswer.className = 'answer-box timeout';
   el.prFeedback.className = 'math-feedback try';
-  el.prFeedback.textContent = `⏰ Time's up! ${q.a} × ${q.b} = ${q.area}. It'll come back later.`;
+  el.prFeedback.textContent = out.text;
   await waitInGame(2200);
-  practice.index++;
+  Practice.next(practice);
   nextPracticeQuestion();
 }
 
@@ -392,39 +320,21 @@ function finishPractice() {
   stopPracticeTimer();
   el.prBar.style.width = '100%';
   const pr = practice;
-  progress.counters.practiceRounds = (progress.counters.practiceRounds || 0) + 1;
-  // Longer rounds earn a finishing bonus (doubled on Expert, like the other bonuses)
-  const finish = Progress.practiceFinishBonus(pr.count, pr.expert);
-  if (finish) {
-    pr.points += finish;
-    Progress.addPoints(progress, finish);
-    toast(`🏁 Finished all ${pr.count} questions!`, `+${finish} bonus points${pr.expert ? ` (×${EXPERT_BONUS} Expert)` : ''}`);
-  }
-  recordPracticeRound(pr);
-  Progress.noteActivity(progress, { kind: 'practice', difficulty: pr.difficulty, count: pr.count, expert: pr.expert, finished: true, firstTry: pr.firstTry });
-  pr.earned.push(...celebrate(Progress.awardAchievements(progress, { event: 'practice' })));
+  const end = Practice.finish(progress, pr);
+  if (end.finishToast) toast(...end.finishToast);
+  recordPracticeRound(end.record);
+  pr.earned.push(...celebrate(end.earned));
   saveProgress();
-
-  const retries = pr.queue.length - pr.count; // missed facts asked again
-  el.pdSub.textContent =
-    (pr.expert ? '🧠 Expert · ' : '') +
-    `${pr.firstTry} of ${pr.count} right first time` +
-    (retries ? ` · ${retries} ${retries === 1 ? 'fact' : 'facts'} retried` : '') +
-    (pr.bestStreak >= 3 ? ` · best streak ${pr.bestStreak} 🔥` : '');
+  el.pdSub.textContent = end.sub;
 
   // Which facts moved, e.g. "3 × 4: Needs practice → Learning"
   el.pdBody.innerHTML = '';
   const facts = playerFacts(pr.name);
-  const changes = Object.entries(pr.before)
-    .map(([fact, was]) => ({ fact, was, now: Progress.factStatus(facts[fact]) }))
-    .filter((c) => c.was !== c.now)
-    .sort((x, y) => STATUS_ORDER[y.now] - STATUS_ORDER[y.was] - (STATUS_ORDER[x.now] - STATUS_ORDER[x.was]));
   el.pdBody.append(make('h3', 'stats-heading', 'What changed'));
-  if (!changes.length) el.pdBody.append(make('p', 'practice-none', 'No changes this time. Keep practicing and your facts will move up!'));
-  for (const c of changes) {
+  if (!end.changes.length) el.pdBody.append(make('p', 'practice-none', 'No changes this time. Keep practicing and your facts will move up!'));
+  for (const ch of end.changes) {
     const row = make('div', 'practice-change');
-    const up = STATUS_ORDER[c.now] > STATUS_ORDER[c.was];
-    row.append(make('span', null, c.fact), make('span', up ? 'up' : 'down', `${FACT_STATUS[c.was].label} → ${FACT_STATUS[c.now].label}`));
+    row.append(make('span', null, ch.fact), make('span', ch.up ? 'up' : 'down', `${FACT_STATUS[ch.was].label} → ${FACT_STATUS[ch.now].label}`));
     el.pdBody.append(row);
   }
   el.pdBody.append(make('h3', 'stats-heading centered', 'Times table'));

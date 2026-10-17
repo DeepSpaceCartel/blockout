@@ -34,22 +34,8 @@ function recordGame(winnerIndexes) {
 }
 
 // Practice rounds share the history list, marked kind: 'practice'.
-function recordPracticeRound(pr) {
-  const history = loadHistory();
-  history.push({
-    kind: 'practice',
-    at: Date.now(),
-    duration: Date.now() - pr.startedAt,
-    name: pr.name,
-    size: pr.max,
-    level: pr.expert ? 'expert' : 'learn',
-    tables: pr.tables,
-    count: pr.count,
-    firstTry: pr.firstTry,
-    times: pr.times,
-    points: pr.points,
-  });
-  saveHistory(history);
+function recordPracticeRound(record) {
+  saveHistory(Stats.addToHistory(loadHistory(), record));
 }
 
 function renderHistory() {

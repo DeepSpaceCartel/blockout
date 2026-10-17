@@ -11,7 +11,8 @@
     "./views": "./src/views.js",
     "./stats": "./src/stats.js",
     "./settings": "./src/settings.js",
-    "./setup": "./src/setup.js"
+    "./setup": "./src/setup.js",
+    "./practice": "./src/practice.js"
   },
   "dependencies": {
     "@blockout/engine": "*"
