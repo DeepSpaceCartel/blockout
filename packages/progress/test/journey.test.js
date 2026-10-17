@@ -110,9 +110,18 @@ test('merging two saves keeps the higher levels', () => {
   assert.ok(Progress.isUnlocked(m, 'table5'));
 });
 
-test('Practice Journey: each table in rounds of 5, 10 and 20; Free practice from ×2', () => {
-  assert.equal(Journey.PRACTICE_LEVELS.length, 36);
-  assert.deepEqual([1, 2, 3, 4].map(Journey.practiceSetup), [{ table: 1, count: 5 }, { table: 1, count: 10 }, { table: 1, count: 20 }, { table: 2, count: 5 }]);
+test('Practice Journey: each table in five rounds (5, 10, 20, Expert, Expert with a timer); Free practice from ×2', () => {
+  assert.equal(Journey.PRACTICE_LEVELS.length, 60);
+  assert.deepEqual([1, 2, 3, 4, 5, 6].map(Journey.practiceSetup), [
+    { table: 1, count: 5, expert: false, timer: 0 },
+    { table: 1, count: 10, expert: false, timer: 0 },
+    { table: 1, count: 20, expert: false, timer: 0 },
+    { table: 1, count: 10, expert: true, timer: 0 },
+    { table: 1, count: 10, expert: true, timer: 30 },
+    { table: 2, count: 5, expert: false, timer: 0 },
+  ]);
+  // the timer gets shorter along each difficulty's tables
+  assert.deepEqual([1, 3, 5, 7, 8, 9, 10, 11, 12].map((t) => Journey.practiceSetup(practiceLevelOfTable(t) + 4).timer), [30, 10, 5, 10, 5, 30, 10, 5, 5]);
   const s = Progress.createProgress();
   assert.equal(Journey.freePracticeOpen(s), false);
   assert.equal(Journey.onPracticeJourney(s, 'free'), true, 'nothing to pick yet');
@@ -121,14 +130,17 @@ test('Practice Journey: each table in rounds of 5, 10 and 20; Free practice from
   assert.deepEqual([r.advanced, r.to, r.grants, r.reward], [true, 2, ['practice10'], 5]);
   assert.match(Journey.practiceResultMessage(r).title, /Round 2 of ×1/);
   Journey.recordPracticeLevel(s, 2, { count: 10, firstTry: 8 });
-  const t = Journey.recordPracticeLevel(s, 3, { count: 20, firstTry: 16 });
+  Journey.recordPracticeLevel(s, 3, { count: 20, firstTry: 16 });
+  const e = Journey.recordPracticeLevel(s, 4, { count: 10, firstTry: 8 });
+  assert.deepEqual(e.grants, ['practiceTimer30']);
+  assert.equal(Journey.practiceResultMessage(e).text, 'Next: 10 questions, Expert, 30 s timer. +5 points');
+  assert.deepEqual([2, 4, 5, 6].map(Journey.practiceNextLabel), ['10 questions ›', 'Expert ›', 'Expert + timer ›', '×2 ›']);
+  const t = Journey.recordPracticeLevel(s, 5, { count: 10, firstTry: 8 });
   assert.deepEqual(t.grants, ['table2']);
   assert.match(Journey.practiceResultMessage(t).title, /×2 unlocked/);
   assert.equal(Journey.freePracticeOpen(s), true);
-  assert.equal(Journey.practiceTier(s, practiceLevelOfTable(7)), 'easy', 'Medium practice waits for the game’s Medium');
-  s.unlocks.push('difficulty.medium');
-  assert.equal(Journey.practiceTier(s, practiceLevelOfTable(7)), 'medium');
-  assert.equal(Journey.practiceLine(8), 'The ×3 table up to 3 × 6 · round 2 of 3: 10 questions');
+  assert.equal(Journey.practiceTier(practiceLevelOfTable(7)), 'medium');
+  assert.equal(Journey.practiceLine(14), 'The ×3 table up to 3 × 6 · round 4 of 5: 10 questions, Expert');
   assert.deepEqual(Journey.practiceSteps(s).slice(0, 2).map((x) => [x.label, x.done, x.current]), [['×1', true, false], ['×2', false, true]]);
   for (const l of Journey.PRACTICE_LEVELS) for (const id of l.grants) assert.equal(Progress.shopItem(id).practiceJourney, l.level, id);
 });
@@ -141,4 +153,8 @@ test('older saves: Practice starts on the first round of the highest table owned
   // from 0.7, a level a table: to that table's first round
   assert.equal(lvl({ practiceV2: true, practiceJourneyV1: true, practiceJourney: { level: 6 } }), practiceLevelOfTable(6));
   assert.equal(lvl({ practiceV2: true, practiceJourneyV1: true, practiceJourney: { level: 13 } }), Journey.PRACTICE_DONE);
+  // from 0.8, three rounds a table: the same table and round
+  const v2 = { practiceV2: true, practiceJourneyV1: true, practiceJourneyV2: true };
+  assert.equal(lvl({ ...v2, practiceJourney: { level: 17 } }), practiceLevelOfTable(6) + 1, '×6, round 2');
+  assert.equal(lvl({ ...v2, practiceJourney: { level: 37 } }), Journey.PRACTICE_DONE);
 });

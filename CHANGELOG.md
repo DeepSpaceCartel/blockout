@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Expert in Practice's Journey ([ADR-0013](https://github.com/DeepSpaceCartel/blockout/blob/main/docs/decisions/0013-practice-expert-rounds.md)): each times table now has five rounds, 5, 10 and 20 questions in Learn, then 10 in Expert, then 10 in Expert against a timer that gets shorter along each difficulty's tables (30 s, 10 s, 5 s). Expert practice and its timers are no longer bought: reaching them unlocks them for Free practice. Players keep their table and round.
+
 ## [0.8.0] - 2026-10-17
 
 ### Changed

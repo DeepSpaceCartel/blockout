@@ -16,7 +16,7 @@ When the board is full, or nobody can place anything, the game ends. The results
 
 ## Practice
 
-**Practice** asks questions without a board, picking the facts that need it most. It's free and goes one times table at a time, each in three rounds of 5, 10 and 20 questions: **Practice ×1**, and on to ×2 once all three rounds have 4 out of 5 right first try, up to ×12. From ×2, **Free practice** lets you pick the tables and the length yourself. **Learn** has help; **Expert** has none, doubles the bonus points and can add a timer. Longer rounds earn a finishing bonus.
+**Practice** asks questions without a board, picking the facts that need it most. It's free and goes one times table at a time, each in five rounds: 5, 10 and 20 questions in **Learn** (with help), then 10 in **Expert** (no picture, no help, double bonus points), then 10 in Expert against a timer. Each round needs 4 out of 5 right first try. Start with **Practice ×1** and go on to ×2, and so on up to ×12. From ×2, **Free practice** lets you pick the tables, length, level and timer yourself from what you've reached. Longer rounds earn a finishing bonus.
 
 ![Practice settings: difficulty, level, times tables and number of questions](../assets/screenshots/practice-menu.png)
 

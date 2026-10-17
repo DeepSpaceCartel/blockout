@@ -107,13 +107,16 @@ export function timerHelp(timer) {
 // chosen). Returns the round; round.current is the first question.
 // journeyLevel: a Practice Journey round, its table and its length (see journeyQueue).
 export function createRound(state, { name = 'You', difficulty = 'easy', count = 5, tables = [], level = 'learn', timer = 0, journeyLevel = null, rng = Math.random, now = Date.now } = {}) {
-  const expert = level === 'expert';
   const facts = playerFacts(state, name);
+  // a Journey round: the level sets the table, the length, Expert and the timer
   const journey = journeyLevel ? Progress.PRACTICE_LEVELS[journeyLevel - 1] : null;
   if (journey) {
     tables = [journey.table];
     count = journey.count;
+    level = journey.expert ? 'expert' : 'learn';
+    timer = journey.timer;
   }
+  const expert = level === 'expert';
   const queue = journey ? journeyQueue(facts, journey.table, count, rng) : Progress.pickPracticeFacts(facts, Progress.practiceSet(difficulty), count, rng, tables);
   const before = {};
   for (const [a, b] of queue) before[Progress.factKey(a, b)] = Progress.factStatus(facts[Progress.factKey(a, b)]);

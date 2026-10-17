@@ -35,7 +35,7 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onClass
   // Practice's Journey: the level picks the times table
   const practiceLevel = choice.mode === 'practice' && Journey.onPracticeJourney(progress, choice.practicePlay) ? Journey.practiceLevel(progress) : null;
   const practiceSwitch = choice.mode === 'practice' && Journey.freePracticeOpen(progress) && !Journey.practiceDone(progress);
-  const d = journeyLevel ? Journey.levelSetup(journeyLevel).difficulty : practiceLevel ? Journey.practiceTier(progress, practiceLevel) : choice.difficulty;
+  const d = journeyLevel ? Journey.levelSetup(journeyLevel).difficulty : practiceLevel ? Journey.practiceTier(practiceLevel) : choice.difficulty;
   const level = Setup.gameLevel(progress, d, choice); // (what's unlocked on this difficulty)
   const practicing = choice.mode === 'practice';
   const pr = Practice.practiceChoice(progress, d, choice.practice || {});
@@ -113,7 +113,8 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onClass
           ) : null}
           {choice.mode === 'single' && (journeyLevel || Journey.isDone(progress)) ? <JourneyCard progress={progress} /> : null}
           {practicing && (practiceLevel || Journey.practiceDone(progress)) ? <JourneyCard progress={progress} practice /> : null}
-          {practicing ? (
+          {/* (on the Journey the round sets Learn or Expert, the timer and the length) */}
+          {practicing && practiceLevel ? null : practicing ? (
             <>
               <Segments
                 compact
@@ -132,17 +133,14 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onClass
                   onLocked={(secs) => onLocked(Practice.timerItem(d, secs))}
                 />
               ) : null}
-              {/* (on the Journey the level sets the round's length) */}
-              {practiceLevel ? null : (
-                <Segments
-                  compact
-                  items={Practice.PRACTICE_COUNTS.map((n) => ({ id: n, label: `${n}`, sub: 'questions', open: isOpen(progress, Practice.countItem(d, n)) }))}
-                  prefix="q"
-                  value={pr.count}
-                  onPick={(count) => setPractice({ count })}
-                  onLocked={(n) => onLocked(Practice.countItem(d, n))}
-                />
-              )}
+              <Segments
+                compact
+                items={Practice.PRACTICE_COUNTS.map((n) => ({ id: n, label: `${n}`, sub: 'questions', open: isOpen(progress, Practice.countItem(d, n)) }))}
+                prefix="q"
+                value={pr.count}
+                onPick={(count) => setPractice({ count })}
+                onLocked={(n) => onLocked(Practice.countItem(d, n))}
+              />
             </>
           ) : choice.mode === 'single' ? (
             <Segments

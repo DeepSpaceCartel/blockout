@@ -4,7 +4,7 @@
 // An ES module (@blockout/progress), used by the games and the server.
 
 import * as Core from '@blockout/engine';
-import { LEVELS, DONE, levelOfStep, levelGranting, grantsUpTo, PRACTICE_LEVELS, PRACTICE_DONE, practiceLevelOfTable, practiceLevelGranting, practiceGrantsUpTo } from './levels.js';
+import { LEVELS, DONE, levelOfStep, levelGranting, grantsUpTo, PRACTICE_LEVELS, PRACTICE_DONE, PRACTICE_ROUNDS, practiceLevelOfTable, practiceLevelGranting, practiceGrantsUpTo } from './levels.js';
 
 function createProgress() {
   return {
@@ -28,6 +28,7 @@ function createProgress() {
     journey: { level: 1 }, // the Journey level reached (see levels.js)
     practiceJourneyV1: true, // …or from before Practice had its own Journey
     practiceJourneyV2: true, // …or from before each table had three rounds (5, 10, 20)
+    practiceJourneyV3: true, // …or from before each table had five (Expert, and Expert with a timer)
     practiceJourney: { level: 1 }, // Practice's Journey level: the ×n table
     stickers: {}, // sticker id -> how many
     boardWins: {}, // board size -> wins against the CPU on it
@@ -155,7 +156,13 @@ function normalize(saved) {
     const tables = state.unlocks.map((id) => /^table(\d+)$/.exec(id)).filter(Boolean).map((m) => Number(m[1]));
     state.practiceJourney.level = Math.max(state.practiceJourney.level, ...tables.map(practiceLevelOfTable));
   } else if (!saved.practiceJourneyV2) state.practiceJourney.level = practiceLevelOfTable(Number(state.practiceJourney.level) || 1);
-  state.practiceJourneyV1 = state.practiceJourneyV2 = true;
+  // …and then five (Expert, and Expert with a timer, after the three): a save
+  // from 0.8 keeps its table and round
+  else if (!saved.practiceJourneyV3) {
+    const old = Math.max(1, Number(state.practiceJourney.level) || 1) - 1;
+    state.practiceJourney.level = Math.floor(old / 3) >= 12 ? PRACTICE_DONE : Math.floor(old / 3) * PRACTICE_ROUNDS + (old % 3) + 1;
+  }
+  state.practiceJourneyV1 = state.practiceJourneyV2 = state.practiceJourneyV3 = true;
   grantPracticeJourney(state);
   // The old all-in-one timer unlock (10/20/30 s) becomes the 30 s and 10 s unlocks.
   if (state.unlocks.includes('answerTime')) {
@@ -276,18 +283,17 @@ const PRACTICE_COUNT_CHAINS = DIFFICULTIES.flatMap((d) =>
   }))
 );
 
-// Expert practice timer unlocks, one chain per difficulty. Easy keeps the
-// original ids (practiceTimer30, …); the others add the difficulty.
+// Expert practice timers, per difficulty, reached on Practice's Journey. Easy
+// keeps the original ids (practiceTimer30, …); the others add the difficulty.
 const practiceTimerId = (secs, difficulty = 'easy') => (difficulty === 'easy' ? `practiceTimer${secs}` : `practiceTimer${secs}.${difficulty}`);
-const TIMER_PRICES = { easy: [40, 70, 100], medium: [60, 100, 140], hard: [80, 130, 180] };
-const PRACTICE_TIMER_CHAINS = DIFFICULTIES.flatMap((d, di) =>
-  [30, 10, 5].map((secs, i) => ({
+const PRACTICE_TIMER_CHAINS = DIFFICULTIES.flatMap((d) =>
+  [30, 10, 5].map((secs) => ({
     id: practiceTimerId(secs, d),
     group: 'Practice',
     name: `Expert practice timer: ${secs} seconds (${TIMER_DIFFICULTY_NAMES[d]})`,
-    price: stepPrice(['easy', 'medium', 'hard'].map((x) => TIMER_PRICES[x][i]), di, 30),
-    // the chain starts with Expert practice (and, above Easy, that difficulty)
-    requires: i ? practiceTimerId([30, 10, 5][i - 1], d) : practiceExpertId(d), // starts with that difficulty's Expert
+    // (reached on Practice's Journey, not bought: see levels.js)
+    price: 0,
+    practiceJourney: practiceLevelGranting(practiceTimerId(secs, d)),
     perk: `${secs === 5 ? 'Only for the quickest' : 'Race the clock'} on ${TIMER_DIFFICULTY_NAMES[d]}: a timer bonus of up to +${TIMER_BONUS_MAX[secs] * 2} each (Expert doubles it).`,
   }))
 );
@@ -333,17 +339,18 @@ const SHOP = [
   ...GAME_CHAINS,
   // Longer practice rounds, per difficulty: reached on Practice's Journey. See practiceCountId.
   ...PRACTICE_COUNT_CHAINS,
-  // Expert practice, unlocked for each difficulty. See practiceExpertId.
-  ...DIFFICULTIES.map((d, i) => ({
+  // Expert practice, per difficulty: reached on Practice's Journey. See practiceExpertId.
+  ...DIFFICULTIES.map((d) => ({
     id: practiceExpertId(d),
     group: 'Practice',
     name: `Expert practice (${TIMER_DIFFICULTY_NAMES[d]}): no picture, no help, ×2 bonus points`,
-    price: stepPrice([200, 250, 300], i, 50),
-    requires: d === 'easy' ? 'practice' : `difficulty.${d}`,
+    // (reached on Practice's Journey, not bought: see levels.js)
+    price: 0,
+    practiceJourney: practiceLevelGranting(practiceExpertId(d)),
     perk: 'Bonus points are doubled, including the bonus for finishing 10 or 20 questions.',
   })),
-  // Expert practice timers: a chain per difficulty (30 s, then 10 s, then 5 s),
-  // since being quick on ×6 facts isn't being quick on ×12 ones. See practiceTimerId.
+  // Expert practice timers, per difficulty (being quick on ×6 facts isn't being
+  // quick on ×12 ones): reached on Practice's Journey. See practiceTimerId.
   ...PRACTICE_TIMER_CHAINS,
   // Times tables to practice: each one comes with its Practice Journey level
   ...Array.from({ length: 12 }, (_, i) => ({

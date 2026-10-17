@@ -53,6 +53,7 @@ nav:
       - 0010. Boards and difficulties are Journey levels: decisions/0010-journey-progression.md
       - 0011. Practice is free, a times table a level: decisions/0011-practice-journey.md
       - 0012. Three stages a level: decisions/0012-journey-stages.md
+      - 0013. Expert rounds in Practice: decisions/0013-practice-expert-rounds.md
 
 theme:
   name: material

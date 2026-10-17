@@ -25,7 +25,7 @@ const practiceJourneyOn = () => setup.mode === 'practice' && Journey.onPracticeJ
 const practiceJourneyLevel = () => (practiceJourneyOn() ? Journey.practiceLevel(progress) : null);
 
 // The difficulty Practice's Expert, timers and lengths go by on the Journey (null: the menu's)
-const practiceJourneyDifficulty = () => (practiceJourneyOn() ? Journey.practiceTier(progress, Journey.practiceLevel(progress)) : null);
+const practiceJourneyDifficulty = () => (practiceJourneyOn() ? Journey.practiceTier(Journey.practiceLevel(progress)) : null);
 
 function renderSteps(steps) {
   el.journeySteps.replaceChildren(
@@ -98,7 +98,10 @@ function renderJourney() {
   if (setup.mode === 'single') el.boardSizeField.hidden = on;
   else {
     el.practiceTablesField.hidden = on;
-    el.practiceCountField.hidden = on; // (the level sets the round's length)
+    // (the round sets the length, Learn or Expert and the timer)
+    el.practiceCountField.hidden = on;
+    el.practiceLevelField.hidden = on;
+    if (on) el.practiceTimerField.hidden = true;
     el.practicePreview.hidden = on;
   }
   if (on) {

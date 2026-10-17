@@ -333,9 +333,9 @@ function Main({ onTheme }) {
     if (choice.mode === 'practice' && Journey.onPracticeJourney(progress, choice.practicePlay)) {
       // Practice's Journey: the ×n table of the level reached
       const journeyLevel = Journey.practiceLevel(progress);
-      const d = Journey.practiceTier(progress, journeyLevel);
-      const pr = Practice.practiceChoice(progress, d, choice.practice || {});
-      return setGame({ key: Date.now(), practice: { difficulty: d, count: Journey.practiceSetup(journeyLevel).count, tables: [], level: pr.level, timer: pr.timer, journeyLevel } });
+      // (the round sets the length, Learn or Expert and the timer)
+      const round = Journey.practiceSetup(journeyLevel);
+      return setGame({ key: Date.now(), practice: { difficulty: Journey.practiceTier(journeyLevel), count: round.count, tables: [], level: round.expert ? 'expert' : 'learn', timer: round.timer, journeyLevel } });
     }
     if (choice.mode === 'practice' && modeOpen(progress, 'practice')) {
       const d = difficultyOpen(progress, choice.difficulty) ? choice.difficulty : 'easy';

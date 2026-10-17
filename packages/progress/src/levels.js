@@ -54,28 +54,57 @@ const grantsUpTo = (level) => [...LEVELS.filter((l) => l.level <= level).flatMap
 
 // Practice's Journey: each ×n table (with a little review of the tables before
 // it) up to the dice of its difficulty, as Practice always asked (upTo: 6 for
-// ×1–×6, 8 for ×7–×8, 12 from ×9), in rounds of 5, then 10, then 20 questions.
+// ×1–×6, 8 for ×7–×8, 12 from ×9), in five rounds: 5, 10 and 20 questions in
+// Learn, then 10 in Expert, then 10 in Expert against a timer. The timer gets
+// shorter as the tables of a difficulty go on (TIMERS).
 // Reaching a table unlocks it for Free practice (level 1 is where Practice
-// itself starts), and reaching its longer rounds unlocks them for that
-// difficulty (×1 for Easy, ×7 Medium, ×9 Hard, ×12 the ones after Hard).
+// itself starts); reaching a round unlocks what it brings, for its difficulty,
+// the first time: the longer rounds and Expert on a difficulty's first table
+// (×1 Easy, ×7 Medium, ×9 Hard, ×12 the ones after Hard), each timer on the
+// first table that uses it (with the longer ones, if they haven't come yet).
 const UP_TO = { easy: 6, medium: 8, hard: 12 };
-const COUNTS = [5, 10, 20];
-const countId = (count, d) => (d === 'easy' ? `practice${count}` : `practice${count}.${d}`);
-const COUNT_TABLES = { 1: ['easy'], 7: ['medium'], 9: ['hard'], 12: ['tricky', 'master', 'legend'] };
+const ROUNDS = [{ count: 5 }, { count: 10 }, { count: 20 }, { count: 10, expert: true }, { count: 10, expert: true, timed: true }];
+const TIMERS = { 1: 30, 2: 30, 3: 10, 4: 10, 5: 5, 6: 5, 7: 10, 8: 5, 9: 30, 10: 10, 11: 5, 12: 5 };
+const AFTER_HARD = ['tricky', 'master', 'legend'];
+const FIRST_TABLES = { 1: ['easy'], 7: ['medium'], 9: ['hard'], 12: AFTER_HARD };
+const suffix = (d) => (d === 'easy' ? '' : `.${d}`);
+const countId = (count, d) => `practice${count}${suffix(d)}`;
+const expertId = (d) => `practiceExpert${suffix(d)}`;
+const timerId = (secs, d) => `practiceTimer${secs}${suffix(d)}`;
 const PRACTICE_LEVELS = [];
+const given = new Set(); // (each id comes with the first round that brings it)
 for (let table = 1; table <= 12; table++) {
-  COUNTS.forEach((count, i) => {
-    const grants = [];
-    if (table === 1 && i === 0) grants.push('practice');
-    if (i === 0) grants.push(`table${table}`);
-    if (i > 0) grants.push(...(COUNT_TABLES[table] || []).map((d) => countId(count, d)));
-    PRACTICE_LEVELS.push({ level: PRACTICE_LEVELS.length + 1, table, stage: i + 1, count, difficulty: tierFor(table), upTo: UP_TO[tierFor(table)], grants });
+  const tier = tierFor(table);
+  const firsts = FIRST_TABLES[table] || [];
+  ROUNDS.forEach((round, i) => {
+    let ids = [];
+    if (i === 0) ids = [...(table === 1 ? ['practice'] : []), `table${table}`];
+    if (i === 1 || i === 2) ids = firsts.map((d) => countId(round.count, d));
+    if (i === 3) ids = firsts.map(expertId);
+    if (i === 4) {
+      ids = [30, 10, 5].filter((secs) => secs >= TIMERS[table]).map((secs) => timerId(secs, tier));
+      if (table === 12) ids.push(...AFTER_HARD.flatMap((d) => [30, 10, 5].map((secs) => timerId(secs, d))));
+    }
+    const grants = ids.filter((id) => !given.has(id));
+    grants.forEach((id) => given.add(id));
+    PRACTICE_LEVELS.push({
+      level: PRACTICE_LEVELS.length + 1,
+      table,
+      stage: i + 1,
+      count: round.count,
+      expert: Boolean(round.expert),
+      timer: round.timed ? TIMERS[table] : 0,
+      difficulty: tier,
+      upTo: UP_TO[tier],
+      grants,
+    });
   });
 }
 const PRACTICE_DONE = PRACTICE_LEVELS.length + 1;
+const PRACTICE_ROUNDS = ROUNDS.length;
 
 // The first Practice level of the ×n table (or PRACTICE_DONE past ×12)
-const practiceLevelOfTable = (table) => (table > 12 ? PRACTICE_DONE : (table - 1) * COUNTS.length + 1);
+const practiceLevelOfTable = (table) => (table > 12 ? PRACTICE_DONE : (table - 1) * ROUNDS.length + 1);
 
 // The Practice level that unlocks a Shop id (null: not a Practice Journey unlock)
 function practiceLevelGranting(id) {
@@ -85,4 +114,4 @@ function practiceLevelGranting(id) {
 
 const practiceGrantsUpTo = (level) => PRACTICE_LEVELS.filter((l) => l.level <= level).flatMap((l) => l.grants);
 
-export { LEVELS, STEPS, STAGES, DONE, DONE_GRANTS, tierFor, levelOfStep, levelGranting, grantsUpTo, PRACTICE_LEVELS, PRACTICE_DONE, practiceLevelOfTable, practiceLevelGranting, practiceGrantsUpTo };
+export { LEVELS, STEPS, STAGES, DONE, DONE_GRANTS, tierFor, levelOfStep, levelGranting, grantsUpTo, PRACTICE_LEVELS, PRACTICE_DONE, PRACTICE_ROUNDS, practiceLevelOfTable, practiceLevelGranting, practiceGrantsUpTo };

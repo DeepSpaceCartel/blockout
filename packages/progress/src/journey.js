@@ -4,7 +4,7 @@
 // in progress.js (recordLevelGame, recordPracticeLevel), the levels in levels.js.
 import * as Progress from './progress.js';
 import { DIFFICULTY_NAMES } from './setup.js';
-import { LEVELS, STEPS, DONE, PRACTICE_LEVELS, PRACTICE_DONE, levelOfStep, practiceLevelOfTable } from './levels.js';
+import { LEVELS, STEPS, DONE, PRACTICE_LEVELS, PRACTICE_DONE, PRACTICE_ROUNDS, levelOfStep, practiceLevelOfTable } from './levels.js';
 
 export { LEVELS, STEPS, DONE, PRACTICE_LEVELS, PRACTICE_DONE };
 export const { journeyLevel, levelResult, recordLevelGame, LEVEL_GOAL, levelUpReward } = Progress;
@@ -80,7 +80,7 @@ export function resultMessage(r) {
   return { title: r.missing === 'win' ? 'Almost!' : 'So close!', text: MISSING[r.missing].replace('FIVE', fiveOf()) };
 }
 
-// ---- Practice's Journey: each ×n table in rounds of 5, 10 and 20 questions
+// ---- Practice's Journey: each ×n table in five rounds (5, 10, 20, Expert, Expert with a timer)
 
 export const { practiceLevel, recordPracticeLevel } = Progress;
 
@@ -93,26 +93,34 @@ export const freePracticeOpen = (state) => practiceLevel(state) >= FREE_PRACTICE
 export const practiceDone = (state) => practiceLevel(state) >= PRACTICE_DONE;
 export const onPracticeJourney = (state, play) => !practiceDone(state) && (play !== 'free' || !freePracticeOpen(state));
 
-// What a Practice level's round is: { table, count }
+// What a Practice level's round is: { table, count, expert, timer (s, 0: none) }
 export const practiceSetup = (level) => {
   const l = practiceInfo(level);
-  return { table: l.table, count: l.count };
+  return { table: l.table, count: l.count, expert: l.expert, timer: l.timer };
 };
 
-// The difficulty a Practice level's Expert and timers go by: the table's
-// (Easy up to ×6, Medium ×7–×8, Hard from ×9), once the game's Journey has
-// opened it; Easy until then
-export function practiceTier(state, level) {
-  const tier = practiceInfo(level).difficulty;
-  return tier === 'easy' || Progress.isUnlocked(state, `difficulty.${tier}`) ? tier : 'easy';
-}
+// The difficulty a Practice level's round belongs to (its dice, its records):
+// Easy up to ×6, Medium ×7–×8, Hard from ×9
+export const practiceTier = (level) => practiceInfo(level).difficulty;
+
+// "10 questions, Expert, 10 s timer"
+export const practiceRound = (level) => {
+  const l = practiceInfo(level);
+  return `${l.count} questions${l.expert ? ', Expert' : ''}${l.timer ? `, ${l.timer} s timer` : ''}`;
+};
 
 export const practiceName = (level) => (level >= PRACTICE_DONE ? 'Every table done!' : `Practice Level ${level}`);
 
-// "The ×7 table up to 7 × 8 · round 2 of 3: 10 questions"
+// "The ×7 table up to 7 × 8 · round 4 of 5: 10 questions, Expert"
 export const practiceLine = (level) => {
   const l = practiceInfo(level);
-  return `The ×${l.table} table up to ${l.table} × ${l.upTo} · round ${l.stage} of 3: ${l.count} questions`;
+  return `The ×${l.table} table up to ${l.table} × ${l.upTo} · round ${l.stage} of ${PRACTICE_ROUNDS}: ${practiceRound(level)}`;
+};
+
+// The button to the next round: "×4 ›", "10 questions ›", "Expert ›", "Expert + timer ›"
+export const practiceNextLabel = (level) => {
+  const l = practiceInfo(level);
+  return l.stage === 1 ? `×${l.table} ›` : l.timer ? 'Expert + timer ›' : l.expert ? 'Expert ›' : `${l.count} questions ›`;
 };
 
 export const practiceGoalLine = () => `Get ${fiveOf()} answers right first try`;
@@ -131,7 +139,7 @@ export function practiceResultMessage(r) {
     if (r.to >= PRACTICE_DONE) return { title: '📚 Every table done!', text: `You finished every times table. Pick any of them in Free practice! +${r.reward} points` };
     const next = practiceInfo(r.to);
     if (next.stage === 1) return { title: `🎉 ×${next.table} unlocked!`, text: `Next: the ×${next.table} table. +${r.reward} points` };
-    return { title: `🎉 Round ${next.stage} of ×${next.table}!`, text: `Next: ${next.count} questions. +${r.reward} points` };
+    return { title: `🎉 Round ${next.stage} of ×${next.table}!`, text: `Next: ${practiceRound(r.to)}. +${r.reward} points` };
   }
   if (!r.current) return null;
   return { title: 'So close!', text: `Get ${fiveOf()} right first try to move up.` };

@@ -51,28 +51,41 @@ Reaching a board's first stage unlocks the board and difficulty it uses:
 
 ## Practice's Journey
 
-Practice is free, and goes one times table at a time, each in three rounds:
+Practice is free, and goes one times table at a time, each in five rounds:
 
-| Round | Questions |
+| Round | Questions | Mode |
+|---|---|---|
+| 1 | 5 | Learn |
+| 2 | 10 | Learn |
+| 3 | 20 | Learn |
+| 4 | 10 | Expert: no picture, no "Help me count" |
+| 5 | 10 | Expert with a timer |
+
+That makes 60 levels: ×1 is Levels 1–5, ×6 is 26–30, ×12 is 56–60.
+
+**The timer** gets shorter along each difficulty's tables:
+
+| Difficulty | Tables and timers |
 |---|---|
-| 1 | 5 |
-| 2 | 10 |
-| 3 | 20 |
+| Easy | ×1–×2: 30 s · ×3–×4: 10 s · ×5–×6: 5 s |
+| Medium | ×7: 10 s · ×8: 5 s |
+| Hard | ×9: 30 s · ×10: 10 s · ×11–×12: 5 s |
 
-That makes 36 levels: ×1 is Levels 1–3, ×6 is 16–18, ×12 is 34–36.
-- **Moving up:** each round needs 4 out of 5 right first try. Each round passed earns 5 points × the table.
+- **Moving up:** each round needs 4 out of 5 right first try; a timeout counts as missed. Each round passed earns 5 points × the table.
 - **Facts go up to the table's dice,** as Practice always did: 6 for ×1–×6 (6 × 1 to 6 × 6), 8 for ×7 and ×8, 12 from ×9.
 - **Review:** about one question in five reviews the tables before, with the same limit.
-- **Longer rounds:** reaching a table's second and third rounds unlocks 10- and 20-question rounds for Free practice. Easy's come on ×1, Medium's on ×7, Hard's on ×9, and the later difficulties' on ×12.
-- **Free practice** opens on ×2. You pick your own tables, difficulty and length.
-- **Expert and timers** go by the table's difficulty once the game's Journey has opened it, and by Easy until then.
+- **On the Journey, the round decides everything:** its length, Learn or Expert, and the timer.
+- **Unlocks for Free practice** come with the first round that brings them, for its difficulty:
+  - 10 and 20 questions, and Expert, on a difficulty's first table: ×1 for Easy, ×7 for Medium, ×9 for Hard, ×12 for the ones after Hard.
+  - Each timer on the first table that uses it.
+- **Free practice** opens on ×2. You pick your own tables, difficulty, length, level and timer from what you've reached.
 - **Separate from the game:** the two Journeys move on their own.
 
 ## What's still bought
 
 Points buy what changes *how* you play, not *what* you play next:
 - Multiplayer
-- Expert and its timers (for the difficulty the level uses)
+- Single player's Expert and its timers (for the difficulty the level uses)
 - Settings such as auto roll, and the Wardrobe's looks
 
 ## Older saves
@@ -80,8 +93,9 @@ Points buy what changes *how* you play, not *what* you play next:
 Nobody loses anything:
 - **From before the Journey:** a save starts on the highest board its boards, difficulties and wins reach, and on 6×6 at least once it has played. In Practice it starts on the highest table it owns.
 - **From 0.6–0.7:** a save starts on the first stage of the board or table it was on.
+- **From 0.8:** a save keeps its table and round.
 
-The decisions are [ADR-0010](../decisions/0010-journey-progression.md), [ADR-0011](../decisions/0011-practice-journey.md) and [ADR-0012](../decisions/0012-journey-stages.md).
+The decisions are [ADR-0010](../decisions/0010-journey-progression.md), [ADR-0011](../decisions/0011-practice-journey.md), [ADR-0012](../decisions/0012-journey-stages.md) and [ADR-0013](../decisions/0013-practice-expert-rounds.md).
 
 The rules are in `@blockout/progress`:
 - `levels.js`: the ladders

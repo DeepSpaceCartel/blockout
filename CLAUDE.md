@@ -74,7 +74,7 @@ await page.addInitScript((pr) => { if (!sessionStorage.getItem('s')) { sessionSt
   localStorage.setItem('blockout.progress', JSON.stringify(pr)); } }, progress);
 ```
 
-- **Seed the migration flags.** A seeded progress must include `boardsV2, practiceV2, placeAutoV1, gameExpertV1, practiceTimersV1, journeyV1, journeyV2, practiceJourneyV1, practiceJourneyV2, boardWinsFromHistory: true` (and `journey: { level: 16 }` to start on 6×6, where the old free board was; `practiceJourney: { level: n }` with `unlocks` up to its table), or the old-save migrations in `Progress.normalize` grant extra unlocks and skew the test. Add `checkIn: { last: <today>, streak: 1 }` to skip the daily check-in popup.
+- **Seed the migration flags.** A seeded progress must include `boardsV2, practiceV2, placeAutoV1, gameExpertV1, practiceTimersV1, journeyV1, journeyV2, practiceJourneyV1, practiceJourneyV2, practiceJourneyV3, boardWinsFromHistory: true` (and `journey: { level: 16 }` to start on 6×6, where the old free board was; `practiceJourney: { level: n }` with `unlocks` up to its table), or the old-save migrations in `Progress.normalize` grant extra unlocks and skew the test. Add `checkIn: { last: <today>, streak: 1 }` to skip the daily check-in popup.
 - **To unlock everything,** seed `unlocks: Progress.SHOP.map(i => i.id)`, or type the IDDQD cheat (~ key).
 - **Useful ids:**
   - `#start-btn`, `#roll-btn`, `#unlock-yes` (the quick-unlock confirm), `#cheats-input`
@@ -102,7 +102,7 @@ await page.addInitScript((pr) => { if (!sessionStorage.getItem('s')) { sessionSt
   - Buying from a menu control activates it (`activation` in `@blockout/progress/shop` says what; each client applies it).
 - **The Journeys** (`@blockout/progress/journey`, levels in `levels.js`; ADRs [0010](docs/decisions/0010-journey-progression.md), [0011](docs/decisions/0011-practice-journey.md), [0012](docs/decisions/0012-journey-stages.md)):
   - *Game:* `STEPS` are n×n boards with an n-sided die (1–12), then 6 challenges; each board has 3 stages (`LEVELS`, 42): win with ≥ 80 % first-try answers, then also without "Help me count", then also more than half the board (`levelResult`). `recordLevelGame` moves you up and grants a board's ids on its first stage. Free play opens on 6×6 (`levelOfStep(6)`). The menu is a Journey card with "Play Level N".
-  - *Practice:* free; each ×n table has 3 rounds of 5, 10, 20 questions (`PRACTICE_LEVELS`, 36), facts up to the table's dice (6/8/12), ~1 in 5 reviewing earlier tables (`journeyQueue`). `recordPracticeLevel` (in `Practice.finish`) grants `table<n>` and the 10/20 round lengths. Free practice opens on ×2; Expert/timers follow `practiceTier`.
+  - *Practice:* free; each ×n table has 5 rounds: 5, 10, 20 questions in Learn, 10 in Expert, 10 in Expert with a timer (`TIMERS`: shorter along each difficulty's tables) — `PRACTICE_LEVELS`, 60 ([ADR-0013](docs/decisions/0013-practice-expert-rounds.md)). Facts up to the table's dice (6/8/12), ~1 in 5 reviewing earlier tables (`journeyQueue`); the round sets length, Expert and timer (`createRound` with `journeyLevel`). `recordPracticeLevel` (in `Practice.finish`) grants `table<n>`, the 10/20 lengths, Expert and the timers, each with the first round that brings it. Free practice opens on ×2.
 - **Per-difficulty unlocks:** each difficulty has its own Expert level, timers and practice question counts (`gameExpertId`, `gameTimerId`, `practiceCountId`, `practiceTimerId`, `practiceExpertId`).
 - **Difficulties:**
 

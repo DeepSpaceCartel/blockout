@@ -154,6 +154,7 @@ export function run() {
     journeyCard: $('journey-card'),
     practiceTablesField: $('practice-tables-field'),
     practiceCountField: $('practice-count-field'),
+    practiceLevelField: $('practice-level-field'),
     pdJourney: $('pd-journey'),
     playKind: $('play-kind'),
     journeyInfo: $('journey-info'),
