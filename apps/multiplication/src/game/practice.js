@@ -2,6 +2,7 @@
 
 import * as Core from '@blockout/engine';
 import * as Progress from '@blockout/progress';
+import * as Shop from '@blockout/progress/shop';
 import { COUNT_STEP, TRY_AGAIN, el } from './base.js';
 import { BONUS_TOASTS, capitalize, celebrate, progress, saveProgress, toast } from './wallet.js';
 import { settings } from './settings.js';
@@ -114,10 +115,7 @@ function renderPracticeTables() {
 }
 
 // "×3 and ×4 (11 facts): 2 need practice, 5 learning, 4 not seen yet, 0 mastered."
-function tablesLabel(tables) {
-  const list = [...tables].sort((a, b) => a - b).map((n) => `×${n}`);
-  return list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}` : list[0];
-}
+const tablesLabel = Shop.tablesLabel;
 
 // The tables a round asks about: the ones picked, or else every unlocked one.
 function practiceTableList() {

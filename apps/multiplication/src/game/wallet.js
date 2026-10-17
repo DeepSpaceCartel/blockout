@@ -3,6 +3,7 @@
 import * as Auth from '@blockout/auth';
 import * as Cosmetics from '@blockout/progress/cosmetics';
 import * as Progress from '@blockout/progress';
+import * as Shop from '@blockout/progress/shop';
 import { PROGRESS_KEY, el } from './base.js';
 import { settings } from './settings.js';
 import { look } from './wardrobe.js';
@@ -73,9 +74,7 @@ function setBadge(btn, label, count, what) {
 }
 
 // 10000 → "10,000" (in the reader's locale).
-function formatPoints(n) {
-  return Number(n).toLocaleString();
-}
+const formatPoints = Shop.formatPoints;
 
 // Show newly earned achievements as toasts; returns them for the caller.
 // Every big (non-minor) achievement drops one random sticker.

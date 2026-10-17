@@ -2,21 +2,14 @@
 
 import * as Cosmetics from '@blockout/progress/cosmetics';
 import * as Progress from '@blockout/progress';
+import * as Shop from '@blockout/progress/shop';
 import { $, el } from './base.js';
 import { celebrate, formatPoints, progress, saveProgress, toast } from './wallet.js';
 import { applyTheme, chooseCosmetic, icon, openStickers, openWardrobe, setWardrobeFilter, syncBoardLocks, syncModeLocks, syncSettingsUI, wardrobeAvailable, wardrobeFilter } from './wardrobe.js';
 import { make } from './play.js';
-import { tablesLabel, updatePracticePreview } from './practice.js';
+import { updatePracticePreview } from './practice.js';
 
-let ACTIVATE;
-
-const BUY_REASONS = {
-  season: (r) => `In the shop in ${r.when}`,
-  points: (r) => `Need ${formatPoints(r.missing)} more`,
-  requires: (r) => `Unlock ${Progress.shopItem(r.requires).name.split(':')[0]} first`,
-  win: (r) => `Win a game on ${r.size}×${r.size} first`,
-  master: (r) => `Master your Times Table up to ${r.size} × ${r.size} first`,
-};
+// (the Shop's rules and words are shared with the phone app: @blockout/progress/shop)
 
 // Opened from a results screen, the Shop / Wardrobe / Stickers show only what
 // their button promised; this line says so and can switch to everything.
@@ -64,48 +57,38 @@ function renderShop(highlight = shopHighlight) {
   el.shopBody.innerHTML = '';
   renderWalletBar('shop', !!shopFilter);
   if (shopFilter && !shopFilter.size) el.shopBody.append(make('p', 'filter-note', 'Nothing to unlock right now. Keep playing to earn points!'));
-  let group = null;
-  for (const item of Progress.SHOP) {
-    if (item.cosmetic) continue; // looks are unlocked in the Wardrobe
-    if (shopFilter && !shopFilter.has(item.id)) continue;
-    if (item.group !== group) {
-      group = item.group;
-      el.shopBody.append(make('h3', 'stats-heading', group));
+  for (const group of Shop.shopGroups(progress, shopFilter)) {
+    el.shopBody.append(make('h3', 'stats-heading', group.name));
+    for (const { item, owned, hidden, canBuy, why } of group.rows) {
+      const row = make('div', 'shop-item' + (item.id === highlight ? ' highlight' : ''));
+      if (hidden) row.classList.add('skeleton-row');
+      const name = make('span', 'shop-name', hidden ? 'Locked' : item.name);
+      if (!hidden && item.perk) name.append(make('span', 'shop-perk', `🎁 ${item.perk}`));
+      row.append(name);
+      if (owned) {
+        row.classList.add('owned');
+        const mark = make('span', 'shop-owned');
+        mark.append(icon('check'), ' Unlocked');
+        row.append(mark);
+      } else {
+        const btn = make('button', 'btn btn-small' + (canBuy ? ' btn-primary' : ''), `🪙 ${formatPoints(item.price)}`);
+        btn.type = 'button';
+        btn.dataset.buy = item.id;
+        btn.dataset.cost = item.price;
+        btn.disabled = !canBuy;
+        if (hidden) {
+          btn.replaceChildren(icon('lock'));
+          btn.setAttribute('aria-label', 'Locked');
+        }
+        row.append(btn);
+        if (why) row.append(make('span', 'shop-why', why));
+      }
+      el.shopBody.append(row);
     }
-    const row = make('div', 'shop-item' + (item.id === highlight ? ' highlight' : ''));
-    const hiddenStep = !Progress.isUnlocked(progress, item.id) && Progress.isHidden(progress, item.id);
-    if (hiddenStep) row.classList.add('skeleton-row');
-    const name = make('span', 'shop-name', hiddenStep ? 'Locked' : item.name);
-    if (!hiddenStep && item.perk) name.append(make('span', 'shop-perk', `🎁 ${item.perk}`));
-    row.append(name);
-    const owned = Progress.isUnlocked(progress, item.id);
-    if (owned) {
-      row.classList.add('owned');
-      const owned = make('span', 'shop-owned');
-      owned.append(icon('check'), ' Unlocked');
-      row.append(owned);
-    } else {
-      const check = Progress.canBuy(progress, item.id);
-      const btn = make('button', 'btn btn-small' + (check.ok ? ' btn-primary' : ''), `🪙 ${formatPoints(item.price)}`);
-      btn.type = 'button';
-      btn.dataset.buy = item.id;
-      btn.dataset.cost = item.price;
-      btn.disabled = !check.ok;
-      row.append(btn);
-      if (hiddenStep) {
-        btn.replaceChildren(icon('lock'));
-        btn.setAttribute('aria-label', 'Locked');
-        const earn = Progress.canBuy(progress, item.id);
-        row.append(make('span', 'shop-why', earn.reason === 'win' ? `Win a game on ${earn.size}×${earn.size} to reveal it` : earn.reason === 'master' ? `Master your Times Table up to ${earn.size} × ${earn.size} to reveal it (${earn.mastered} of ${earn.need})` : 'Unlock the one before it first'));
-      } else if (!check.ok) row.append(make('span', 'shop-why', BUY_REASONS[check.reason](check)));
-    }
-    el.shopBody.append(row);
   }
 }
 
-function shopAvailable() {
-  return new Set(Progress.SHOP.filter((i) => !i.cosmetic && Progress.canBuy(progress, i.id).ok).map((i) => i.id));
-}
+const shopAvailable = () => Shop.availableIds(progress);
 
 // What was tapped to open the shop, so buying it switches that exact choice on.
 let shopSource = null; // { item, el }
@@ -128,9 +111,10 @@ function closeShop() {
 
 // Buy an item and switch it on; used by the shop and the quick unlock.
 function purchase(item) {
-  if (!Progress.buy(progress, item.id).ok) return false;
-  toast(`🔓 Unlocked: ${item.name}`, `-${formatPoints(item.price)} points`);
-  celebrate(Progress.awardAchievements(progress, { event: 'buy' }));
+  const bought = Shop.purchase(progress, item.id);
+  if (!bought.ok) return false;
+  toast(...bought.toast);
+  celebrate(bought.earned);
   saveProgress();
   refreshAvailableFilters();
   if (!el.shopDialog.hidden) renderShop(item.id);
@@ -163,66 +147,33 @@ function refreshAvailableFilters() {
 
 let unlockAsk = null; // { item, el }
 
-// What to do to reveal a locked board or difficulty.
-function revealHint(r) {
-  if (r.reason === 'win') return `Win a game against the CPU on the ${r.size}×${r.size} board to reveal the next board.`;
-  const extra = r.practice ? ` and get the ${r.practice} ${r.practice === 1 ? 'fact' : 'facts'} that need practice back on track` : '';
-  const which = r.faces ? `using ${tablesLabel(r.faces)}` : `up to ${r.size} × ${r.size}`;
-  return `Master ${r.need} of the ${r.total} facts ${which} on your Times Table${extra} to reveal the next difficulty. You have ${r.mastered} so far. Practice helps!`;
-}
-
 function confirmUnlock(itemId, sourceEl) {
-  let item = Progress.shopItem(itemId);
-  const check = Progress.canBuy(progress, itemId);
-  let offer = check.ok;
-  let message;
-  if (Progress.isHidden(progress, itemId)) {
-    // a locked placeholder: offer the next step, without saying what this one is
-    item = Progress.shopItem(Progress.nextInChain(progress, itemId));
-    const next = Progress.canBuy(progress, item.id);
-    if (next.reason === 'win' || next.reason === 'master') {
-      // earned, not bought: a win on the board before, or knowing the times table
-      unlockAsk = null;
-      el.unlockTitle.textContent = '🔒 Locked';
-      el.unlockPrice.textContent = '';
-      el.unlockMessage.textContent = revealHint(next);
-      el.unlockMessage.hidden = false;
-      el.unlockYes.hidden = true;
-      el.unlockNo.textContent = 'OK';
-      el.unlockDialog.hidden = false;
-      el.unlockNo.focus();
-      return;
-    }
-    offer = next.ok;
-    message = 'Unlock this first to see what comes next.';
-    if (next.reason === 'points') message += ` You need ${formatPoints(next.missing)} more points for it.`;
-    sourceEl = null;
-  } else if (check.reason === 'requires') {
-    // offer the thing that has to come first
-    const first = Progress.shopItem(check.requires);
-    const firstCheck = Progress.canBuy(progress, first.id);
-    message = `${item.name} needs ${first.name} first.`;
-    item = first;
-    offer = firstCheck.ok;
-    if (!offer) message += firstCheck.reason === 'points' ? ` You need ${formatPoints(firstCheck.missing)} more points for it.` : '';
-    sourceEl = null; // what gets switched on is the prerequisite
-  } else if (check.reason === 'points') {
-    message = `You need ${formatPoints(check.missing)} more points. Keep playing to earn them!`;
-  } else if (check.reason === 'season') {
-    message = `This one is in the shop in ${check.when}.`;
+  const offer = Shop.unlockOffer(progress, itemId);
+  if (offer.kind === 'earn') {
+    // earned, not bought: a win on the board before, or knowing the times table
+    unlockAsk = null;
+    el.unlockTitle.textContent = offer.title;
+    el.unlockPrice.textContent = '';
+    el.unlockMessage.textContent = offer.message;
+    el.unlockMessage.hidden = false;
+    el.unlockYes.hidden = true;
+    el.unlockNo.textContent = 'OK';
+    el.unlockDialog.hidden = false;
+    el.unlockNo.focus();
+    return;
   }
-  unlockAsk = offer ? { item, el: sourceEl } : null;
-  el.unlockTitle.textContent = offer ? `Unlock ${item.name}?` : item.name;
-  el.unlockPrice.textContent = `🪙 ${formatPoints(item.price)} · you have ${formatPoints(progress.wallet)}`;
-  // what it gives you (e.g. the bonus for finishing longer practice rounds)
-  const perk = offer && item.perk ? `🎁 ${item.perk}` : '';
-  el.unlockMessage.textContent = [perk, message].filter(Boolean).join(' ');
-  el.unlockMessage.hidden = !perk && !message;
-  el.unlockYes.hidden = !offer;
-  if (offer) el.unlockYes.textContent = `Unlock for 🪙 ${formatPoints(item.price)}`;
-  el.unlockNo.textContent = offer ? 'Cancel' : 'OK';
+  const yes = offer.kind === 'offer';
+  // (what gets switched on is what was tapped, unless a prerequisite is offered instead)
+  unlockAsk = yes ? { item: offer.item, el: offer.same ? sourceEl : null } : null;
+  el.unlockTitle.textContent = offer.title;
+  el.unlockPrice.textContent = offer.price;
+  el.unlockMessage.textContent = offer.message || '';
+  el.unlockMessage.hidden = !offer.message;
+  el.unlockYes.hidden = !yes;
+  if (yes) el.unlockYes.textContent = `Unlock for 🪙 ${formatPoints(offer.item.price)}`;
+  el.unlockNo.textContent = yes ? 'Cancel' : 'OK';
   el.unlockDialog.hidden = false;
-  (offer ? el.unlockYes : el.unlockNo).focus();
+  (yes ? el.unlockYes : el.unlockNo).focus();
 }
 
 function closeUnlock() {
@@ -232,36 +183,16 @@ function closeUnlock() {
 
 // ---- "you can afford something" button on the results screens
 
-// Shop items (not Wardrobe looks) you can afford right now
-function affordableCount() {
-  return Progress.SHOP.filter((item) => !item.cosmetic && Progress.canBuy(progress, item.id).ok).length;
-}
-
-// Things in the Wardrobe you own (or titles you've earned) but haven't looked at yet.
-function wardrobeKeys() {
-  const keys = [];
-  for (const cat of Cosmetics.CATEGORIES) {
-    for (const opt of cat.options) {
-      if (opt.price && Progress.isUnlocked(progress, Cosmetics.itemFor(cat.id, opt.id))) keys.push(`${cat.id}:${opt.id}`);
-    }
-  }
-  for (const t of Cosmetics.TITLES) if (t.id !== 'none' && t.earned(progress)) keys.push(`title:${t.id}`);
-  return keys;
-}
-
-const seenList = (kind) => (progress.seen = progress.seen || {})[kind] || (progress.seen[kind] = []);
-
-const newWardrobe = () => wardrobeKeys().filter((k) => !seenList('wardrobe').includes(k)).length;
-
-// Wardrobe looks you could buy right now (the Wardrobe's share of the shop)
-const affordableLooks = () => Progress.SHOP.filter((i) => i.cosmetic && Progress.canBuy(progress, i.id).ok).length;
-
-const newStickers = () => Object.keys(progress.stickers || {}).filter((id) => !seenList('stickers').includes(id)).length;
-
-const spareStickers = () => Object.values(progress.stickers || {}).reduce((n, c) => n + Math.max(0, c - 1), 0);
+const affordableCount = () => Shop.affordableCount(progress);
+const wardrobeKeys = () => Shop.wardrobeKeys(progress);
+const seenList = (kind) => Shop.seenList(progress, kind);
+const newWardrobe = () => Shop.newWardrobe(progress);
+const affordableLooks = () => Shop.affordableLooks(progress);
+const newStickers = () => Shop.newStickers(progress);
+const spareStickers = () => Shop.spareStickers(progress);
 
 function markSeen(kind, keys) {
-  progress.seen[kind] = [...new Set([...seenList(kind), ...keys])];
+  Shop.markSeen(progress, kind, keys);
   saveProgress();
 }
 
@@ -300,12 +231,31 @@ function tap(selector) {
 
 const setOption = (key, value) => () => tap(`[data-setting="${key}"] [data-value="${value}"]`);
 
+// Bought straight from the shop list: switch on the obvious choice
+// (Shop.activation says which), by tapping the menu's own controls.
+function applyActivation(a) {
+  if (!a) return;
+  if (a.mode) tap(`[data-mode="${a.mode}"]`);
+  if (a.mode === 'multi') {
+    tap('#multi-kind [data-kind="local"]');
+    if (a.players > 2) tap(`#player-count [data-count="${a.players}"]`);
+  }
+  const where = a.mode === 'practice' ? 'practice' : 'game';
+  if (a.level) tap(`#${where}-level [data-level="${a.level}"]`);
+  if (a.timer) tap(`#${where}-timer [data-secs="${a.timer}"]`);
+  if (a.count) tap(`#practice-count [data-count="${a.count}"]`);
+  if (a.size) tap(`#board-size [data-size="${a.size}"]`);
+  if (a.difficulty) setOption('difficulty', a.difficulty)();
+  if (a.setting) setOption(...a.setting)();
+  if (a.mode === 'practice') updatePracticePreview();
+}
+
 function activatePurchase(item) {
   const source = shopSource;
   shopSource = null;
   if (item.cosmetic) chooseCosmetic(item.cosmetic[0], item.cosmetic[1]); // put it on
   else if (source && source.item === item.id && source.el.isConnected) source.el.click(); // the exact thing tapped
-  else if (ACTIVATE[item.id]) ACTIVATE[item.id]();
+  else applyActivation(Shop.activation(item.id));
   applyTheme(false); // e.g. golden dice
 }
 
@@ -365,56 +315,6 @@ export function run() {
   el.unlockDialog.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeUnlock();
   });
-
-  // Bought straight from the shop list: switch on the obvious choice. Items with
-  // more than one choice and no clear favourite (CPU speed, placing) are left alone.
-  ACTIVATE = {
-    multiplayer: () => (tap('[data-mode="multi"]'), tap('#multi-kind [data-kind="local"]')),
-    players3: () => (tap('[data-mode="multi"]'), tap('#multi-kind [data-kind="local"]'), tap('#player-count [data-count="3"]')),
-    players4: () => (tap('[data-mode="multi"]'), tap('#multi-kind [data-kind="local"]'), tap('#player-count [data-count="4"]')),
-    practice: () => tap('[data-mode="practice"]'),
-    ...Object.fromEntries(Progress.DIFFICULTIES.map((d) => [Progress.practiceExpertId(d), () => (tap('[data-mode="practice"]'), tap('#practice-level [data-level="expert"]'))])),
-    ...Object.fromEntries(
-      Progress.DIFFICULTIES.flatMap((d) => [
-        [Progress.gameExpertId(d), () => (tap('[data-mode="single"]'), tap('#game-level [data-level="expert"]'))],
-        ...[30, 10, 5].map((secs) => [Progress.gameTimerId(secs, d), () => (tap('[data-mode="single"]'), tap('#game-level [data-level="expert"]'), tap(`#game-timer [data-secs="${secs}"]`))]),
-      ])
-    ),
-    ...Object.fromEntries(
-      Progress.DIFFICULTIES.flatMap((d) => [10, 20].map((n) => [Progress.practiceCountId(n, d), () => (tap('[data-mode="practice"]'), tap(`#practice-count [data-count="${n}"]`))]))
-    ),
-    ...Object.fromEntries(
-      Progress.DIFFICULTIES.flatMap((d) =>
-        [30, 10, 5].map((secs) => [Progress.practiceTimerId(secs, d), () => (tap('[data-mode="practice"]'), tap('#practice-level [data-level="expert"]'), tap(`#practice-timer [data-secs="${secs}"]`))])
-      )
-    ),
-    ...Object.fromEntries(Array.from({ length: 12 }, (_, i) => [`table${i + 1}`, () => (tap('[data-mode="practice"]'), updatePracticePreview())])),
-    board8: () => tap('#board-size [data-size="8"]'),
-    board10: () => tap('#board-size [data-size="10"]'),
-    board12: () => tap('#board-size [data-size="12"]'),
-    board16: () => tap('#board-size [data-size="16"]'),
-    board24: () => tap('#board-size [data-size="24"]'),
-    board20: () => tap('#board-size [data-size="20"]'),
-    boardCustom: () => tap('#board-size [data-size="custom"]'),
-    'difficulty.medium': setOption('difficulty', 'medium'),
-    'difficulty.hard': setOption('difficulty', 'hard'),
-    'difficulty.tricky': setOption('difficulty', 'tricky'),
-    'difficulty.master': setOption('difficulty', 'master'),
-    'difficulty.legend': setOption('difficulty', 'legend'),
-    diceMode: setOption('diceMode', 'real'),
-    autoRoll: setOption('autoRoll', 'auto'),
-    fitRolls: setOption('fitRolls', 'always'),
-    answerTime30: setOption('answerTime', '30'),
-    answerTime10: setOption('answerTime', '10'),
-    answerTime5: setOption('answerTime', '5'),
-    cpuInstant: setOption('cpuSteps', 'instant'),
-    cpuEnd: setOption('cpuEnd', 'button'),
-    showProgress: setOption('showProgress', 'true'),
-    firstInCorner: setOption('firstInCorner', 'true'),
-    timesMastered: setOption('timesMastered', 'time'),
-    timesLearning: setOption('timesLearning', 'time'),
-    timesPractice: setOption('timesPractice', 'time'),
-  };
 
   el.shopDialog.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeShop();

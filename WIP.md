@@ -23,6 +23,20 @@ The full production-readiness plan (approved 2026-10-15) is at the end of this f
 - **Development:** release `blockout-dev` (namespace `blockout-dev`, `values-dev.yaml`): only MongoDB and Valkey; `npm run services` forwards them. Local servers sign in with the workspace Keycloak (`localhost:8080` and `:5173` are allowed redirects).
 - **rts-terraform PR #43** (merged, applied): Gateway listeners `blockout-deepspacecartel-com` and `id-deepspacecartel-com`, the shared certificate's SANs, and the DNS records.
 
+## The phone app: porting the rest (started 2026-10-17)
+
+The owner chose: phases 1–6 and 8 (not the other games), and **extract shared rules into pure packages, then both the web game and the app use them**. One phase at a time, each step tested in the app's web build (390×844 and 375×667) and on the owner's iPhone through Expo Go.
+
+1. **Progress:** Shop ← `@blockout/progress/shop` (done: the web shop uses it; the app's Shop screen next), then achievements and stickers, stats, daily check-in, settings.
+2. **The rest of the game:** Tricky, Master, Legend, Expert levels and answer timers. Move the web game's turns (`play.js`) onto `@blockout/engine/match` here (class and pair modes need forced dice and no game end).
+3. **Practice** (`practice.js` → a pure session module in `@blockout/progress`).
+4. **Wardrobe.**
+5. **Student accounts:** homework, codes (`blockout://` links, QR), joining a class, deleting the account.
+6. **Live classes as a student:** `@blockout/classroom` gets platform adapters (storage, no `EventSource`: long polling, absolute server URL).
+8. **Grown-ups' screens:** teacher's My classes and hosting, parent's My kids, admin.
+
+Working notes: the container has 7.7 GB; run Turborepo with `--concurrency=2` while Metro or Playwright run (a full parallel test and build got the session OOM-killed). The Expo dev server: `npm run tunnel --workspace @blockout/mobile` (needs `npx expo login`).
+
 ## What's open
 
 1. **Backups:** object storage and its keys (`RCLONE_CONFIG_*`, see `docs/guides/operate.md`). Until then, losing the MongoDB volume loses every account.

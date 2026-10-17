@@ -6,7 +6,8 @@
   "type": "module",
   "exports": {
     ".": "./src/progress.js",
-    "./cosmetics": "./src/cosmetics.js"
+    "./cosmetics": "./src/cosmetics.js",
+    "./shop": "./src/shop.js"
   },
   "dependencies": {
     "@blockout/engine": "*"
