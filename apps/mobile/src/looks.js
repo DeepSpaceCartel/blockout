@@ -64,7 +64,7 @@ export const keypadSkin = (t, id) =>
   KEYPAD_SKINS[id] || {
     key: { bg: t.surface, edge: t.line, ink: t.ink },
     check: { bg: t.good, edge: t.line, ink: '#fff' },
-    back: { bg: t.surface, edge: t.line, ink: t.ink },
+    back: { bg: t.bad, edge: t.bad, ink: '#fff' }, // (red, as on the web game's keypad)
     radius: 12,
   };
 export const useKeypadSkin = () => keypadSkin(useTheme(), useLooks().keypad);

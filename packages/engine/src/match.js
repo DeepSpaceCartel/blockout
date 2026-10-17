@@ -152,23 +152,28 @@ function answerDecided(entry, answer) {
 // The human's answer. ms: how long they took (help excluded); timer: { secs,
 // left } when there's an answer timer. Right: points and bonus, 'scored'.
 // Wrong: try again, and after two misses it's time to help (unless Expert).
+// Right first time: no wrong answer, and no "Help me count". Only that earns
+// bonus points (first try, speedy, streak, timer) and counts towards mastering
+// the fact; a helped answer ends the streak. (Used by every client.)
+const firstTry = (pend) => pend.attempts === 0 && !pend.helped;
+
 function answer(m, value, { ms = 0, timer = null } = {}) {
   expect(m, 'answer');
   const pend = m.pending;
   const p = currentPlayer(m);
   const { rect } = pend;
   if (Number(value) === rect.area) {
-    const firstTry = pend.attempts === 0;
+    const first = firstTry(pend);
     p.stats.times.push(ms);
-    p.streak = firstTry ? p.streak + 1 : 0;
+    p.streak = first ? p.streak + 1 : 0;
     p.bestStreak = Math.max(p.bestStreak, p.streak);
-    const bonus = m.answerBonus({ firstTry, ms, streak: p.streak, timer });
+    const bonus = m.answerBonus({ firstTry: first, ms, streak: p.streak, timer });
     const total = bonus.total * m.bonusMultiplier;
-    award(m, rect, firstTry, total);
+    award(m, rect, first, total);
     m.phase = 'scored';
     const wrongAnswers = pend.miss ? pend.miss.answers : [];
     m.pending = null;
-    return { correct: true, firstTry, rect, bonus: { ...bonus, total }, streak: p.streak, wrongAnswers };
+    return { correct: true, firstTry: first, rect, bonus: { ...bonus, total }, streak: p.streak, wrongAnswers };
   }
   p.streak = 0;
   pend.attempts++;
@@ -287,4 +292,4 @@ function results(m) {
   };
 }
 
-export { PHASES, createMatch, currentPlayer, mustUseCorner, roll, judge, previewAt, startRotated, autoSpot, award, noteMiss, place, answer, answerDecided, help, countPlan, legendSplit, timeout, pass, cpuTurn, isOver, endTurn, results };
+export { PHASES, createMatch, currentPlayer, firstTry, mustUseCorner, roll, judge, previewAt, startRotated, autoSpot, award, noteMiss, place, answer, answerDecided, help, countPlan, legendSplit, timeout, pass, cpuTurn, isOver, endTurn, results };

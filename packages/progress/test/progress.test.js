@@ -74,10 +74,12 @@ test('daily check-in: once a day, streak grows on consecutive days', () => {
 
 test('achievements are awarded once and pay their reward', () => {
   const s = P.createProgress();
-  const first = P.awardAchievements(s, { event: 'answer', correct: true, ms: 2000, streak: 5, a: 6, b: 6 });
+  // right, quick and big, but not first time (a wrong answer, or "Help me count"): none of those
+  assert.deepEqual(P.awardAchievements(P.createProgress(), { event: 'answer', correct: true, firstTry: false, ms: 2000, streak: 0, a: 6, b: 12 }), []);
+  const first = P.awardAchievements(s, { event: 'answer', correct: true, firstTry: true, ms: 2000, streak: 5, a: 6, b: 6 });
   assert.deepEqual(first.map((a) => a.id).sort(), ['big_block', 'speedy', 'streak5']);
   assert.equal(s.wallet, 15 + 15 + 20);
-  assert.deepEqual(P.awardAchievements(s, { event: 'answer', correct: true, ms: 2000, streak: 5, a: 6, b: 6 }), []);
+  assert.deepEqual(P.awardAchievements(s, { event: 'answer', correct: true, firstTry: true, ms: 2000, streak: 5, a: 6, b: 6 }), []);
   const game = P.awardAchievements(s, { event: 'game', games: 1, wonVsCpu: true, humanWon: true, full: true, perfect: false, difficulty: 'easy' });
   assert.deepEqual(game.map((a) => a.id).sort(), ['first_game', 'first_win', 'full_house']);
 });

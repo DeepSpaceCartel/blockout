@@ -169,3 +169,16 @@ test('auto placing picks a spot that fits, and the starting way round is one tha
   assert.ok(Match.judge(m, spot).ok);
   assert.equal(Match.startRotated(m), false);
 });
+
+test('“Help me count” first: right, but not first time (no bonus, no streak)', () => {
+  const m = Match.createMatch({ mode: 'single', difficulty: 'easy', size: 6, players: [{ name: 'You' }, { name: 'CPU', cpu: true }], answerBonus: ({ firstTry }) => (firstTry ? { total: 2, parts: [{ label: 'first try', points: 2 }] } : { total: 0, parts: [] }) });
+  Match.roll(m, [2, 3]);
+  Match.place(m, { x: 0, y: 0, w: 3, h: 2 });
+  assert.ok(Match.help(m));
+  const res = Match.answer(m, 6, { ms: 500 });
+  assert.equal(res.correct, true);
+  assert.equal(res.firstTry, false);
+  assert.equal(res.bonus.total, 0);
+  assert.equal(m.players[0].score, 6, 'just the squares');
+  assert.equal(m.players[0].streak, 0);
+});

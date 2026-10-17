@@ -91,3 +91,13 @@ test('Expert: no help, double bonuses; a timeout counts as missed and comes back
   assert.match(Practice.timeout(s, r).text, /^⏰ Time's up! .* It'll come back later\.$/);
   assert.equal(r.queue.length, before + 1);
 });
+
+test('practice: a helped question earns its point but no bonus', () => {
+  const state = Progress.createProgress();
+  const round = Practice.createRound(state, { difficulty: 'easy', count: 1, tables: [3], rng: () => 0.1 });
+  assert.ok(Practice.help(state, round));
+  const res = Practice.answer(state, round, round.current.area, { ms: 500 });
+  assert.equal(res.firstTry, false);
+  assert.equal(res.bonus.total, 0);
+  assert.equal(round.streak, 0);
+});

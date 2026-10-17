@@ -151,7 +151,7 @@ export function answer(state, round, value, { ms = 0, timer = null } = {}) {
   if (!q || q.done) return null;
   if (Number(value) === q.area) {
     q.done = true;
-    const firstTry = q.attempts === 0;
+    const firstTry = q.attempts === 0 && !q.helped; // ("Help me count" too: no bonus, no streak)
     round.answered++;
     if (firstTry && !q.retry) round.firstTry++;
     round.times.push(Math.round(ms));

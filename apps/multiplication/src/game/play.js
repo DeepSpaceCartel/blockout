@@ -399,7 +399,7 @@ async function checkAnswer() {
     stopTimer();
     const p = currentPlayer();
     const ms = performance.now() - pend.startedAt - pend.pausedMs;
-    const firstTry = pend.attempts === 0;
+    const firstTry = Match.firstTry(pend); // (no wrong answer and no "Help me count")
     p.stats.times.push(ms);
     p.streak = firstTry ? p.streak + 1 : 0;
     p.bestStreak = Math.max(p.bestStreak, p.streak);

@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A Keycloak client for the app, `blockout-mobile` (`keycloak.mobile.redirectUrls`), whose tokens the server accepts like the web game's.
 - Keycloak's admin console can be public (`keycloak.httpRoute.adminConsole`; on in the workspace cluster, at `https://id.deepspacecartel.com/admin`). Its `master` realm gets brute-force protection either way.
 
+### Changed
+- After “Help me count”, a right answer earns its squares (or practice point) but no bonus points: no first-try, speedy, streak or timer bonus, and the streak ends. Speedy, Big block and Twelve times now need the answer right first time too.
+- The phone app's backspace key is red, like the web game's.
+
 ## [0.5.0] - 2026-10-17
 
 ### Changed
