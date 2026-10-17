@@ -65,7 +65,7 @@ In the web build only, `window.BLOCKOUT_FAST = true` (set before the page loads)
 | File | What |
 |---|---|
 | `src/App.js` | The menu or the game, the save, signing in, and the bonus and achievement banners |
-| `src/Game.js` | A game: turns from `@blockout/engine/match`, on three screens sized to the phone (nothing scrolls). **Roll:** big dice, then "Draw it ›", which also moves on by itself after a moment. **Board:** drawing, the CPU's turn (its rectangle grows, it explains the counting) and the results. **Answer:** the rectangle just drawn on its own, the question and the keypad; "Help me count" lights up its rows |
+| `src/Game.js` | A game: turns from `@blockout/engine/match`, on screens sized to the phone (nothing scrolls). **Roll:** big dice, then "Draw it ›", which also moves on by itself after a moment. **Board:** drawing, the CPU's turn (its rectangle grows, it explains the counting) and the results. **Answer:** the question and the keypad. **Help:** "Help me count" (or two wrong answers): the rectangle on its own, its rows lighting up with the running total, then "I know it! ›" back to the answer; the time spent counting doesn't count against the bonuses |
 | `src/Board.js` | The board in SVG (`react-native-svg`); a drag (`PanResponder`) draws a rectangle |
 | `src/account.js` | Signing in (`expo-auth-session`), tokens in `expo-secure-store`, the API, saving and syncing |
 | `src/sync.js`, `src/rewards.js`, `src/boardMath.js` | The parts with no React Native in them, tested with `node --test` |

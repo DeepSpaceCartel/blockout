@@ -4,8 +4,9 @@
 //   roll    big dice and a Roll button; then "Draw it ›" (or on by itself)
 //   board   the board, as big as it fits: drawing the rectangle, the CPU's
 //           turn and its explanation, and the results
-//   answer  the rectangle just drawn on its own, the question and the keypad;
-//           "Help me count" lights up its rows
+//   answer  the question and the keypad
+//   help    "Help me count": the rectangle on its own, its rows lighting up
+//           one by one with the running total, then back to the answer
 //
 // The screen animates between the match's steps; a game left half-way just
 // stops (every wait checks it's still the same game).
@@ -48,7 +49,7 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
   if (testing) window.BlockoutMobile = { match, Match };
 
   const [area, setArea] = useState(null); // { width, height } below the header
-  const [view, setView] = useState('roll'); // 'roll' | 'board' | 'answer'
+  const [view, setView] = useState('roll'); // 'roll' | 'board' | 'answer' | 'help'
   const [msg, setMsg] = useState('');
   const [oops, setOops] = useState(false);
   const [dice, setDice] = useState([null, null]);
@@ -62,6 +63,8 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
   const [feedback, setFeedback] = useState(null); // { text, kind: 'good' | 'try' | 'help' }
   const [busy, setBusy] = useState(false);
   const [over, setOver] = useState(null); // { results }
+  const [helpDone, setHelpDone] = useState(false); // counted: "I know it! ›"
+  const helpStarted = useRef(0);
   const answerStart = useRef(0);
   const pausedMs = useRef(0);
   const turnId = useRef(0); // (so a late "on by itself" doesn't skip a turn)
@@ -192,7 +195,12 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
     }
     setEntry('');
     setFeedback({ text: TRY_AGAIN[(res.attempts - 1) % TRY_AGAIN.length], kind: 'try' });
-    if (res.helpNow) helpCount("Let's count them together!");
+    if (res.helpNow) {
+      setBusy(true);
+      await wait(900 * Math.max(pace, 0.2)); // ("Not quite" first)
+      setBusy(false);
+      helpCount("Let's count them together!");
+    }
   }
 
   async function helpCount(intro = null) {
@@ -202,23 +210,35 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
     if (!h) return;
     award(Rewards.onHelp(progress, match, rect));
     onSave();
+    helpStarted.current = Date.now();
+    setHelpDone(false);
+    setCounting(null);
+    setView('help');
     if (h.split) {
       const s = h.split;
-      setFeedback({ kind: 'help', text: `Split ${s.teen} into 10 and ${s.ones}: 10 × ${s.other} = ${s.tens}, ${s.ones} × ${s.other} = ${s.rest}. Now add them up!` });
+      setFeedback({ kind: 'help', text: `Split ${s.teen} into 10 and ${s.ones}: 10 × ${s.other} = ${s.tens}, and ${s.ones} × ${s.other} = ${s.rest}. Now add them up!` });
+      setHelpDone(true);
       return;
     }
     const plan = h.count;
-    const started = Date.now();
     const units = plan.steps === 1 ? plan.unit : `${plan.unit}s`;
-    setBusy(true);
+    setFeedback({ kind: 'help', text: intro || `${plan.steps} ${units} of ${plan.group}. Let's count by ${plan.group}s!` });
+    await wait(COUNT_STEP_MS);
     for (let i = 1; i <= plan.steps; i++) {
-      setFeedback({ kind: 'help', text: `${intro ? `${intro} ` : ''}${plan.steps} ${units} of ${plan.group}: ${plan.totals.slice(0, i).join(', ')}` });
+      setFeedback({ kind: 'help', text: `${plan.steps} ${units} of ${plan.group}: ${plan.totals.slice(0, i).join(', ')}` });
       setCounting({ byRows: plan.byRows, group: plan.group, shown: i });
       await wait(COUNT_STEP_MS);
     }
-    pausedMs.current += Date.now() - started; // counting doesn't count against them
     setFeedback({ kind: 'help', text: `${plan.totals.join(', ')}. So what is ${rect.a} × ${rect.b}?` });
-    setBusy(false);
+    setHelpDone(true);
+  }
+
+  // From counting back to the answer (the time spent counting doesn't count against them)
+  function backToAnswer() {
+    pausedMs.current += Date.now() - helpStarted.current;
+    setFeedback(null);
+    setEntry('');
+    setView('answer');
   }
 
   // ---- the CPU's turn: roll, then on the board: draw it growing, explain the counting
@@ -350,12 +370,11 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
               </Text>
             )}
           </View>
+        ) : view === 'help' ? (
+          <HelpScreen area={area} rect={match.pending.rect} color={PLAYER_COLORS[current % PLAYER_COLORS.length]} counting={counting} text={feedback ? feedback.text : ''} done={helpDone} onBack={backToAnswer} />
         ) : (
           <AnswerScreen
-            area={area}
             rect={match.pending ? match.pending.rect : match.lastRect}
-            color={PLAYER_COLORS[current % PLAYER_COLORS.length]}
-            counting={counting}
             entry={entry}
             feedback={feedback}
             busy={busy}
@@ -365,6 +384,21 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
           />
         )}
       </View>
+    </View>
+  );
+}
+
+// "Help me count": the rectangle as big as it fits, its rows lighting up
+function HelpScreen({ area, rect, color, counting, text, done, onBack }) {
+  const t = useTheme();
+  const below = 120 + 72; // the words and the button
+  return (
+    <View style={styles.helpScreen}>
+      <RectPicture rect={rect} color={color} counting={counting} maxWidth={area.width - 32} maxHeight={Math.max(80, area.height - below - 32)} />
+      <Text testID="help-text" style={[styles.helpText, { color: t.ink }]}>
+        {text}
+      </Text>
+      <Button testID="help-done" title="I know it! ›" onPress={onBack} disabled={!done} style={styles.wide} />
     </View>
   );
 }
@@ -397,15 +431,12 @@ function Header({ match, who, over, dice, onExit }) {
   );
 }
 
-// The rectangle just drawn, the question and the keypad
-function AnswerScreen({ area, rect, color, counting, entry, feedback, busy, canHelp, onKey, onHelp }) {
+// The question and the keypad
+function AnswerScreen({ rect, entry, feedback, busy, canHelp, onKey, onHelp }) {
   const t = useTheme();
   if (!rect) return null;
-  const KEYPAD = 4 * 64 + 3 * 8; // (four rows of keys)
-  const below = 72 + 56 + KEYPAD + (canHelp ? 64 : 0) + 24; // question, feedback, keypad, help
   return (
     <View style={styles.answerScreen}>
-      <RectPicture rect={rect} color={color} counting={counting} maxWidth={area.width - 32} maxHeight={Math.max(60, area.height - below)} />
       <View style={styles.questionRow}>
         <Text style={[styles.question, { color: t.ink }]}>
           {rect.a} × {rect.b} =
@@ -475,11 +506,13 @@ const styles = StyleSheet.create({
   steps: { alignSelf: 'stretch', padding: 12, borderRadius: 12, borderWidth: 2, gap: 4 },
   step: { fontSize: 16, lineHeight: 22 },
   stepBig: { fontSize: 22, fontWeight: '800' },
-  answerScreen: { flex: 1, justifyContent: 'flex-end', gap: 10, paddingHorizontal: 16, paddingBottom: 16 },
+  answerScreen: { flex: 1, justifyContent: 'center', gap: 14, paddingHorizontal: 16, paddingBottom: 16 },
   questionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
-  question: { fontSize: 34, fontWeight: '800' },
-  answerBox: { minWidth: 110, borderWidth: 3, borderRadius: 12, paddingVertical: 4, alignItems: 'center' },
-  answerText: { fontSize: 34, fontWeight: '800' },
+  question: { fontSize: 44, fontWeight: '800' },
+  answerBox: { minWidth: 130, borderWidth: 3, borderRadius: 14, paddingVertical: 6, alignItems: 'center' },
+  answerText: { fontSize: 44, fontWeight: '800' },
+  helpScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 20, paddingHorizontal: 16, paddingBottom: 16 },
+  helpText: { fontSize: 22, fontWeight: '700', textAlign: 'center', lineHeight: 30, minHeight: 60 },
   feedback: { fontSize: 17, textAlign: 'center', fontWeight: '600', lineHeight: 23, minHeight: 46 },
   results: { alignSelf: 'stretch', padding: 14, borderRadius: 16, borderWidth: 2, gap: 8 },
   resultTitle: { fontSize: 26, fontWeight: '800', textAlign: 'center' },
