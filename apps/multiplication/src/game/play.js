@@ -2,10 +2,10 @@
 
 import * as Core from '@blockout/engine';
 import * as Match from '@blockout/engine/match';
-import * as Cosmetics from '@blockout/progress/cosmetics';
 import * as Progress from '@blockout/progress';
 import * as Views from '@blockout/progress/views';
 import * as Stats from '@blockout/progress/stats';
+import * as Wardrobe from '@blockout/progress/wardrobe';
 import { AUTO_PLACE_MS, AUTO_ROLL_MS, COUNT_STEP, PASS_DELAY, TRY_AGAIN, el, seededRandom, setup } from './base.js';
 import { BONUS_TOASTS, capitalize, celebrate, celebrateWin, grantStickers, progress, queueAchievements, saveProgress, toast } from './wallet.js';
 import { cpuStep, settings } from './settings.js';
@@ -23,18 +23,9 @@ let gameId = 0; // bumped on every new game so pending timers from an old game d
 
 // Wardrobe on players: the CPU character's name and avatar; in single player,
 // your avatar and title. "CPU 2" in multiplayer becomes e.g. "Owl 2".
-function wardrobeLook(p, mode) {
-  if (p.cpu) {
-    const ch = look('cpu');
-    const name = p.name === 'CPU' ? ch.cpuName : p.name.replace(/^CPU\b/, ch.short);
-    return { name, avatar: ch.avatar, hello: ch.hello };
-  }
-  if (mode === 'multi') return {};
-  if (mode === 'pair' && !p.statsName) return {}; // your partner isn't wearing your Wardrobe
-  const avatar = look('avatar');
-  const t = Cosmetics.title(settings.cosmetics.title);
-  return { avatar: avatar.id === 'none' ? '' : avatar.preview, title: t.id === 'none' ? '' : t.name };
-}
+// (avatar and title for the player on this device: in single player, class games
+// and their own side of a pair; not in home multiplayer or for a pair partner)
+const wardrobeLook = (p, mode) => Wardrobe.playerLook(settings.cosmetics, p, mode === 'multi' || (mode === 'pair' && !p.statsName) ? 'multi' : 'single');
 
 // invite: a decoded invite, whose settings and dice seed apply to this game only.
 // extra: { cfg, classroom } for a class game: fixed settings, dice from the teacher.

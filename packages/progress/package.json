@@ -12,7 +12,8 @@
     "./stats": "./src/stats.js",
     "./settings": "./src/settings.js",
     "./setup": "./src/setup.js",
-    "./practice": "./src/practice.js"
+    "./practice": "./src/practice.js",
+    "./wardrobe": "./src/wardrobe.js"
   },
   "dependencies": {
     "@blockout/engine": "*"

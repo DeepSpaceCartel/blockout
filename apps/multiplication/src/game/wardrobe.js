@@ -1,9 +1,9 @@
 // Wardrobe (cosmetics): part of the multiplication game (split from the old js/game.js).
 
-import * as Cosmetics from '@blockout/progress/cosmetics';
 import * as Progress from '@blockout/progress';
 import * as Views from '@blockout/progress/views';
 import * as Settings from '@blockout/progress/settings';
+import * as Wardrobe from '@blockout/progress/wardrobe';
 import * as Setup from '@blockout/progress/setup';
 import { BOARD_UNLOCK, DEFAULT_NAMES, DEFAULT_SETTINGS, el, setup } from './base.js';
 import { formatPoints, progress, saveProgress, toast, updateMenuBadges } from './wallet.js';
@@ -20,12 +20,10 @@ function loadCosmetics() {
   const chosen = { ...(settings.cosmetics || {}) };
   if (settings.diceStyle === 'golden' && !chosen.dice) chosen.dice = 'golden'; // old Dice style setting
   delete settings.diceStyle;
-  const clean = Cosmetics.sanitize(chosen, (id) => Progress.isUnlocked(progress, id));
-  clean.title = Cosmetics.title(chosen.title).earned(progress) ? Cosmetics.title(chosen.title).id : 'none';
-  settings.cosmetics = clean;
+  settings.cosmetics = Wardrobe.chosenLooks(chosen, progress);
 }
 
-const look = (categoryId) => Cosmetics.option(categoryId, settings.cosmetics[categoryId]) || Cosmetics.category(categoryId).options[0];
+const look = (categoryId) => Wardrobe.look(settings.cosmetics, categoryId);
 
 function chooseCosmetic(categoryId, optionId) {
   settings.cosmetics[categoryId] = optionId;
@@ -76,44 +74,35 @@ let wardrobeFilter = null; // Set of 'category:option' keys (new or unlockable w
 
 let wardrobeNew = []; // keys that were new when the Wardrobe opened
 
-function wardrobeAvailable() {
-  const unlockable = Progress.SHOP.filter((i) => i.cosmetic && Progress.canBuy(progress, i.id).ok).map((i) => i.cosmetic.join(':'));
-  return new Set([...wardrobeNew, ...unlockable]);
-}
+const wardrobeAvailable = () => Wardrobe.availableKeys(progress, wardrobeNew);
 
 function renderWardrobe() {
   const body = el.wardrobeBody;
   body.innerHTML = '';
   renderWalletBar('wardrobe', !!wardrobeFilter);
-  const now = new Date();
-  const shows = (key) => !wardrobeFilter || wardrobeFilter.has(key);
   if (wardrobeFilter && !wardrobeFilter.size) body.append(make('p', 'filter-note', 'Nothing new to wear yet. Keep playing to earn points!'));
-  for (const cat of Cosmetics.CATEGORIES) {
-    if (!cat.options.some((o) => shows(`${cat.id}:${o.id}`))) continue;
+  for (const { category: cat, options } of Wardrobe.wardrobeRows(progress, settings.cosmetics, wardrobeFilter)) {
     body.append(make('h3', 'stats-heading', cat.name));
     const row = make('div', 'wardrobe-row');
-    for (const opt of cat.options) {
-      if (!shows(`${cat.id}:${opt.id}`)) continue;
-      const item = Cosmetics.itemFor(cat.id, opt.id);
-      const owned = Progress.isUnlocked(progress, item);
-      const chip = make('button', 'wardrobe-chip' + (settings.cosmetics[cat.id] === opt.id ? ' selected' : '') + (owned ? '' : ' locked'));
+    for (const o of options) {
+      const opt = o.option;
+      const chip = make('button', 'wardrobe-chip' + (o.worn ? ' selected' : '') + (o.owned ? '' : ' locked'));
       chip.type = 'button';
       chip.dataset.cat = cat.id;
       chip.dataset.opt = opt.id;
       chip.append(chipPreview(cat, opt), make('span', 'chip-name', opt.name));
-      if (!owned) {
-        const check = Progress.canBuy(progress, item, now);
-        chip.dataset.unlock = item;
+      if (!o.owned) {
+        chip.dataset.unlock = o.item;
         const tag = make('span', 'lock-badge');
-        if (Progress.isHidden(progress, item)) {
+        if (o.hidden) {
           // further down this category's chain: a placeholder, like the main menu
           chip.classList.add('skeleton');
           chip.setAttribute('aria-label', 'Locked: unlock the one before it first');
           tag.append(icon('lock'));
-        } else if (check.reason === 'season') tag.append(icon('lock'), ` ${Progress.shopItem(item).seasonLabel}`);
+        } else if (o.season) tag.append(icon('lock'), ` ${o.season}`);
         else {
-          chip.dataset.cost = opt.price;
-          tag.append(icon('lock'), ` ${formatPoints(opt.price)}`);
+          chip.dataset.cost = o.price;
+          tag.append(icon('lock'), ` ${formatPoints(o.price)}`);
         }
         chip.append(tag);
       }
@@ -122,19 +111,18 @@ function renderWardrobe() {
     body.append(row);
   }
   // Titles are earned, not bought
-  if (!Cosmetics.TITLES.some((t) => shows(`title:${t.id}`))) return;
+  const titles = Wardrobe.titleRow(progress, settings.cosmetics, wardrobeFilter);
+  if (!titles.length) return;
   body.append(make('h3', 'stats-heading', 'Your title'));
   const row = make('div', 'wardrobe-row');
-  for (const t of Cosmetics.TITLES) {
-    if (!shows(`title:${t.id}`)) continue;
-    const got = t.earned(progress);
-    const chip = make('button', 'wardrobe-chip title-chip' + (settings.cosmetics.title === t.id ? ' selected' : '') + (got ? '' : ' locked'));
+  for (const { title: t, earned, worn } of titles) {
+    const chip = make('button', 'wardrobe-chip title-chip' + (worn ? ' selected' : '') + (earned ? '' : ' locked'));
     chip.type = 'button';
     chip.dataset.cat = 'title';
     chip.dataset.opt = t.id;
-    chip.disabled = !got;
+    chip.disabled = !earned;
     chip.append(make('span', 'chip-name', t.name));
-    if (!got) chip.append(make('span', 'chip-need', t.need));
+    if (!earned) chip.append(make('span', 'chip-need', t.need));
     row.append(chip);
   }
   body.append(row);
