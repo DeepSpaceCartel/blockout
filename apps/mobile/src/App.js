@@ -366,8 +366,18 @@ function Main({ onTheme }) {
         <ShopScreen progress={progress} onAsk={ask} onClose={() => setScreen('menu')} />
       ) : screen === 'account' && user ? (
         <AccountScreen user={user} toast={toasts.show} onUser={setUser} onSignOut={signOut} onDeleted={deleted} onClose={() => setScreen('menu')} />
-      ) : screen === 'homework' && user ? (
-        <HomeworkScreen onPlay={playHomework} onCount={setHomeworkCount} onClose={() => setScreen('menu')} />
+      ) : screen === 'homework' ? (
+        <HomeworkScreen
+          progress={progress}
+          student={Boolean(user && user.role === 'student')}
+          onPlay={playHomework}
+          onDaily={() => {
+            setScreen('menu');
+            playDaily();
+          }}
+          onCount={setHomeworkCount}
+          onClose={() => setScreen('menu')}
+        />
       ) : screen === 'classes' && user ? (
         <MyClassesScreen user={user} toast={toasts.show} onHost={() => setHosting({ host: null })} onOpenLobby={(host) => setHosting({ host })} onClose={() => setScreen('menu')} />
       ) : screen === 'admin' && user ? (
@@ -404,7 +414,6 @@ function Main({ onTheme }) {
           choice={choice}
           onChoose={choose}
           onPlay={() => play()}
-          onDaily={playDaily}
           onClass={(code) => setInClass({ code })}
           liveClasses={liveClasses}
           onSignIn={signIn}
@@ -413,7 +422,7 @@ function Main({ onTheme }) {
           onClasses={() => setScreen('classes')}
           onKids={() => setScreen('kids')}
           onAdmin={() => setScreen('admin')}
-          homeworkCount={homeworkCount}
+          homeworkCount={homeworkCount + (Daily.today(progress).done ? 0 : 1)}
           signingIn={signingIn}
           accountError={accountError}
           onLocked={ask}

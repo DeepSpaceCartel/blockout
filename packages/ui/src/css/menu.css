@@ -164,11 +164,10 @@ kbd {
       "logo    form"
       "tagline form"
       "live    form"
-      "daily   form"
       "modes   form"
       "actions form";
     /* the last row takes the slack, so the menu sits level with Start */
-    grid-template-rows: auto auto auto auto auto auto 1fr;
+    grid-template-rows: auto auto auto auto auto 1fr;
     column-gap: clamp(24px, 3vw, 40px);
     align-items: start;
     padding: clamp(20px, 3vh, 32px) clamp(24px, 3vw, 36px);
@@ -177,7 +176,6 @@ kbd {
   .start-card > .logo { grid-area: logo; }
   .start-card > .tagline { grid-area: tagline; margin-bottom: 1rem; }
   .start-card > .live-banner { grid-area: live; }
-  .start-card > .daily-card { grid-area: daily; }
   .start-card > .mode-picker { grid-area: modes; }
   .start-card > #setup-form { grid-area: form; }
   .start-card > .menu-actions { grid-area: actions; align-self: end; }
@@ -205,8 +203,8 @@ kbd {
   .start-card .menu-actions .btn { flex-basis: calc((100% - 8px) / 2); }
 }
 
-/* Today's practice: one small task a day (@blockout/progress/daily) */
-.daily-card { display: flex; align-items: center; gap: 12px; margin: 10px 0 12px; padding: 10px 14px; border: 2px solid var(--gold-line); background: var(--gold-bg); border-radius: 14px; text-align: left; }
+/* Today's practice: one small task a day (@blockout/progress/daily), at the top of Homework */
+.daily-card { display: flex; align-items: center; gap: 12px; margin: 4px 0 12px; padding: 10px 14px; border: 2px solid var(--gold-line); background: var(--gold-bg); border-radius: 14px; text-align: left; }
 .daily-card.done { border-color: var(--line); background: var(--surface); }
 .daily-card .daily-text { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .daily-card .daily-title { font-weight: 900; }

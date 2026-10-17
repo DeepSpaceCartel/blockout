@@ -126,7 +126,7 @@ await page.addInitScript((pr) => { if (!sessionStorage.getItem('s')) { sessionSt
 - **Dialogs** have a bottom `.dialog-actions` button panel, like the Shop.
 - **Accounts are optional:** guests must always be able to play everything except hosting a class. Store as little about children as possible (see docs/privacy.md).
 - **Roles are Blockout's** ([ADR-0008](docs/decisions/0008-roles-in-blockout.md)): every new account is a student; one-time invites (hashed, expiring) make teachers and grown-ups; only `admin` comes from the token. An account in use keeps its role.
-- **Today's practice** (`@blockout/progress/daily`): one task a day from the player's own Times Table, kept in the save (`daily`) so it stays all day; it may give a taste of the next, still locked, table. Homework shows beside it.
+- **Today's practice** (`@blockout/progress/daily`): one task a day from the player's own Times Table, kept in the save (`daily`) so it stays all day; it may give a taste of the next, still locked, table. It's at the top of Homework (for guests too), not on the menu.
 - **Homework** only asks for what the child can already play (`Progress.availableOptions`, `sharedOptions` for a class). Tapping it sets up the menu and starts the game.
 - **The audience is 8-year-olds:** use short, friendly, concrete wording ("Help me count", "Needs practice"). Target devices are Chromebooks, and it must work at phone width too.
 

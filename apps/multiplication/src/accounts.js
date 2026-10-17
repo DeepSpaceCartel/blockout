@@ -217,7 +217,7 @@ function renderMenu() {
   el.accountBtn.replaceChildren(u ? `${ROLE[u.role].emoji} ${u.name}` : '👤 Sign in');
   el.accountBtn.title = u ? `${ROLE[u.role].label} account: tap for yours` : 'Sign in (you can always play as a guest)';
   const role = Auth.role();
-  el.homeworkBtn.hidden = role !== 'student';
+  el.homeworkBtn.hidden = !['guest', 'student'].includes(role); // (guests too: today's practice)
   el.classesBtn.hidden = role !== 'teacher';
   el.kidsBtn.hidden = role !== 'parent';
 }
@@ -564,10 +564,17 @@ function homeworkForm(onSubmit, options, who) {
   return form;
 }
 
+// Today's practice first (everyone), then the homework set by a teacher or grown-up
 async function openHomework() {
   homework.clear();
   homework.done();
   homework.open();
+  homework.body.append(make('h3', 'stats-heading', '⭐ Today’s practice'), Game.dailyCard(() => homework.close()));
+  homework.body.append(make('h3', 'stats-heading', 'From your teacher'));
+  if (Auth.role() !== 'student') {
+    homework.body.append(make('p', 'setting-help', 'Sign in with your school account to see homework from your teacher or a grown-up.'));
+    return;
+  }
   try {
     const { homework: items } = await Auth.api('GET', '/api/me/homework');
     homework.body.append(make('p', 'setting-help', Homework.homeworkIntro(items)));
@@ -599,14 +606,19 @@ function playHomework(goal) {
   if (!start.disabled) start.click();
 }
 
-async function refreshHomeworkBadge() {
-  if (Auth.role() !== 'student') return;
-  try {
-    const { homework: items } = await Auth.api('GET', '/api/me/homework');
-    setBadge(el.homeworkBtn, Homework.openCount(items));
-  } catch (_) {
-    // offline: no badge
+// Homework's badge: what's still to do, today's practice too. localOnly: just
+// today's practice changed (no need to ask the server again)
+let homeworkOpen = 0;
+async function refreshHomeworkBadge(localOnly = false) {
+  if (!localOnly && Auth.role() === 'student') {
+    try {
+      homeworkOpen = Homework.openCount((await Auth.api('GET', '/api/me/homework')).homework);
+    } catch (_) {
+      // offline: just today's practice
+    }
   }
+  if (!['guest', 'student'].includes(Auth.role())) return;
+  setBadge(el.homeworkBtn, homeworkOpen + (Game.dailyOpen() ? 1 : 0));
 }
 
 let currentClass = null;
