@@ -3,8 +3,8 @@ name: blockout
 description: Blockout, multiplication as area for 3rd graders. The games, live classes and accounts, with everything they run on - MongoDB, Valkey (Redis) and Keycloak with its Postgres - and their backups.
 type: application
 # The chart's own version; release.yml sets both to the release's version.
-version: 0.7.0
-appVersion: "0.7.0"
+version: 0.8.0
+appVersion: "0.8.0"
 kubeVersion: ">=1.29.0-0"
 home: https://github.com/DeepSpaceCartel/blockout
 sources:

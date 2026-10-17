@@ -4,8 +4,8 @@
 # until every part is ready; a failed update is rolled back by itself. The same
 # as installing the released chart (docs/guides/deploy.md), with a local one.
 #
-#   op run --env-file=deploy/blockout/.env.1password -- deploy/blockout/install.sh 0.7.0
-#   deploy/blockout/install.sh 0.7.0 -f secrets.yaml           # or the secrets in a file
+#   op run --env-file=deploy/blockout/.env.1password -- deploy/blockout/install.sh 0.8.0
+#   deploy/blockout/install.sh 0.8.0 -f secrets.yaml           # or the secrets in a file
 #   IMAGE=registry.example.org/blockout:test deploy/blockout/install.sh
 #   VALUES=values-production.yaml deploy/blockout/install.sh 1.0.0
 #

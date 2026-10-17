@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-17
+
 ### Changed
 - Smaller steps on both Journeys ([ADR-0012](https://github.com/DeepSpaceCartel/blockout/blob/main/docs/decisions/0012-journey-stages.md)). Each board now has three stages: beat the CPU with 4 out of 5 answers right first try, then without “Help me count”, then also claiming more than half the board (42 levels in all). Each times table in Practice has three rounds, 5, 10 and 20 questions (36 levels). 10- and 20-question rounds are no longer bought: reaching them on Practice's Journey unlocks them. Players keep their place: they start on the first stage of the board or table they were on.
 
@@ -131,7 +133,8 @@ The first release since 0.2.0 (0.3.0 wasn't released on its own): accounts and h
 - The first playable Blockout: roll two dice, draw the rectangle, answer the multiplication, against the CPU.
 
 <!-- No release tags yet: the links point at the release commits (tag them v0.1.0 and v0.2.0 to switch to compare/v0.1.0...v0.2.0). -->
-[Unreleased]: https://github.com/DeepSpaceCartel/blockout/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/DeepSpaceCartel/blockout/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/DeepSpaceCartel/blockout/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/DeepSpaceCartel/blockout/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/DeepSpaceCartel/blockout/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/DeepSpaceCartel/blockout/compare/v0.4.1...v0.5.0

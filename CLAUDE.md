@@ -50,7 +50,7 @@ npm start           # build, then serve everything on http://localhost:8080
 npm start -- --public-url https://<name>.trycloudflare.com   # behind a Cloudflare tunnel
 npm run dev         # Vite dev servers (multiplication on :5173, proxying /api) + the server with --watch
 cloudflared tunnel --url http://localhost:8080
-op run --env-file=deploy/blockout/.env.1password -- deploy/blockout/install.sh 0.7.0   # install or update everything (values-workspace.yaml); secrets from 1Password
+op run --env-file=deploy/blockout/.env.1password -- deploy/blockout/install.sh 0.8.0   # install or update everything (values-workspace.yaml); secrets from 1Password
 npm run services    # forward the development MongoDB and Valkey (release blockout-dev) to localhost; prints the URLs
 # Keycloak admin console: https://id.deepspacecartel.com/admin (user admin; password in Secret blockout-keycloak-admin)
 BLOCKOUT_AUTH=keycloak KEYCLOAK_ISSUER=https://id.deepspacecartel.com/realms/blockout KEYCLOAK_CLIENT_ID=blockout npm start

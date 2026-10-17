@@ -1,6 +1,6 @@
 {
   "name": "@blockout/game-kit",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
   "description": "The shared page engine for the other operations' games (addition, subtraction, division, fractions): one UI driven by an operation from @blockout/engine/variants.",
   "type": "module",
