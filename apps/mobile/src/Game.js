@@ -17,7 +17,7 @@
 // make them. The words, the board's catching up and the rewards are shared
 // with the web game (@blockout/progress/classroom).
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Match from '@blockout/engine/match';
 import * as Core from '@blockout/engine';
 import * as Progress from '@blockout/progress';
@@ -32,7 +32,7 @@ import { addToHistory, recordGame } from './history';
 import { useTheme } from './theme';
 import { usePlayerColors } from './looks';
 import { Celebration, Rolling, Streak } from './effects';
-import { Button, Die, Keypad } from './ui';
+import { Button, Die, Earned, Keypad } from './ui';
 
 // For automated checks of the web build: BLOCKOUT_FAST (set before the page
 // loads) makes every wait 20 times shorter, and BlockoutMobile.match is the game
@@ -59,7 +59,9 @@ const article = (n) => (/^(8|11|18)$/.test(String(n)) || /^8\d$/.test(String(n))
 // live: a live class's game: { kind: 'class' | 'pair', view (the server's,
 // updated as it changes), session, client, me (pairs: your player), onOver()
 // when its results are up }; onExit then leaves the class.
-export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, progress, onSave, toast, onEarned, onExit, onAgain, live = null }) {
+// earned: what it's earned so far (held back from popping up while playing:
+// onHold(true) while it's on screen), listed on its results screen
+export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, progress, onSave, toast, onEarned, earned = [], onHold = () => {}, onExit, onAgain, live = null }) {
   const t = useTheme();
   const PLAYER_COLORS = usePlayerColors(); // (the Wardrobe's colours)
   const [, setTick] = useState(0);
@@ -80,7 +82,7 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
   if (!lc.current) {
     lc.current = { round: 0, reported: true, doneTurn: 0, synced: 0, passSeen: 0, rollShown: null, note: '' };
     match.teacherPlayer = Boolean(live && live.session.teacher);
-    if (live && live.kind === 'class' && Live.rejoinClass(match, live.view.you)) toast(`🏫 Back in class ${live.view.code}`, `You have ${live.view.you.score} points.`);
+    if (live && live.kind === 'class' && Live.rejoinClass(match, live.view.you)) toast(`🏫 Back in class ${live.view.code}`, `You have ${live.view.you.score} points.`, { urgent: true });
   }
   const gen = useRef(0); // a new roll from the teacher stops whatever the last one was still doing
 
@@ -112,13 +114,14 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
   const pausedMs = useRef(0);
   const turnId = useRef(0); // (so a late "on by itself" doesn't skip a turn)
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    onHold(true); // (bonuses and achievements wait for the results)
+    return () => {
       alive.current = false;
       stopClock();
-    },
-    []
-  );
+      onHold(false);
+    };
+  }, []);
 
   // ---- the answer timer (Expert's, or Home multiplayer's from Settings). It
   // pauses while counting; when it runs out the rectangle comes off.
@@ -571,7 +574,7 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
     c.reported = true;
     c.doneTurn = c.round;
     live.client.sendResult(live.session, { round: c.round, ...result }).catch((err) => {
-      if (err.code !== 'stale' && err.code !== 'done') toast('⚠️ Couldn’t send your answer', err.message);
+      if (err.code !== 'stale' && err.code !== 'done') toast('⚠️ Couldn’t send your answer', err.message, { urgent: true });
     });
   }
 
@@ -587,7 +590,7 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
     } catch (err) {
       match.phase = 'roll';
       setBusy(false);
-      if (err.code !== 'turn' && err.code !== 'stale') toast('⚠️ Couldn’t roll', err.message);
+      if (err.code !== 'turn' && err.code !== 'stale') toast('⚠️ Couldn’t roll', err.message, { urgent: true });
       return redraw();
     }
     await rollAnimation();
@@ -638,7 +641,7 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
       stopClock();
       if (!c.reported) {
         Live.skipUnfinished(match);
-        toast('⏭️ Next roll!', 'Your teacher moved on before you finished that one.');
+        toast('⏭️ Next roll!', 'Your teacher moved on before you finished that one.', { urgent: true });
       }
     }
     c.round = view.round;
@@ -813,7 +816,7 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
             {rolled ? <Button testID="draw-it" title="Draw it ›" onPress={toBoard} style={styles.wide} /> : null}
           </View>
         ) : view === 'board' ? (
-          <View style={styles.boardScreen}>
+          <BoardScreen over={Boolean(over)}>
             <Board
               match={match}
               width={side((over ? 300 : steps.length ? 214 : 150) + (goOn ? 64 : 0) + (placeMode === 'click' && match.phase === 'place' ? 64 : 0))}
@@ -840,9 +843,9 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
             )}
             {goOn ? <Button testID="go-on" title={goOn} onPress={() => goOnPressed.current && goOnPressed.current()} style={styles.wide} /> : null}
             {over && over.live ? (
-              <LiveResults over={over} tournament={live.view.tournament ? Live.tournamentLine(live.view.tournament) : null} teacherPlayer={match.teacherPlayer} onLeave={onExit} />
+              <LiveResults over={over} earned={earned} tournament={live.view.tournament ? Live.tournamentLine(live.view.tournament) : null} teacherPlayer={match.teacherPlayer} onLeave={onExit} />
             ) : over ? (
-              <Results over={over} match={match} who={who} onAgain={onAgain} onExit={onExit} />
+              <Results over={over} match={match} who={who} earned={earned} onAgain={onAgain} onExit={onExit} />
             ) : steps.length ? (
               <View style={[styles.steps, { backgroundColor: t.surface, borderColor: t.line }]}>
                 {steps.slice(-3).map((s, i, shown) => (
@@ -856,7 +859,7 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
                 {msg}
               </Text>
             )}
-          </View>
+          </BoardScreen>
         ) : view === 'help' ? (
           <HelpScreen area={area} rect={match.pending.rect} color={PLAYER_COLORS[current % PLAYER_COLORS.length]} counting={counting} text={feedback ? feedback.text : ''} done={helpDone} onBack={backToAnswer} />
         ) : (
@@ -876,6 +879,17 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
       </View>
       {over && (over.live ? over.celebrate : over.results.winners.length === 1 && !over.results.winners[0].cpu) ? <Celebration /> : null}
     </View>
+  );
+}
+
+// The board screen; at the end it scrolls (the results, with what was earned,
+// can be more than a small phone shows under the board)
+function BoardScreen({ over, children }) {
+  if (!over) return <View style={styles.boardScreen}>{children}</View>;
+  return (
+    <ScrollView style={styles.fill} contentContainerStyle={[styles.boardScreen, styles.boardScroll]}>
+      {children}
+    </ScrollView>
   );
 }
 
@@ -975,7 +989,7 @@ function AnswerScreen({ rect, entry, feedback, busy, help, onKey, onHelp, streak
   );
 }
 
-function Results({ over, match, who, onAgain, onExit }) {
+function Results({ over, match, who, earned, onAgain, onExit }) {
   const t = useTheme();
   const PLAYER_COLORS = usePlayerColors(); // (the Wardrobe's colours)
   const { results } = over;
@@ -997,6 +1011,7 @@ function Results({ over, match, who, onAgain, onExit }) {
           </View>
         </View>
       ))}
+      <Earned notes={earned} />
       {match.mode === 'multi' ? <Text style={[styles.resultSub, { color: t.muted }]}>Multiplayer games are just for fun: they don’t count towards Stats or achievements.</Text> : null}
       <View style={styles.resultActions}>
         <Button title="Play Again" onPress={onAgain} style={styles.flex} testID="again" />
@@ -1009,7 +1024,7 @@ function Results({ over, match, who, onAgain, onExit }) {
 // A live class's results: the server's (Live.classResult / pairResult). The
 // next game is the teacher's to start, so it's stay, or leave the class.
 // tournament: where you stand now (it changes as the other games finish)
-function LiveResults({ over, tournament, teacherPlayer, onLeave }) {
+function LiveResults({ over, earned, tournament, teacherPlayer, onLeave }) {
   const t = useTheme();
   const PLAYER_COLORS = usePlayerColors();
   const r = over.live;
@@ -1046,6 +1061,7 @@ function LiveResults({ over, tournament, teacherPlayer, onLeave }) {
           {tournament}
         </Text>
       ) : null}
+      <Earned notes={earned} />
       <Text style={[styles.resultSub, { color: t.muted }]}>{teacherPlayer ? 'Thanks for playing! Teacher games don’t count towards stats.' : 'Stay on this screen: your teacher can start another game.'}</Text>
       <View style={styles.resultActions}>
         <Button kind="secondary" title="Leave class" onPress={onLeave} style={styles.flex} testID="leave-class" />
@@ -1077,6 +1093,7 @@ const styles = StyleSheet.create({
   rollMsg: { fontSize: 24, fontWeight: '700', textAlign: 'center', lineHeight: 32 },
   wide: { alignSelf: 'stretch' },
   boardScreen: { flex: 1, alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 4 },
+  boardScroll: { flexGrow: 1, flex: 0, paddingBottom: 16 },
   msg: { fontSize: 18, textAlign: 'center', lineHeight: 24 },
   steps: { alignSelf: 'stretch', padding: 12, borderRadius: 12, borderWidth: 2, gap: 4 },
   step: { fontSize: 16, lineHeight: 22 },

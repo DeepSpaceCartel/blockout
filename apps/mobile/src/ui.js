@@ -2,6 +2,7 @@
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Rect, Stop, Text as SvgText } from 'react-native-svg';
 import { useTheme } from './theme';
+import * as Notes from './notes';
 import { useDiceSkin, useKeypadSkin } from './looks';
 
 // primary: the one thing to do next (solid, with a soft shadow); secondary:
@@ -122,6 +123,32 @@ export function Keypad({ onKey, disabled }) {
   );
 }
 
+// What a game or round earned (held back while playing, stacked: notes.js),
+// for its results screen
+export function Earned({ notes }) {
+  const t = useTheme();
+  if (!notes || !notes.length) return null;
+  return (
+    <View testID="earned" style={styles.earned} accessibilityLabel="You earned">
+      {notes.map((n) => {
+        const [title, text] = Notes.words(n);
+        return (
+          <View key={n.kind} style={[styles.note, { backgroundColor: t.goldBg, borderColor: t.gold }]}>
+            <Text style={[styles.noteTitle, { color: t.ink }]} numberOfLines={1}>
+              {title}
+            </Text>
+            {text ? (
+              <Text style={[styles.noteText, { color: t.goldInk }]} numberOfLines={1}>
+                {text}
+              </Text>
+            ) : null}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 8 },
   close: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
@@ -131,6 +158,10 @@ const styles = StyleSheet.create({
   primary: { shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
   buttonText: { fontSize: 17, fontWeight: '700', letterSpacing: 0.2 },
   dieNumber: { textAlign: 'center', fontWeight: '800' },
+  earned: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  note: { borderWidth: 1.5, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, maxWidth: '100%' },
+  noteTitle: { fontSize: 13, fontWeight: '800' },
+  noteText: { fontSize: 11, fontWeight: '700' },
   keypad: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
   key: { width: '30%', paddingVertical: 12, borderRadius: 12, borderWidth: 2, alignItems: 'center' },
   keyText: { fontSize: 24, fontWeight: '700' },

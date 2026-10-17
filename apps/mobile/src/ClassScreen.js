@@ -25,7 +25,7 @@ function gameFor(view) {
 
 // user: the signed-in account (a student plays under their first name);
 // resume: a session from last time; code: from a link; onExit() back to the menu
-export default function ClassScreen({ user, resume = null, code: linkCode = '', progress, settings, onSave, toast, onEarned, onExit }) {
+export default function ClassScreen({ user, resume = null, code: linkCode = '', progress, settings, onSave, toast, onEarned, earned, onHold, onExit }) {
   const t = useTheme();
   const looks = useLooks();
   const [session, setSession] = useState(resume);
@@ -96,6 +96,8 @@ export default function ClassScreen({ user, resume = null, code: linkCode = '', 
         onSave={onSave}
         toast={toast}
         onEarned={onEarned}
+        earned={earned}
+        onHold={onHold}
         onExit={leave}
         live={{ kind: playing.kind, view, session, client: Classroom.client, me: playing.me, onOver: () => finished.current.add(playing.key) }}
       />

@@ -14,7 +14,7 @@ import { addToHistory } from './history';
 import { useTheme } from './theme';
 import { usePlayerColors } from './looks';
 import { Streak } from './effects';
-import { Button, Keypad } from './ui';
+import { Button, Earned, Keypad } from './ui';
 
 const testing = Platform.OS === 'web' && typeof window !== 'undefined';
 const pace = testing && window.BLOCKOUT_FAST ? 0.05 : 1;
@@ -28,7 +28,8 @@ const STATUS = { mastered: '#2a9d5c', learning: '#f2c94c', practice: '#d64533', 
 
 // options: { difficulty, count, tables, level, timer }; the save is changed in
 // place (onSave after each change); toast and onEarned as in the game.
-export default function PracticeScreen({ options, progress, settings = Settings.DEFAULT_SETTINGS, onSave, toast, onEarned, onExit, onAgain }) {
+// earned / onHold: as Game's (pop-ups wait for the results)
+export default function PracticeScreen({ options, progress, settings = Settings.DEFAULT_SETTINGS, onSave, toast, onEarned, earned = [], onHold = () => {}, onExit, onAgain }) {
   const t = useTheme();
   const PLAYER_COLORS = usePlayerColors(); // (the Wardrobe's colours)
   const r = useRef(null);
@@ -56,10 +57,12 @@ export default function PracticeScreen({ options, progress, settings = Settings.
 
   const wait = useCallback((ms) => new Promise((resolve) => setTimeout(() => alive.current && resolve(), ms)), []);
   useEffect(() => {
+    onHold(true); // (bonuses and achievements wait for the results)
     startQuestion();
     return () => {
       alive.current = false;
       stopClock();
+      onHold(false);
     };
   }, []);
 
@@ -241,7 +244,7 @@ export default function PracticeScreen({ options, progress, settings = Settings.
       </View>
       <View style={styles.fill} onLayout={(e) => setArea(e.nativeEvent.layout)}>
         {!area ? null : view === 'done' && end ? (
-          <Done end={end} progress={progress} round={round} settings={settings} onAgain={onAgain} onExit={onExit} />
+          <Done end={end} progress={progress} round={round} settings={settings} earned={earned} onAgain={onAgain} onExit={onExit} />
         ) : view === 'help' && q ? (
           <View style={styles.helpScreen}>
             <RectPicture rect={{ a: q.a, b: q.b, w: q.b, h: q.a }} color={PLAYER_COLORS[0]} counting={counting} maxWidth={area.width - 32} maxHeight={Math.max(80, area.height - 200)} />
@@ -282,7 +285,7 @@ export default function PracticeScreen({ options, progress, settings = Settings.
   );
 }
 
-function Done({ end, progress, round, settings, onAgain, onExit }) {
+function Done({ end, progress, round, settings, earned, onAgain, onExit }) {
   const t = useTheme();
   const facts = Stats.playerFacts(progress, round.name);
   const grid = Stats.factGrid(facts, { unlocked: Views.tableSize(progress), showTime: Settings.showsTime(settings) });
@@ -292,6 +295,7 @@ function Done({ end, progress, round, settings, onAgain, onExit }) {
         <Text testID="pd-sub" style={[styles.sub, { color: t.ink }]}>
           {end.sub}
         </Text>
+        <Earned notes={earned} />
         <Text style={[styles.groupTitle, { color: t.muted }]}>What changed</Text>
         {end.changes.length ? (
           end.changes.map((c) => (

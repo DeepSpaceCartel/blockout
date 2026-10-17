@@ -32,6 +32,7 @@ import MyKidsScreen from './MyKidsScreen';
 import AdminScreen from './AdminScreen';
 import * as Classroom from './classroom';
 import { parseLink } from './links';
+import * as Notes from './notes';
 import { DEFAULT_LOOKS, Looks } from './looks';
 import { ThemeSetting, useTheme } from './theme';
 
@@ -356,12 +357,14 @@ function Main({ onTheme }) {
           onSave={save}
           toast={toasts.show}
           onEarned={celebrate}
+          earned={toasts.held}
+          onHold={toasts.hold}
           onExit={() => setInClass(null)}
         />
       ) : game && game.practice ? (
-        <PracticeScreen key={game.key} options={game.practice} progress={progress} settings={settings} onSave={save} toast={toasts.show} onEarned={celebrate} onExit={() => setGame(null)} onAgain={() => play()} />
+        <PracticeScreen key={game.key} options={game.practice} progress={progress} settings={settings} onSave={save} toast={toasts.show} onEarned={celebrate} earned={toasts.held} onHold={toasts.hold} onExit={() => setGame(null)} onAgain={() => play()} />
       ) : game ? (
-        <Game key={game.key} setup={game.setup} settings={settings} progress={progress} onSave={save} toast={toasts.show} onEarned={celebrate} onExit={() => setGame(null)} onAgain={() => play()} />
+        <Game key={game.key} setup={game.setup} settings={settings} progress={progress} onSave={save} toast={toasts.show} onEarned={celebrate} earned={toasts.held} onHold={toasts.hold} onExit={() => setGame(null)} onAgain={() => play()} />
       ) : screen === 'shop' ? (
         <ShopScreen progress={progress} onAsk={ask} onClose={() => setScreen('menu')} />
       ) : screen === 'account' && user ? (
@@ -441,43 +444,56 @@ function Main({ onTheme }) {
   );
 }
 
-// Bonuses and achievements show one at a time, sliding in at the top
+// Bonuses and achievements show one at a time, sliding in at the top; the
+// same kind waiting in the queue is stacked into one (notes.js). During a
+// game or practice round they're held instead (hold(true)) and listed on its
+// results screen (held), except urgent ones (show(title, text, { urgent })).
 function useToasts() {
   const t = useTheme();
   // (positioned absolutely, so it has to step below the notch and status bar itself)
   const insets = useSafeAreaInsets();
-  const queue = useRef([]);
+  const queue = useRef([]); // stacked notes (notes.js)
   const active = useRef(false); // (a ref: show() is called from other screens' renders)
   const [current, setCurrent] = useState(null);
+  const holding = useRef(false);
+  const [held, setHeld] = useState([]);
   const y = useRef(new Animated.Value(-200)).current;
 
   const next = () => {
-    const item = queue.current.shift();
+    const note = queue.current.shift();
+    const item = note ? Notes.words(note) : null;
     active.current = Boolean(item);
-    setCurrent(item || null);
+    setCurrent(item ? { title: item[0], text: item[1] } : null);
     if (!item) return;
     y.setValue(-(insets.top + 160));
     Animated.sequence([
       Animated.spring(y, { toValue: 0, useNativeDriver: true }),
-      Animated.delay(1800),
+      Animated.delay(1500),
       Animated.timing(y, { toValue: -(insets.top + 160), duration: 250, useNativeDriver: true }),
     ]).start(next);
   };
 
-  const show = (title, text) => {
-    queue.current.push({ title, text });
+  const show = (title, text, { urgent = false } = {}) => {
+    if (holding.current && !urgent) return setHeld((list) => Notes.stack(list, title, text));
+    queue.current = Notes.stack(queue.current, title, text);
     if (!active.current) next();
+  };
+
+  // A game or round starts (true: hold what it earns) or ends (false)
+  const hold = (on) => {
+    holding.current = on;
+    if (on) setHeld([]);
   };
 
   const View_ = () =>
     current ? (
-      <Animated.View pointerEvents="none" style={[styles.toast, { top: insets.top + 8, backgroundColor: t.goldBg, borderColor: t.gold, transform: [{ translateY: y }] }]}>
+      <Animated.View testID="toast" pointerEvents="none" style={[styles.toast, { top: insets.top + 8, backgroundColor: t.goldBg, borderColor: t.gold, transform: [{ translateY: y }] }]}>
         <Text style={[styles.toastTitle, { color: t.ink }]}>{current.title}</Text>
         <Text style={[styles.toastText, { color: t.goldInk }]}>{current.text}</Text>
       </Animated.View>
     ) : null;
 
-  return { show, View: View_ };
+  return { show, hold, held, View: View_ };
 }
 
 const styles = StyleSheet.create({

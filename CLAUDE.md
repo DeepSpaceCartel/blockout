@@ -117,7 +117,7 @@ await page.addInitScript((pr) => { if (!sessionStorage.getItem('s')) { sessionSt
 - **Bonuses** are in `@blockout/progress` (`answerBonus`, `timerBonus`, `boardFinishBonus`, `practiceFinishBonus`). Tell the player about them in the menu hints and the unlock dialogs.
 - **Achievements:**
   - They show one at a time as a WoW-style banner (`celebrate`, then a queue).
-  - Results screens stay minimal: no points line, stickers row or achievement list. Actions go on one row of equal buttons.
+  - Results screens stay minimal: no points line, stickers row or achievement list. Actions go on one row of equal buttons. The phone app is the exception: pop-ups would cover the game, so it holds them while playing and lists them, stacked, on the results (`src/notes.js`); urgent ones (a skipped roll, a failed send) still pop up.
   - Secret achievements (`hidden: true`, group "Secrets") show as "???" until earned.
 - **Cheat codes:** press ~.
   - They're in `Progress.CHEAT_CODES`, with `cheatOn`/`cheatOff` storing what each changed so it can be undone.

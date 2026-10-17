@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- In the phone app, bonuses, achievements and stickers no longer pop up during a game or practice round: they're listed on its results, the same kind stacked into one ("⚡ Speedy ×3 · +9 bonus points"). Pop-ups elsewhere stack repeats too.
 - Today's practice: one small task a day at the top of Homework (now there for guests too, its badge counting today's task), picked from the player's own Times Table (facts that need practice, the next table to master, a taste of the next table, or a game that stretches a little), worth 30 points and 10 more for each day in a row. In the web game and the phone app, for guests too.
 - Blockout for phones and tablets (`apps/mobile`): a React Native app, built with Expo, that runs in Expo Go. You against the CPU or two players on one phone, Easy to Hard, drawing by dragging, a keypad, "Help me count", points and achievements, and signing in with Google, with the save synced with the web game.
 - The Wardrobe in the phone app (menu › Looks): every look from the web game, worn in its games and practice, from dice, keypads and boards to the CPU's character and the win celebration.
