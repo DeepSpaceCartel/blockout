@@ -20,11 +20,19 @@ function shade(hex, amount) {
 
 // The lines between the squares inside a rectangle, drawn over its colour so
 // every square can be counted
-function SquareLines({ x, y, w, h, cell, width = 1.5 }) {
+// every square can be counted (quieter than the rectangle's outline, so its shape still shows)
+function SquareLines({ x, y, w, h, cell, width = 1, opacity = 0.45 }) {
   const lines = [];
-  for (let i = 1; i < w; i++) lines.push(<Line key={`c${i}`} x1={(x + i) * cell} y1={y * cell} x2={(x + i) * cell} y2={(y + h) * cell} stroke="#fff" strokeOpacity={0.6} strokeWidth={width} />);
-  for (let i = 1; i < h; i++) lines.push(<Line key={`r${i}`} x1={x * cell} y1={(y + i) * cell} x2={(x + w) * cell} y2={(y + i) * cell} stroke="#fff" strokeOpacity={0.6} strokeWidth={width} />);
+  for (let i = 1; i < w; i++) lines.push(<Line key={`c${i}`} x1={(x + i) * cell} y1={y * cell} x2={(x + i) * cell} y2={(y + h) * cell} stroke="#fff" strokeOpacity={opacity} strokeWidth={width} />);
+  for (let i = 1; i < h; i++) lines.push(<Line key={`r${i}`} x1={x * cell} y1={(y + i) * cell} x2={(x + w) * cell} y2={(y + i) * cell} stroke="#fff" strokeOpacity={opacity} strokeWidth={width} />);
   return lines;
+}
+
+// A rectangle's outline: dark and thick, just inside its edge, so two
+// rectangles side by side show a clear line between them
+const OUTLINE = 3.5;
+function Outline({ x, y, w, h, cell, color }) {
+  return <Rect x={x * cell + OUTLINE / 2} y={y * cell + OUTLINE / 2} width={w * cell - OUTLINE} height={h * cell - OUTLINE} fill="none" stroke={shade(color, -0.6)} strokeWidth={OUTLINE} />;
 }
 
 // drag: { c0, r0, c1, r1, verdict } while drawing (verdict: match.judge's); preview: the CPU's rectangle so
@@ -94,7 +102,7 @@ export default function Board({ match, width, drag, preview, hide, counting, can
             <G key={`r${i}`}>
               {box(r, 'fill', { fill: color, fillOpacity: r.solved ? 0.85 : 0.5 })}
               <SquareLines {...r} cell={cell} />
-              {box(r, 'edge', { fill: 'none', stroke: shade(color, -0.35), strokeWidth: 2.5 })}
+              <Outline {...r} cell={cell} color={color} />
               {label && r.solved ? (
                 <SvgText x={(r.x + r.w / 2) * cell} y={(r.y + r.h / 2) * cell + 6} fill="#fff" fontFamily={FONT} fontSize={Math.min(18, cell * 0.6)} fontWeight="bold" textAnchor="middle">
                   {r.area}
@@ -156,7 +164,7 @@ function CountingOverlay({ counting, cell, t, everySquare = false }) {
     strips.push(
       <G key={i}>
         <Rect x={strip.x * cell} y={strip.y * cell} width={strip.w * cell} height={strip.h * cell} fill={t.gold} fillOpacity={0.9} />
-        <SquareLines {...strip} cell={cell} width={2} />
+        <SquareLines {...strip} cell={cell} width={1.5} opacity={0.6} />
         {numbered.map((sq) => {
           const n = i * group + (byRows ? sq.x - strip.x : sq.y - strip.y) + 1;
           const total = n === (i + 1) * group;
@@ -196,8 +204,8 @@ export function RectPicture({ rect, color, counting, maxWidth, maxHeight }) {
       <Svg width={width} height={height} pointerEvents="none">
         <Rect x={0} y={0} width={width} height={height} fill={color} fillOpacity={0.85} />
         {counting ? <CountingOverlay counting={{ ...counting, rect: at }} cell={cell} t={t} everySquare /> : null}
-        <SquareLines x={0} y={0} w={rect.w} h={rect.h} cell={cell} width={2} />
-        <Rect x={1.5} y={1.5} width={width - 3} height={height - 3} fill="none" stroke={shade(color, -0.35)} strokeWidth={3} />
+        <SquareLines x={0} y={0} w={rect.w} h={rect.h} cell={cell} width={1.5} opacity={0.55} />
+        <Outline x={0} y={0} w={rect.w} h={rect.h} cell={cell} color={color} />
       </Svg>
     </View>
   );
