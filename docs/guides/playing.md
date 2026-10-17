@@ -6,7 +6,7 @@ Everything here works without an account. Progress is saved in the browser; [sig
 
 ## Single player
 
-Pick **Single player** and tap **Play Level 1**. The [Journey](../concepts/progression.md) picks the board and the dice: it starts on a 1×1 board with a 1-sided die and grows to 12×12 with a 12-sided die, and beyond. Each board has three stages: beat the CPU with 4 out of 5 answers right first try, then do it without “Help me count”, then also claim more than half the board. From the 6×6 board, **Free play** lets you pick any difficulty and board you've reached. Roll, draw the rectangle (drag it out, or click to drop it once *Click to place* is unlocked), and answer. The CPU takes its turn and shows its working.
+Pick **Single player** and tap **Play Level 1**. The [Journey](../concepts/progression.md) picks the board and the dice: it starts on a 1×1 board with a 1-sided die and grows to 12×12 with a 12-sided die, and beyond. From 4×4 on, each board has three stages: beat the CPU with 4 out of 5 answers right first try, then do it without “Help me count”, then win with every answer right first try. From the 6×6 board, **Free play** lets you pick any difficulty and board you've reached. Roll, draw the rectangle (drag it out, or click to drop it once *Click to place* is unlocked), and answer. The CPU takes its turn and shows its working.
 
 ![A single-player game: the board, the roll and the scores](../assets/screenshots/single-player.png)
 

@@ -6,31 +6,32 @@ An 8-year-old shouldn't have to plan a route through a skill tree. The game pick
 
 ## The game's Journey
 
-Each board has three stages, and each stage asks a little more than the one before:
+From 4×4 on, each board has three stages, and each stage asks a little more than the one before. The first boards, 1×1 to 3×3, are a game or two each, so they have one stage ([ADR-0014](../decisions/0014-first-boards-one-stage.md)):
 
 | Stage | To move up |
 |---|---|
 | 1 | Beat the CPU with **4 out of 5 answers right first try** |
 | 2 | …without "Help me count" |
-| 3 | …and claim **more than half the board** |
+| 3 | Beat the CPU with **every answer right first try** |
 
 The boards, in order:
 
 | Levels | Board | Dice |
 |---|---|---|
-| 1–36 | *n*×*n*, three stages each (1×1 is Levels 1–3, 6×6 is 16–18, 12×12 is 34–36) | *n*-sided (1 to 12) |
-| 37 | 16×16 | 12-sided |
-| 38 | 12×12 | Tricky |
-| 39 | 20×20 | 12-sided |
-| 40 | 12×12 | Master |
-| 41 | 16×16 | Legend |
-| 42 | 24×24 | 12-sided |
+| 1–3 | 1×1, 2×2, 3×3, one stage each | 1-, 2-, 3-sided |
+| 4–30 | *n*×*n* from 4×4 to 12×12, three stages each (6×6 is 10–12, 12×12 is 28–30) | *n*-sided (4 to 12) |
+| 31 | 16×16 | 12-sided |
+| 32 | 12×12 | Tricky |
+| 33 | 20×20 | 12-sided |
+| 34 | 12×12 | Master |
+| 35 | 16×16 | Legend |
+| 36 | 24×24 | 12-sided |
 
 How it plays out:
 - **Warm-ups first.** The first boards are short: 1×1 is a single square.
-- **The board grows with the times tables.** The 6×6 board (Level 16) is where everyone used to start, and 12×12 (Level 34) is the classic game.
+- **The board grows with the times tables.** The 6×6 board (Level 10) is where everyone used to start, and 12×12 (Level 28) is the classic game.
 - **Rewards.** Each stage passed earns 10 points × the board's size. Reaching 6×6, 12×12 and the end each earn an achievement.
-- **The results say what's missing:** the win, the answers, "Help me count", or the half board.
+- **The results say what's missing:** the win, the answers, "Help me count", or a slip on stage 3.
 
 ## What a board unlocks
 
@@ -43,9 +44,9 @@ Reaching a board's first stage unlocks the board and difficulty it uses:
 | 9×9 | Hard |
 | 10×10 | 10×10 |
 | 12×12 | 12×12 |
-| Levels 37–42 | 16×16, Tricky, 20×20, Master, Legend and 24×24, in that order |
+| Levels 31–36 | 16×16, Tricky, 20×20, Master, Legend and 24×24, in that order |
 
-- **Custom boards** unlock after Level 42.
+- **Custom boards** unlock after Level 36.
 - **Everything that depends on a difficulty follows automatically:** its Expert games and timers, its practice, and homework.
 - **Free play** opens on 6×6. It's the old menu with difficulty and board, offering only what the Journey has reached.
 
@@ -93,9 +94,9 @@ Points buy what changes *how* you play, not *what* you play next:
 Nobody loses anything:
 - **From before the Journey:** a save starts on the highest board its boards, difficulties and wins reach, and on 6×6 at least once it has played. In Practice it starts on the highest table it owns.
 - **From 0.6–0.7:** a save starts on the first stage of the board or table it was on.
-- **From 0.8:** a save keeps its table and round.
+- **From 0.8–0.9:** a save keeps its board and stage, and its table and round.
 
-The decisions are [ADR-0010](../decisions/0010-journey-progression.md), [ADR-0011](../decisions/0011-practice-journey.md), [ADR-0012](../decisions/0012-journey-stages.md) and [ADR-0013](../decisions/0013-practice-expert-rounds.md).
+The decisions are [ADR-0010](../decisions/0010-journey-progression.md), [ADR-0011](../decisions/0011-practice-journey.md), [ADR-0012](../decisions/0012-journey-stages.md), [ADR-0013](../decisions/0013-practice-expert-rounds.md) and [ADR-0014](../decisions/0014-first-boards-one-stage.md).
 
 The rules are in `@blockout/progress`:
 - `levels.js`: the ladders

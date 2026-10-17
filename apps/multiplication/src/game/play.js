@@ -866,7 +866,7 @@ function renderRewards(winners, empty) {
 // still takes. Returns the achievements it earned.
 function renderLevelResult(humanWon) {
   const you = game.players.find((p) => !p.cpu);
-  const r = Progress.recordLevelGame(progress, game.level, { won: humanWon, answered: you.answered + you.stats.timeouts, firstTry: you.firstTry, helped: you.stats.helped, squares: you.squares, size: game.size });
+  const r = Progress.recordLevelGame(progress, game.level, { won: humanWon, answered: you.answered + you.stats.timeouts, firstTry: you.firstTry, helped: you.stats.helped });
   const message = Journey.resultMessage(r);
   if (message) {
     const line = make('p', 'journey-result' + (r.advanced ? ' up' : ''));

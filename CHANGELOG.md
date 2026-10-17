@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- The Journey's first boards, 1×1 to 3×3, have one stage each: beat the CPU with 4 out of 5 answers right first try. Three stages start on 4×4, so the Journey has 36 levels. Before, 1×1 was played three times, and 2×2's last stage (more than half the board) was mostly luck ([ADR-0014](https://github.com/DeepSpaceCartel/blockout/blob/main/docs/decisions/0014-first-boards-one-stage.md)). Players keep their board and stage.
+- A board's stage 3 asks for every answer right first try, instead of more than half the board. That was mostly luck, and players got stuck on "So close! Now claim more than half the board" even after winning.
+
 ## [0.9.0] - 2026-10-17
 
 ### Changed

@@ -25,6 +25,7 @@ function createProgress() {
     gameExpertV1: true, // …or from before single player had Learn / Expert
     journeyV1: true, // …or from before boards and difficulties were Journey levels
     journeyV2: true, // …or from before each board had three stages
+    journeyV3: true, // …or from before 1×1 to 3×3 had one stage each
     journey: { level: 1 }, // the Journey level reached (see levels.js)
     practiceJourneyV1: true, // …or from before Practice had its own Journey
     practiceJourneyV2: true, // …or from before each table had three rounds (5, 10, 20)
@@ -146,7 +147,15 @@ function normalize(saved) {
   // goes to the first stage of its board.
   if (!saved.journeyV1) state.journey.level = Math.max(state.journey.level, startLevel(state));
   else if (!saved.journeyV2) state.journey.level = levelOfStep(Number(state.journey.level) || 1);
-  state.journeyV1 = state.journeyV2 = true;
+  // …and then the first boards (1×1 to 3×3) one stage each: a save from
+  // 0.8–0.9 keeps its board and stage (on those boards, their one stage)
+  else if (!saved.journeyV3) {
+    const old = Math.max(1, Number(state.journey.level) || 1);
+    const [step, stage] = old > 42 ? [19, 1] : old > 36 ? [old - 24, 1] : [Math.ceil(old / 3), ((old - 1) % 3) + 1];
+    const base = levelOfStep(step);
+    state.journey.level = base >= DONE ? DONE : base + Math.min(stage, LEVELS[base - 1].stages) - 1;
+  }
+  state.journeyV1 = state.journeyV2 = state.journeyV3 = true;
   grantJourney(state);
   // Practice and its times tables became Practice Journey levels: an older
   // save starts on the highest table it owns (and Practice is free). Then each
@@ -459,10 +468,11 @@ function startLevel(state) {
 // How a game on a level went: { won, answered, firstTry } (the human's) →
 // { won, accuracy, passed, missing: null | 'win' | 'accuracy' }
 // stage: what the level asks (levels.js): 1 the win and the answers, 2 also
-// no "Help me count", 3 also more than half the board (squares of size²).
-function levelResult({ won, answered = 0, firstTry = 0, helped = 0, squares = 0, size = 0 }, stage = 1) {
+// no "Help me count", 3 every answer right first try (a helped one isn't).
+function levelResult({ won, answered = 0, firstTry = 0, helped = 0 }, stage = 1) {
   const accuracy = answered ? firstTry / answered : 0;
-  const missing = !won ? 'win' : accuracy < LEVEL_GOAL.firstTry ? 'accuracy' : stage >= 2 && helped > 0 ? 'help' : stage >= 3 && squares * 2 <= size * size ? 'half' : null;
+  // (what to say: the stage's own goal first, so stage 3 says "every answer")
+  const missing = !won ? 'win' : stage >= 3 && firstTry < answered ? 'perfect' : accuracy < LEVEL_GOAL.firstTry ? 'accuracy' : stage >= 2 && helped > 0 ? 'help' : null;
   return { won: Boolean(won), accuracy, passed: !missing, missing };
 }
 

@@ -13,8 +13,11 @@ const tierFor = (sides) => (sides <= 6 ? 'easy' : sides <= 8 ? 'medium' : 'hard'
 // What each stage of a board asks, on top of the stage before:
 //   1 beat the CPU with 80 % of your answers right first try
 //   2 …without "Help me count"
-//   3 …and claim more than half the board
+//   3 …with every answer right first try
+// (skill, not the dice: how much of the board you get is mostly luck)
+// The first boards (1×1 to 3×3) are a game or two each: one stage.
 const STAGES = 3;
+const STAGES_FROM = 4;
 
 // The steps of the game's Journey: n×n with an n-sided die (1–12), then the
 // challenges. grants: the Shop ids (boards, difficulties) reaching a step
@@ -22,7 +25,7 @@ const STAGES = 3;
 // homework, practice).
 const GRANTS = { 7: ['difficulty.medium'], 8: ['board8'], 9: ['difficulty.hard'], 10: ['board10'], 12: ['board12'] };
 const STEPS = [
-  ...Array.from({ length: 12 }, (_, i) => ({ step: i + 1, size: i + 1, sides: i + 1, difficulty: tierFor(i + 1), stages: STAGES, grants: GRANTS[i + 1] || [] })),
+  ...Array.from({ length: 12 }, (_, i) => ({ step: i + 1, size: i + 1, sides: i + 1, difficulty: tierFor(i + 1), stages: i + 1 >= STAGES_FROM ? STAGES : 1, grants: GRANTS[i + 1] || [] })),
   { step: 13, size: 16, sides: 12, difficulty: 'hard', stages: 1, grants: ['board16'] },
   { step: 14, size: 12, difficulty: 'tricky', stages: 1, grants: ['difficulty.tricky'] },
   { step: 15, size: 20, sides: 12, difficulty: 'hard', stages: 1, grants: ['board20'] },

@@ -50,7 +50,7 @@ export function goalLine(level = 1) {
   const stage = levelInfo(level).stage;
   const base = `Beat the CPU with ${fiveOf()} answers right first try`;
   if (stage === 2) return `${base}, without “Help me count”`;
-  if (stage === 3) return `${base}, without “Help me count”, and claim more than half the board`;
+  if (stage === 3) return 'Beat the CPU with every answer right first try';
   return base;
 }
 
@@ -66,7 +66,7 @@ const MISSING = {
   win: 'Beat the CPU to move up.',
   accuracy: `You won! Now get FIVE answers right first try to move up.`,
   help: 'You won! Now do it without “Help me count” to move up.',
-  half: 'You won! Now claim more than half the board to move up.',
+  perfect: 'You won! Now get every answer right first try to move up.',
 };
 
 // What the results screen says about a Journey game (recordLevelGame's result):

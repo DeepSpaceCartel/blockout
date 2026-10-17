@@ -33,8 +33,8 @@ test('shop: buying needs points, prerequisites, and only happens once', () => {
   assert.equal(P.isUnlocked(s, 'multiplayer'), true);
   assert.deepEqual(P.buy(s, 'multiplayer'), { ok: false, reason: 'owned' });
   // boards and difficulties come from the Journey, never the wallet
-  assert.deepEqual(P.buy(s, 'board8'), { ok: false, reason: 'journey', level: 22 }); // (8×8's first stage)
-  assert.deepEqual(P.buy(s, 'difficulty.hard'), { ok: false, reason: 'journey', level: 25 }); // (9×9's)
+  assert.deepEqual(P.buy(s, 'board8'), { ok: false, reason: 'journey', level: 16 }); // (8×8's first stage)
+  assert.deepEqual(P.buy(s, 'difficulty.hard'), { ok: false, reason: 'journey', level: 19 }); // (9×9's)
   assert.equal(s.wallet, 850);
   assert.deepEqual(P.buy(s, 'goldenDice'), { ok: false, reason: 'points', missing: 10000 - 850 });
   s.wallet = 10000;
@@ -406,7 +406,7 @@ test('single player Expert and its timers are unlocked for each difficulty; old 
 });
 
 test('difficulties after Hard: Journey levels, each with its own unlocks', () => {
-  assert.deepEqual(['tricky', 'master', 'legend'].map((d) => P.shopItem(`difficulty.${d}`).journey), [38, 40, 41]);
+  assert.deepEqual(['tricky', 'master', 'legend'].map((d) => P.shopItem(`difficulty.${d}`).journey), [32, 34, 35]);
   // Master's dice weighting counts only Tricky's facts
   const t = P.createProgress();
   const ready = P.tableReady(t, { faces: [3, 4], share: 0.75 });

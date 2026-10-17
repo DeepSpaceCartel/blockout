@@ -17,5 +17,6 @@ Architecture Decision Records: one hard-to-reverse decision per file, numbered, 
 | [0009](0009-one-chart.md) | One Helm chart deploys Blockout with its databases and Keycloak | accepted |
 | [0010](0010-journey-progression.md) | Boards and difficulties are Journey levels, not Shop items | accepted (level shapes superseded by [0012](0012-journey-stages.md)) |
 | [0011](0011-practice-journey.md) | Practice is free, and its times tables are Practice Journey levels | accepted (level shapes superseded by [0012](0012-journey-stages.md)) |
-| [0012](0012-journey-stages.md) | Each Journey level has three stages; Practice's longer rounds are stages too | accepted (Practice rounds superseded by [0013](0013-practice-expert-rounds.md)) |
+| [0012](0012-journey-stages.md) | Each Journey level has three stages; Practice's longer rounds are stages too | accepted (Practice rounds superseded by [0013](0013-practice-expert-rounds.md), the first boards' stages and stage 3's goal by [0014](0014-first-boards-one-stage.md)) |
 | [0013](0013-practice-expert-rounds.md) | Practice's Journey has Expert rounds; Expert practice and its timers are reached, not bought | accepted |
+| [0014](0014-first-boards-one-stage.md) | The first boards have one stage; stage 3 asks for every answer right first try | accepted |

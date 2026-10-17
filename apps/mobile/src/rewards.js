@@ -66,7 +66,7 @@ export function onGameOver(progress, match, results, level = null) {
   let journey = null;
   if (level && match.mode === 'single') {
     const you = match.players.find((p) => !p.cpu);
-    journey = Progress.recordLevelGame(progress, level, { won: results.humanWon, answered: you.answered + you.stats.timeouts, firstTry: you.firstTry, helped: you.stats.helped, squares: you.squares, size: match.size });
+    journey = Progress.recordLevelGame(progress, level, { won: results.humanWon, answered: you.answered + you.stats.timeouts, firstTry: you.firstTry, helped: you.stats.helped });
     earned.push(...journey.earned);
   }
   return { points, boardBonus, earned, journey };
