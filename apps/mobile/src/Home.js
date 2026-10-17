@@ -301,7 +301,7 @@ function DailyCard({ daily, onPlay }) {
       style={[styles.daily, { backgroundColor: daily.done ? t.surface : t.goldBg, borderColor: daily.done ? t.line : t.gold }]}
     >
       <Text testID="daily-text" style={[styles.dailyTask, { color: t.ink }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-        {daily.done ? `${daily.title}${daily.streak ? ` ${daily.streak}` : ''}` : `⭐ ${daily.short}`}
+        {daily.done ? `✅ ${daily.short} · done${daily.streak ? ` · ${daily.streak}` : ''}` : `⭐ ${daily.short}`}
         {daily.reward ? <Text style={{ color: t.goldInk }}> · {daily.reward}</Text> : null}
       </Text>
       {daily.done ? null : <SmallButton testID="daily-play" title="Play ›" onPress={onPlay} slim />}

@@ -61,6 +61,7 @@ test('the task stays all day, is done once, and the streak grows the reward', ()
   assert.deepEqual(Daily.today(s, day(1)).task, t);
   assert.equal(Daily.complete(s, { kind: 'practice', tables: [2], count: 5 }, day(1)), null, 'another table');
   assert.equal(Daily.complete(s, { kind: 'practice', tables: [1], count: 3 }, day(1)), null, 'too short');
+  assert.equal(Daily.complete(s, { kind: 'practice', tables: [1, 2], count: 10 }, day(1)), null, 'every table: maybe never asked ×1');
   const wallet = s.wallet;
   const done = Daily.complete(s, { kind: 'practice', tables: [1], count: 5 }, day(1));
   assert.equal(done.bonus, 30);

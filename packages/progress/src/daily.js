@@ -82,11 +82,16 @@ export function today(state, now = new Date()) {
   return d;
 }
 
-// Does this finished round or game do today's task?
+// Does this finished round or game do today's task? A round on exactly its
+// tables (from the card, or picked by hand: a round of every table may never
+// ask about them), or a win on its board (or bigger) at its difficulty.
 // result: { kind: 'practice', tables, count } or { kind: 'game', size, difficulty, won }
 export function matches(task, result) {
   if (!task || result.kind !== task.kind) return false;
-  if (task.kind === 'practice') return result.count >= task.count && task.tables.every((n) => (result.tables || []).includes(n));
+  if (task.kind === 'practice') {
+    const tables = new Set(result.tables || []);
+    return result.count >= task.count && tables.size === task.tables.length && task.tables.every((n) => tables.has(n));
+  }
   return Boolean(result.won) && result.size >= task.size && result.difficulty === task.difficulty;
 }
 
