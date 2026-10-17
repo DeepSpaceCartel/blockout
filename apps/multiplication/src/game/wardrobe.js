@@ -10,9 +10,9 @@ import { formatPoints, progress, saveProgress, toast, updateMenuBadges } from '.
 import { saveSettings, settings } from './settings.js';
 import { game, make, startGame } from './play.js';
 import { confirmUnlock, filterNote, markSeen, refreshOpenNudges, renderWalletBar, seenList, wardrobeKeys } from './shop.js';
-import { practiceLevel, practiceRoundSize, practiceTableList, practiceTimerSecs, startPractice, updatePracticePreview } from './practice.js';
+import { practiceLevel, practiceRoundSize, practiceTableList, practiceTimerSecs, startPractice, startPracticeJourney, updatePracticePreview } from './practice.js';
 import { checkClassroom } from './classroom.js';
-import { journeyDifficulty, renderJourney } from './journey.js';
+import { journeyDifficulty, practiceJourneyOn, renderJourney } from './journey.js';
 import { drawBoard, render, renderDie } from './render.js';
 
 // settings.cosmetics: { dice, pips, roll, colors, pattern, board, place, confetti,
@@ -225,9 +225,9 @@ function icon(name) {
 function setLockBadge(btn, itemId) {
   const locked = !Progress.isUnlocked(progress, itemId);
   const hidden = locked && Progress.isHidden(progress, itemId);
-  // boards and difficulties the Journey hasn't reached yet aren't shown at all
+  // boards, difficulties and tables the Journeys haven't reached yet aren't shown at all
   const item = itemId && Progress.shopItem(itemId);
-  if (item && item.journey) btn.hidden = locked;
+  if (item && (item.journey || item.practiceJourney)) btn.hidden = locked;
   btn.classList.toggle('locked', locked);
   btn.classList.toggle('skeleton', hidden);
   btn.dataset.unlock = locked ? itemId : '';
@@ -346,7 +346,7 @@ function renderSetupSections() {
   el.startBtn.hidden = classroom; // Join / Host instead
   el.startBtn.textContent = setup.mode === 'practice' ? 'Start practice' : 'Start game';
   if (classroom) checkClassroom();
-  renderJourney(); // (single player: the Journey picks the board and dice)
+  renderJourney(); // (single player and Practice: the Journey picks the board and dice, or the table)
 }
 
 function selectMultiKind(kind) {
@@ -647,6 +647,7 @@ export function run() {
     e.preventDefault();
     if (setup.mode === 'multi' && setup.multiKind === 'classroom') return; // not built yet
     if (setup.mode === 'practice') {
+      if (practiceJourneyOn()) return startPracticeJourney(el.practiceName.value.trim() || 'You');
       const tables = practiceTableList();
       if (!tables.length) return;
       const expert = practiceLevel === 'expert';

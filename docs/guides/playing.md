@@ -16,7 +16,7 @@ When the board is full, or nobody can place anything, the game ends. The results
 
 ## Practice
 
-**Practice** asks questions without a board, picking the facts that need it most. **Learn** has help; **Expert** has none, doubles the bonus points and can add a timer. Longer rounds (10 or 20 questions) earn a finishing bonus.
+**Practice** asks questions without a board, picking the facts that need it most. It's free and goes one times table at a time: **Practice ×1**, then ×2 once a round has 4 out of 5 right first try, and so on up to ×12. From Practice Level 2, **Free practice** lets you pick the tables yourself. **Learn** has help; **Expert** has none, doubles the bonus points and can add a timer. Longer rounds (10 or 20 questions) earn a finishing bonus.
 
 ![Practice settings: difficulty, level, times tables and number of questions](../assets/screenshots/practice-menu.png)
 
@@ -37,7 +37,7 @@ Each difficulty unlocks when the Journey reaches it: Medium at Level 7, Hard at 
 
 ## Points, shop and Wardrobe
 
-Right answers earn points: more for first-try answers, streaks, quick answers on a timer, and finishing bigger boards. Points buy things in the **Shop**: practice and its times tables, Expert and its timers, multiplayer, and settings like auto roll. (Boards and difficulties come from the Journey.) Unlocks come as a skill tree: only the next step shows its price.
+Right answers earn points: more for first-try answers, streaks, quick answers on a timer, and finishing bigger boards. Points buy things in the **Shop**: Expert and its timers, longer practice rounds, multiplayer, and settings like auto roll. (Boards, difficulties and times tables come from the Journeys.) Unlocks come as a skill tree: only the next step shows its price.
 
 ![The shop: unlocks grouped by kind, with the wallet at the bottom](../assets/screenshots/shop.png)
 

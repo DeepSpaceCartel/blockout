@@ -11,7 +11,7 @@
     <div class="start-card">
       <div class="top-row">
         <div class="wallet" title="Points you can spend in the shop">🪙 <span id="wallet-amount">0</span> points</div>
-        <button type="button" class="account-chip" id="account-btn" hidden>👤 Sign in</button>
+        <button type="button" class="account-chip" id="account-btn" hidden><svg class="icon" aria-hidden="true"><use href="#i-user"></use></svg> Sign in</button>
       </div>
       <h1 class="logo">BLOCK<span>OUT</span></h1>
       <p class="tagline">Roll two dice, draw a rectangle, claim the most squares.</p>
@@ -36,11 +36,11 @@
       </div>
 
       <form id="setup-form" autocomplete="off">
-        <!-- Single player: the Journey (level by level) or Free play (pick a board), see game/journey.js -->
+        <!-- Single player and Practice: the Journey (level by level) or Free play / Free practice, see game/journey.js -->
         <div class="journey-card" id="journey-card">
           <div class="segmented" id="play-kind" role="radiogroup" aria-label="What to play" hidden>
-            <button type="button" data-play="journey" class="selected" role="radio" aria-checked="true">🧗 Journey <small>level by level</small></button>
-            <button type="button" data-play="free" role="radio" aria-checked="false">🎲 Free play <small>pick a board</small></button>
+            <button type="button" data-play="journey" class="selected" role="radio" aria-checked="true"><svg class="icon" aria-hidden="true"><use href="#i-mountain"></use></svg> Journey <small>level by level</small></button>
+            <button type="button" data-play="free" role="radio" aria-checked="false"><svg class="icon" aria-hidden="true"><use href="#i-dices"></use></svg> Free play <small>pick a board</small></button>
           </div>
           <div class="journey-info" id="journey-info">
             <p class="journey-level" id="journey-level"></p>
@@ -71,8 +71,8 @@
           <div class="field">
             <span>Level</span>
             <div class="segmented" id="game-level">
-              <button type="button" data-level="learn" class="selected">🌱 Learn</button>
-              <button type="button" data-level="expert">🧠 Expert</button>
+              <button type="button" data-level="learn" class="selected"><svg class="icon" aria-hidden="true"><use href="#i-sprout"></use></svg> Learn</button>
+              <button type="button" data-level="expert"><svg class="icon" aria-hidden="true"><use href="#i-brain"></use></svg> Expert</button>
             </div>
             <p class="setting-help" id="game-level-help"></p>
           </div>
@@ -124,8 +124,8 @@
           <div class="field">
             <span>Level</span>
             <div class="segmented" id="practice-level">
-              <button type="button" data-level="learn" class="selected">🌱 Learn</button>
-              <button type="button" data-level="expert">🧠 Expert</button>
+              <button type="button" data-level="learn" class="selected"><svg class="icon" aria-hidden="true"><use href="#i-sprout"></use></svg> Learn</button>
+              <button type="button" data-level="expert"><svg class="icon" aria-hidden="true"><use href="#i-brain"></use></svg> Expert</button>
             </div>
             <p class="setting-help" id="practice-level-help">Learn: see each fact as a rectangle and get help counting.</p>
           </div>
@@ -148,7 +148,7 @@
             </div>
             <p class="setting-help" id="practice-count-help"></p>
           </div>
-          <div class="field">
+          <div class="field" id="practice-tables-field">
             <span>Times tables to practice</span>
             <div class="table-chips" id="practice-tables" role="group" aria-label="Times tables to practice"></div>
             <p class="setting-help">Unlock tables one at a time, then pick as many as you like. None picked: questions come from all your unlocked tables, focusing on the facts you find hardest.</p>
@@ -440,6 +440,7 @@
     <div class="dialog results-dialog" role="dialog" aria-modal="true" aria-labelledby="pd-title">
       <h2 id="pd-title">Practice done! 🎯</h2>
       <p class="result-sub" id="pd-sub"></p>
+      <p class="journey-result" id="pd-journey" hidden></p>
       <div id="pd-body" class="stats" hidden></div>
       <div class="dialog-actions results-actions">
         <button type="button" class="btn btn-primary" id="pd-again">Practice again</button>

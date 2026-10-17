@@ -39,10 +39,19 @@ Finishing Level 18 unlocks Custom boards. Everything that depends on a difficult
 
 **Free play** opens at Level 6. It is the old menu, with difficulty and board, offering only what the Journey has reached.
 
+## Practice's Journey
+
+Practice has its own path, one times table a level:
+- **Levels:** Practice Level 1 is the ×1 table, and so on up to ×12. Each round mixes in a little review of the tables before it (about one question in five).
+- **Moving up:** a round with 4 out of 5 right first try moves you up and unlocks the next table. Each step up earns 5 points × the level.
+- **Free practice:** pick your own tables and difficulty. It opens at Practice Level 2, offering only the tables reached.
+- **Separate from the game:** Practice is free, and its levels don't depend on the game's Journey ([ADR-0011](../decisions/0011-practice-journey.md)).
+- **Expert, timers and longer rounds** go by the table's difficulty once the game's Journey has opened it, and by Easy until then.
+
 ## What's still bought
 
 Points buy what changes *how* you play, not *what* you play next:
-- Practice mode and its times tables, and multiplayer
+- Multiplayer, and longer practice rounds
 - Expert and its timers (for the difficulty the level uses)
 - Settings such as auto roll, and the Wardrobe's looks
 

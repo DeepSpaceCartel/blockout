@@ -24,17 +24,20 @@ export function buyReason(r) {
     case 'requires':
       return `Unlock ${Progress.shopItem(r.requires).name.split(':')[0]} first`;
     case 'journey':
-      return `Reach Level ${r.level} on your Journey`;
+      return r.path === 'practice' ? `Reach Practice Level ${r.level}` : `Reach Level ${r.level} on your Journey`;
     default:
       return '';
   }
 }
 
 // What unlocks a board or difficulty: a level of the Journey
-export const revealHint = (r) => `Reach Level ${r.level} on your Journey to unlock it. Play › moves you up a level when you beat the CPU.`;
+export const revealHint = (r) =>
+  r.path === 'practice'
+    ? `Reach Practice Level ${r.level} to unlock it. A good practice round moves you up to the next times table.`
+    : `Reach Level ${r.level} on your Journey to unlock it. Play › moves you up a level when you beat the CPU.`;
 
 // Shop items that are bought (not Wardrobe looks, not Journey unlocks)
-const shopItems = () => Progress.SHOP.filter((item) => !item.cosmetic && !item.journey);
+const shopItems = () => Progress.SHOP.filter((item) => !item.cosmetic && !item.journey && !item.practiceJourney);
 
 // What can be bought right now (ids)
 export const availableIds = (state) => new Set(shopItems().filter((i) => Progress.canBuy(state, i.id).ok).map((i) => i.id));

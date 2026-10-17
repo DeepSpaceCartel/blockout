@@ -81,3 +81,30 @@ test('merging two saves keeps the higher level', () => {
   assert.equal(Journey.journeyLevel(m), 9);
   assert.ok(Progress.isUnlocked(m, 'difficulty.hard'));
 });
+
+test('Practice Journey: ×1 to ×12, free practice at 2, a good round moves you up', () => {
+  const s = Progress.createProgress();
+  assert.equal(Journey.practiceLevel(s), 1);
+  assert.equal(Journey.freePracticeOpen(s), false);
+  assert.equal(Journey.onPracticeJourney(s, 'free'), true, 'nothing to pick yet');
+  assert.equal(Journey.recordPracticeLevel(s, 1, { count: 5, firstTry: 3 }).missing, 'accuracy');
+  const r = Journey.recordPracticeLevel(s, 1, { count: 5, firstTry: 4 });
+  assert.deepEqual([r.advanced, r.to, r.grants, r.reward], [true, 2, ['table2'], 5]);
+  assert.equal(Journey.freePracticeOpen(s), true);
+  assert.match(Journey.practiceResultMessage(r).title, /×2 unlocked/);
+  assert.equal(Journey.practiceTier(s, 7), 'easy', 'Medium practice waits for the game’s Medium');
+  s.unlocks.push('difficulty.medium');
+  assert.equal(Journey.practiceTier(s, 7), 'medium');
+  assert.equal(Journey.practiceLine(3), 'The ×3 table, with a little review');
+  for (const l of Journey.PRACTICE_LEVELS) for (const id of l.grants) assert.equal(Progress.shopItem(id).practiceJourney, l.level, id);
+});
+
+test('older saves: Practice starts on the highest table owned, and is free', () => {
+  const lvl = (saved) => Journey.practiceLevel(Progress.normalize(saved));
+  assert.equal(lvl({ practiceV2: true, unlocks: [] }), 1);
+  assert.equal(lvl({ practiceV2: true, unlocks: ['practice', 'table1', 'table2', 'table3'] }), 3);
+  assert.ok(Progress.isUnlocked(Progress.normalize({ practiceV2: true }), 'practice'));
+  const m = Progress.mergeProgress(Progress.createProgress(), { ...Progress.createProgress(), practiceJourney: { level: 5 } });
+  assert.equal(Journey.practiceLevel(m), 5);
+  assert.ok(Progress.isUnlocked(m, 'table5'));
+});

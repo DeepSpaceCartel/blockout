@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Practice's Journey: Practice goes one times table at a time, from ×1 to ×12, with a little review of the tables before. A round with 4 out of 5 right first try moves you up and unlocks the next table; Free practice (pick your own tables) opens at Practice Level 2. In the web game and the phone app ([ADR-0011](https://github.com/DeepSpaceCartel/blockout/blob/main/docs/decisions/0011-practice-journey.md)).
+
+### Changed
+- Practice mode is free, and times tables are no longer bought: Practice's Journey unlocks them. Existing players start on the highest table they own and keep everything.
+- The menu's Journey, Free play, Learn, Expert and Play buttons and the Sign in chip use icons instead of emojis.
+
 ## [0.6.0] - 2026-10-17
 
 ### Added

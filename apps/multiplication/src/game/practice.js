@@ -4,6 +4,7 @@ import * as Progress from '@blockout/progress';
 import * as Shop from '@blockout/progress/shop';
 import * as Setup from '@blockout/progress/setup';
 import * as Practice from '@blockout/progress/practice';
+import * as Journey from '@blockout/progress/journey';
 import { COUNT_STEP, TRY_AGAIN, el } from './base.js';
 import { BONUS_TOASTS, capitalize, celebrate, progress, saveProgress, toast } from './wallet.js';
 import { settings } from './settings.js';
@@ -12,6 +13,7 @@ import { FACT_STATUS, answerDecided, cancelContinue, gameId, make, renderFactGri
 import { recordPracticeRound } from './stats.js';
 import { confirmUnlock, refreshNudges } from './shop.js';
 import { completeDaily } from './daily.js';
+import { practiceJourneyDifficulty, practiceJourneyOn, renderJourney } from './journey.js';
 
 let practiceTables;
 
@@ -19,8 +21,12 @@ let practiceTables;
 
 let practiceRoundSize = 5;
 
+// Whose unlocks Practice's Expert, timers and lengths go by: on the Journey
+// the table's difficulty, else the menu's
+const practiceDifficulty = () => practiceJourneyDifficulty() || settings.difficulty;
+
 // 5 comes with Practice mode; 10 and 20 are unlocked for each difficulty
-const countUnlock = (count) => Practice.countItem(settings.difficulty, count);
+const countUnlock = (count) => Practice.countItem(practiceDifficulty(), count);
 
 let practiceLevel = 'learn'; // 'expert' (shop unlock): no picture, no help button until 2 misses, ×2 bonus
 
@@ -30,7 +36,7 @@ const LEVEL_HELP = Practice.LEVEL_HELP;
 
 function renderPracticeLevel() {
   // Expert is unlocked for each difficulty
-  const expertId = Practice.levelItem(settings.difficulty, 'expert');
+  const expertId = Practice.levelItem(practiceDifficulty(), 'expert');
   if (!Progress.isUnlocked(progress, expertId) && practiceLevel === 'expert') practiceLevel = 'learn';
   for (const btn of el.practiceLevel.querySelectorAll('button')) {
     btn.classList.toggle('selected', btn.dataset.level === practiceLevel);
@@ -44,7 +50,7 @@ function renderPracticeLevel() {
 // unlocked separately for each difficulty
 let practiceTimerSecs = 0;
 
-const timerUnlock = (secs) => Practice.timerItem(settings.difficulty, secs);
+const timerUnlock = (secs) => Practice.timerItem(practiceDifficulty(), secs);
 
 function renderPracticeTimer() {
   el.practiceTimerField.hidden = practiceLevel !== 'expert';
@@ -105,6 +111,7 @@ function updatePracticePreview() {
   renderPracticeLevel();
   renderPracticeCount();
   renderPracticeTables();
+  if (practiceJourneyOn()) return renderJourney(); // (the level picks the table)
   const text = Practice.preview(progress, settings.difficulty, [...practiceTables], el.practiceName.value.trim() || 'You');
   el.startBtn.disabled = !text;
   el.practicePreview.textContent = text || 'Unlock a times table to practice: tap ×1 to start.';
@@ -123,14 +130,24 @@ function renderPracticeCount() {
 // Times tables are unlocked one by one (×1, then ×2, …)
 const tableUnlocked = (n) => Practice.tableOpen(progress, n);
 
+// A Practice Journey round: the ×n table of the level reached, with the
+// menu's Level, timer and length (if they're open on its difficulty)
+function startPracticeJourney(name) {
+  const level = Journey.practiceLevel(progress);
+  const d = Journey.practiceTier(progress, level);
+  const c = Practice.practiceChoice(progress, d, { level: practiceLevel, timer: practiceTimerSecs, count: practiceRoundSize });
+  startPractice(name, c.count, [], c.level === 'expert', c.timer, d, level);
+}
+
 // difficulty: whose dice the questions come from (today's practice may pick one)
-function startPractice(name, count, tables = [], expert = false, timer = 0, difficulty = settings.difficulty) {
+// journeyLevel: a Practice Journey round on the ×n table
+function startPractice(name, count, tables = [], expert = false, timer = 0, difficulty = settings.difficulty, journeyLevel = null) {
   stopPracticeTimer();
   cancelContinue();
   stopTimer();
   setGameId(gameId + 1); // cancels anything still waiting from a game
   setGame(null);
-  practice = Practice.createRound(progress, { name, difficulty, count, tables, level: expert ? 'expert' : 'learn', timer });
+  practice = Practice.createRound(progress, { name, difficulty, count, tables, level: expert ? 'expert' : 'learn', timer, journeyLevel });
   practice.earned = [];
   el.startScreen.hidden = true;
   el.gameScreen.hidden = true;
@@ -329,6 +346,14 @@ function finishPractice() {
   pr.earned.push(...completeDaily({ kind: 'practice', tables: pr.tables, count: pr.count })); // (today's practice?)
   saveProgress();
   el.pdSub.textContent = end.sub;
+  // a Journey round: on to the next table, or what it still takes
+  const message = end.journey && Journey.practiceResultMessage(end.journey);
+  el.pdJourney.hidden = !message;
+  el.pdJourney.classList.toggle('up', Boolean(end.journey && end.journey.advanced));
+  if (message) el.pdJourney.replaceChildren(make('strong', null, message.title), ' ', message.text);
+  const next = end.journey && end.journey.advanced && !Journey.practiceDone(progress);
+  el.pdAgain.textContent = next ? `×${end.journey.to} ›` : 'Practice again';
+  if (end.journey && end.journey.advanced) renderJourney();
 
   // Which facts moved, e.g. "3 × 4: Needs practice → Learning"
   el.pdBody.innerHTML = '';
@@ -422,7 +447,11 @@ export function run() {
 
   el.prHelp.addEventListener('click', practiceHelp);
 
-  el.pdAgain.addEventListener('click', () => startPractice(practice.name, practice.count, practice.tables, practice.expert, practice.timer, practice.difficulty));
+  el.pdAgain.addEventListener('click', () => {
+    // a Journey round goes on with the level reached (the next table, after a good round)
+    if (practice.journeyLevel && !Journey.practiceDone(progress)) return startPracticeJourney(practice.name);
+    startPractice(practice.name, practice.count, practice.tables, practice.expert, practice.timer, practice.difficulty);
+  });
 
   el.pdMenu.addEventListener('click', leavePractice);
 
@@ -448,4 +477,4 @@ export function run() {
   });
 }
 
-export { playerFacts, practiceLevel, practiceRoundSize, practiceTableList, practiceTimerSecs, setPractice, startPractice, stopPracticeTimer, tablesLabel, timerText, updatePracticePreview, weakFactWeight };
+export { playerFacts, practiceLevel, practiceRoundSize, practiceTableList, practiceTimerSecs, setPractice, startPractice, startPracticeJourney, stopPracticeTimer, tablesLabel, timerText, updatePracticePreview, weakFactWeight };

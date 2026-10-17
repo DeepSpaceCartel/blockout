@@ -51,6 +51,7 @@ nav:
       - 0008. Roles kept by Blockout, changed by invites: decisions/0008-roles-in-blockout.md
       - 0009. One Helm chart for everything: decisions/0009-one-chart.md
       - 0010. Boards and difficulties are Journey levels: decisions/0010-journey-progression.md
+      - 0011. Practice is free, a times table a level: decisions/0011-practice-journey.md
 
 theme:
   name: material

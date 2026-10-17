@@ -9,6 +9,7 @@ import * as Settings from '@blockout/progress/settings';
 import * as Setup from '@blockout/progress/setup';
 import * as Stats from '@blockout/progress/stats';
 import * as Views from '@blockout/progress/views';
+import * as Journey from '@blockout/progress/journey';
 import { RectPicture } from './Board';
 import { addToHistory } from './history';
 import { useTheme } from './theme';
@@ -289,12 +290,21 @@ function Done({ end, progress, round, settings, earned, onAgain, onExit }) {
   const t = useTheme();
   const facts = Stats.playerFacts(progress, round.name);
   const grid = Stats.factGrid(facts, { unlocked: Views.tableSize(progress), showTime: Settings.showsTime(settings) });
+  // a Practice Journey round: on to the next table, or what it still takes
+  const journey = end.journey ? Journey.practiceResultMessage(end.journey) : null;
+  const up = Boolean(end.journey && end.journey.advanced);
   return (
     <View style={styles.fill}>
       <ScrollView contentContainerStyle={styles.done}>
         <Text testID="pd-sub" style={[styles.sub, { color: t.ink }]}>
           {end.sub}
         </Text>
+        {journey ? (
+          <View testID="pd-journey" style={[styles.journeyResult, { borderColor: up ? t.good : t.line, backgroundColor: up ? t.goodBg : t.soft }]}>
+            <Text style={[styles.sub, { color: up ? t.goodInk : t.ink, fontWeight: '800' }]}>{journey.title}</Text>
+            <Text style={[styles.sub, { color: up ? t.goodInk : t.ink }]}>{journey.text}</Text>
+          </View>
+        ) : null}
         <Earned notes={earned} />
         <Text style={[styles.groupTitle, { color: t.muted }]}>What changed</Text>
         {end.changes.length ? (
@@ -330,7 +340,7 @@ function Done({ end, progress, round, settings, earned, onAgain, onExit }) {
         </View>
       </ScrollView>
       <View style={styles.actions}>
-        <Button testID="pd-again" title="Again" onPress={onAgain} style={styles.flex} />
+        <Button testID="pd-again" title={up && !Journey.practiceDone(progress) ? `×${end.journey.to} ›` : 'Again'} onPress={onAgain} style={styles.flex} />
         <Button kind="secondary" title="Menu" onPress={onExit} style={styles.flex} />
       </View>
     </View>
@@ -349,6 +359,7 @@ function Head({ text, t, gold = false }) {
 }
 
 const styles = StyleSheet.create({
+  journeyResult: { gap: 2, padding: 10, borderWidth: 2, borderRadius: 10 },
   fill: { flex: 1 },
   flex: { flex: 1 },
   wide: { alignSelf: 'stretch' },

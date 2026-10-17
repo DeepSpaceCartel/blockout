@@ -47,7 +47,8 @@ const $ = (id) => document.getElementById(id);
 // multiKind: 'local' (one screen) or 'classroom' (not built yet)
 // level/timer: single player's Learn / Expert and Expert's answer timer (seconds)
 // play: single player's 'journey' (level by level) or 'free' (pick the board)
-const setup = { mode: 'single', play: 'journey', multiKind: 'local', level: 'learn', timer: 0, count: 2, size: 6, names: ['', '', '', ''], types: ['human', 'human', 'human', 'human'] };
+// practicePlay: Practice's 'journey' (a table a level) or 'free' (pick the tables)
+const setup = { mode: 'single', play: 'journey', practicePlay: 'journey', multiKind: 'local', level: 'learn', timer: 0, count: 2, size: 6, names: ['', '', '', ''], types: ['human', 'human', 'human', 'human'] };
 
 // What this part does when the page loads (main.js runs every part in order)
 export function run() {
@@ -151,6 +152,8 @@ export function run() {
     gameTimerHelp: $('game-timer-help'),
     boardSizeHelp: $('board-size-help'),
     journeyCard: $('journey-card'),
+    practiceTablesField: $('practice-tables-field'),
+    pdJourney: $('pd-journey'),
     playKind: $('play-kind'),
     journeyInfo: $('journey-info'),
     journeyLevel: $('journey-level'),

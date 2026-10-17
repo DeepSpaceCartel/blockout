@@ -32,12 +32,15 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onClass
   // difficulty its Expert and timers go by)
   const journeyLevel = choice.mode === 'single' && Journey.onJourney(progress, choice.play) ? Journey.journeyLevel(progress) : null;
   const playSwitch = choice.mode === 'single' && Journey.freePlayOpen(progress) && !Journey.isDone(progress);
-  const d = journeyLevel ? Journey.levelSetup(journeyLevel).difficulty : choice.difficulty;
+  // Practice's Journey: the level picks the times table
+  const practiceLevel = choice.mode === 'practice' && Journey.onPracticeJourney(progress, choice.practicePlay) ? Journey.practiceLevel(progress) : null;
+  const practiceSwitch = choice.mode === 'practice' && Journey.freePracticeOpen(progress) && !Journey.practiceDone(progress);
+  const d = journeyLevel ? Journey.levelSetup(journeyLevel).difficulty : practiceLevel ? Journey.practiceTier(progress, practiceLevel) : choice.difficulty;
   const level = Setup.gameLevel(progress, d, choice); // (what's unlocked on this difficulty)
   const practicing = choice.mode === 'practice';
   const pr = Practice.practiceChoice(progress, d, choice.practice || {});
   const picked = (choice.practice && choice.practice.tables) || [];
-  const prPreview = practicing ? Practice.preview(progress, d, picked) : null;
+  const prPreview = practicing && !practiceLevel ? Practice.preview(progress, d, picked) : null;
   const warning = practicing || journeyLevel ? null : Setup.boardWarning(d, choice.size);
   const setPractice = (part) => onChoose({ practice: { ...pr, tables: picked, ...part } });
   return (
@@ -96,19 +99,20 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onClass
 
         <Section title="Play">
           <Segments items={MODES.map((x) => ({ id: x.id, label: x.label, open: modeOpen(progress, x.id) }))} value={choice.mode} onPick={(mode) => onChoose({ mode })} onLocked={(mode) => onLocked(itemFor.mode(mode))} />
-          {playSwitch ? (
+          {playSwitch || practiceSwitch ? (
             <Segments
               compact
               prefix="play-"
               items={[
                 { id: 'journey', label: '🧗 Journey', open: true },
-                { id: 'free', label: '🎲 Free play', open: true },
+                { id: 'free', label: practicing ? '🎲 Free practice' : '🎲 Free play', open: true },
               ]}
-              value={journeyLevel ? 'journey' : 'free'}
-              onPick={(play) => onChoose({ play })}
+              value={journeyLevel || practiceLevel ? 'journey' : 'free'}
+              onPick={(play) => onChoose(practicing ? { practicePlay: play } : { play })}
             />
           ) : null}
           {choice.mode === 'single' && (journeyLevel || Journey.isDone(progress)) ? <JourneyCard progress={progress} /> : null}
+          {practicing && (practiceLevel || Journey.practiceDone(progress)) ? <JourneyCard progress={progress} practice /> : null}
           {practicing ? (
             <>
               <Segments
@@ -165,7 +169,7 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onClass
           ) : null}
         </Section>
 
-        {journeyLevel ? null : (
+        {journeyLevel || practiceLevel ? null : (
           <Section title="Difficulty">
             {/* (only what the Journey has reached) */}
             <Segments
@@ -179,9 +183,11 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onClass
         )}
 
         {practicing ? (
+          practiceLevel ? null : (
           <Section title="Times tables">
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-              {Practice.tableChoices(d).map((n) => {
+              {/* (only the tables Practice's Journey has reached) */}
+              {Practice.tableChoices(d).filter((n) => Practice.tableOpen(progress, n)).map((n) => {
                 const on = picked.includes(n);
                 const open = Practice.tableOpen(progress, n);
                 return (
@@ -203,6 +209,7 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onClass
               {prPreview || 'Unlock a times table to practice: tap ×1 to start.'}
             </Text>
           </Section>
+          )
         ) : journeyLevel ? null : (
           <Section title="Board">
             <Segments compact items={BOARDS.filter((n) => boardOpen(progress, n)).map((n) => ({ id: n, label: `${n}`, open: true }))} value={choice.size} onPick={(size) => onChoose({ size })} />
@@ -222,7 +229,7 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onClass
         ))}
         <View style={styles.playRow}>
           <Button testID="class" kind="secondary" title="🏫 Class" onPress={() => onClass('')} style={styles.classBtn} />
-          <Button testID="play" title={practicing ? 'Practice' : journeyLevel ? `▶ Play Level ${journeyLevel}` : 'Play'} onPress={onPlay} disabled={Boolean(warning) || (practicing && !prPreview)} style={styles.flex} />
+          <Button testID="play" title={practiceLevel ? `▶ Practice ×${practiceLevel}` : practicing ? 'Practice' : journeyLevel ? `▶ Play Level ${journeyLevel}` : 'Play'} onPress={onPlay} disabled={Boolean(warning) || (practicing && !practiceLevel && !prPreview)} style={styles.flex} />
         </View>
       </View>
     </View>
@@ -230,21 +237,26 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onClass
 }
 
 // The level you're on, what it takes to move up, and the path so far
-function JourneyCard({ progress }) {
+// practice: Practice's Journey (a times table a level) rather than the game's
+function JourneyCard({ progress, practice = false }) {
   const t = useTheme();
-  const level = Journey.journeyLevel(progress);
-  const done = Journey.isDone(progress);
+  const level = practice ? Journey.practiceLevel(progress) : Journey.journeyLevel(progress);
+  const done = practice ? Journey.practiceDone(progress) : Journey.isDone(progress);
+  const steps = practice ? Journey.practiceSteps(progress) : Journey.steps(progress);
+  const line = practice
+    ? done ? 'You finished every times table. Pick any of them in Free practice!' : Journey.practiceLine(level)
+    : done ? 'You finished every level. Pick any board and dice in Free play!' : Journey.levelLine(level);
   return (
     <View testID="journey-card" style={[styles.journey, { backgroundColor: t.accentSoft, borderColor: t.accent }]}>
       <Text testID="journey-level" style={[styles.journeyLevel, { color: t.ink }]}>
-        {Journey.levelName(level)}
+        {practice ? Journey.practiceName(level) : Journey.levelName(level)}
       </Text>
-      <Text style={[styles.journeyLine, { color: t.ink }]}>{done ? 'You finished every level. Pick any board and dice in Free play!' : Journey.levelLine(level)}</Text>
-      {done ? null : <Text style={[styles.preview, { color: t.muted, textAlign: 'center' }]}>🏁 {Journey.goalLine()} to move up.</Text>}
-      <View style={styles.steps} accessibilityLabel={`Level ${level} of ${Journey.LEVELS.length}`}>
-        {Journey.steps(progress).map((s) => (
+      <Text style={[styles.journeyLine, { color: t.ink }]}>{line}</Text>
+      {done ? null : <Text style={[styles.preview, { color: t.muted, textAlign: 'center' }]}>🏁 {practice ? Journey.practiceGoalLine() : Journey.goalLine()} to move up.</Text>}
+      <View style={styles.steps} accessibilityLabel={`Level ${level} of ${steps.length}`}>
+        {steps.map((s) => (
           <View key={s.level} style={[styles.step, { borderColor: s.done ? t.good : s.current ? t.accent : t.line, backgroundColor: s.done ? t.good : s.current ? t.accentButton : t.surface }]}>
-            <Text style={[styles.stepText, { color: s.done || s.current ? t.accentInk : t.muted }]}>{s.level}</Text>
+            <Text style={[styles.stepText, { color: s.done || s.current ? t.accentInk : t.muted }]}>{s.label || s.level}</Text>
           </View>
         ))}
       </View>
@@ -389,7 +401,7 @@ const styles = StyleSheet.create({
   journeyLevel: { fontSize: 24, fontWeight: '900' },
   journeyLine: { fontSize: 16, fontWeight: '700' },
   steps: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 4, marginTop: 4 },
-  step: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  step: { minWidth: 22, height: 22, paddingHorizontal: 3, borderRadius: 11, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   stepText: { fontSize: 10, fontWeight: '800' },
   bottom: { padding: 16, paddingTop: 8 },
   more: { flexDirection: 'row', gap: 8 },

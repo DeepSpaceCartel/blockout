@@ -125,8 +125,8 @@ export function startGame(variantId) {
           <div class="field">
             <span>Level</span>
             <div class="segmented" id="practice-level">
-              <button type="button" data-plevel="learn">🌱 Learn</button>
-              <button type="button" data-plevel="expert">🧠 Expert</button>
+              <button type="button" data-plevel="learn">${icon('sprout')} Learn</button>
+              <button type="button" data-plevel="expert">${icon('brain')} Expert</button>
             </div>
             <p class="setting-help" id="practice-level-help"></p>
           </div>

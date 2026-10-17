@@ -39,8 +39,9 @@ import { ThemeSetting, useTheme } from './theme';
 
 const CHOICE_KEY = 'blockout.mobile.choice';
 const SETTINGS_KEY = 'blockout.settings'; // (on this phone only, like the web game's)
-// play: single player's 'journey' (level by level) or 'free' (pick the board)
-const DEFAULT_CHOICE = { mode: 'single', play: 'journey', difficulty: 'easy', size: 6, level: 'learn', timer: 0, players: 2 };
+// play: single player's 'journey' (level by level) or 'free' (pick the board);
+// practicePlay: Practice's 'journey' (a table a level) or 'free' (pick the tables)
+const DEFAULT_CHOICE = { mode: 'single', play: 'journey', practicePlay: 'journey', difficulty: 'easy', size: 6, level: 'learn', timer: 0, players: 2 };
 
 // The game to start from the menu's choice (falling back to what's unlocked).
 // Single player has its Level (Expert: no help, bonus ×2) and Expert's timer;
@@ -329,6 +330,13 @@ function Main({ onTheme }) {
 
   // Play a game, or a practice round (the round's options from the menu)
   const play = (choice = live.current.choice) => {
+    if (choice.mode === 'practice' && Journey.onPracticeJourney(progress, choice.practicePlay)) {
+      // Practice's Journey: the ×n table of the level reached
+      const journeyLevel = Journey.practiceLevel(progress);
+      const d = Journey.practiceTier(progress, journeyLevel);
+      const pr = Practice.practiceChoice(progress, d, choice.practice || {});
+      return setGame({ key: Date.now(), practice: { difficulty: d, count: pr.count, tables: [], level: pr.level, timer: pr.timer, journeyLevel } });
+    }
     if (choice.mode === 'practice' && modeOpen(progress, 'practice')) {
       const d = difficultyOpen(progress, choice.difficulty) ? choice.difficulty : 'easy';
       const pr = Practice.practiceChoice(progress, d, choice.practice || {});

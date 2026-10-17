@@ -46,14 +46,13 @@ test('modes: multiplayer, 3 and 4 players, practice and expert unlock in order',
   const s = P.createProgress();
   s.wallet = 1000;
   assert.equal(P.buy(s, 'players3').reason, 'requires');
-  assert.equal(P.buy(s, 'practiceExpert').reason, 'requires');
   assert.equal(P.buy(s, 'multiplayer').ok, true);
   assert.equal(P.buy(s, 'players4').reason, 'requires'); // 3 players comes first
   assert.equal(P.buy(s, 'players3').ok, true);
   assert.equal(P.buy(s, 'players4').ok, true);
-  assert.equal(P.buy(s, 'practice').ok, true);
+  assert.equal(P.isUnlocked(s, 'practice'), true, 'Practice is free');
   assert.equal(P.buy(s, 'practiceExpert').ok, true);
-  assert.equal(s.wallet, 1000 - 150 - 100 - 100 - 100 - 200);
+  assert.equal(s.wallet, 1000 - 150 - 100 - 100 - 200);
 });
 
 test('daily check-in: once a day, streak grows on consecutive days', () => {
@@ -190,7 +189,7 @@ test('practice can be limited to chosen times tables', () => {
 
 test('old timer unlock becomes the 30 s and 10 s unlocks', () => {
   const s = P.normalize({ unlocks: ['answerTime', 'cpuSpeed'] });
-  assert.deepEqual(s.unlocks.sort(), ['answerTime10', 'answerTime30', 'cpuSpeed']);
+  assert.deepEqual(s.unlocks.sort(), ['answerTime10', 'answerTime30', 'cpuSpeed', 'practice', 'table1']);
   // now a chain: 30 s, then 10 s, then 5 s
   assert.equal(P.shopItem('answerTime10').requires, 'answerTime30');
   assert.equal(P.shopItem('answerTime5').requires, 'answerTime10');
@@ -227,24 +226,20 @@ test('Times Table readiness: most facts mastered and none needing practice', () 
   assert.equal(P.tableReady(s, 6).ok, false);
 });
 
-test('practice: 5 questions come with it; 10, 20 and each times table are bought in order', () => {
+test('practice: free with ×1; 10 and 20 questions are bought; the tables come with Practice levels', () => {
   const s = P.createProgress();
   s.wallet = 5000;
-  assert.equal(P.isHidden(s, 'table1'), true); // needs Practice mode first
-  P.buy(s, 'practice');
+  assert.ok(P.isUnlocked(s, 'practice') && P.isUnlocked(s, 'table1'));
   assert.equal(P.isUnlocked(s, 'practice10'), false);
   assert.equal(P.buy(s, 'practice20').reason, 'requires');
   assert.equal(P.buy(s, 'practice10').ok, true);
   assert.equal(P.buy(s, 'practice20').ok, true);
-  assert.equal(P.isHidden(s, 'table1'), false);
-  assert.equal(P.buy(s, 'table2').reason, 'requires');
-  for (let n = 1; n <= 12; n++) assert.equal(P.buy(s, `table${n}`).ok, true, `table${n}`);
+  assert.deepEqual(P.buy(s, 'table2'), { ok: false, reason: 'journey', level: 2, path: 'practice' });
+  assert.equal(P.isHidden(s, 'table2'), true);
   // players who bought Practice before keep 10, 20 and every table
   const old = P.normalize({ unlocks: ['practice'] });
   for (const id of ['practice10', 'practice20', 'table1', 'table12']) assert.ok(P.isUnlocked(old, id), id);
-  // and a new save that buys it later doesn't get them free
-  const later = P.normalize({ ...P.normalize(null), unlocks: ['practice'] });
-  assert.equal(P.isUnlocked(later, 'table1'), false);
+  assert.equal(P.practiceLevel(old), 12);
 });
 
 test('best-score tiers: one game can unlock several at once, each only once', () => {
@@ -278,7 +273,7 @@ test('fact speed tiers: mastered plus best time under 10, 5 and 1 seconds, per f
 test('normalize fills in missing fields', () => {
   const s = P.normalize({ wallet: 42, unlocks: ['cpuSpeed'] });
   assert.equal(s.wallet, 42);
-  assert.deepEqual(s.unlocks, ['cpuSpeed']);
+  assert.deepEqual(s.unlocks, ['cpuSpeed', 'practice', 'table1']);
   assert.deepEqual(s.checkIn, { last: null, streak: 0 });
   assert.deepEqual(s.journey, { level: 1 });
   assert.deepEqual(P.normalize(null), P.createProgress());
@@ -368,7 +363,7 @@ test('board finishing bonus: nothing on 6×6, growing faster than the board; cus
 test('expert practice timers are unlocked separately for each difficulty', () => {
   const s = P.createProgress();
   s.wallet = 5000;
-  for (const id of ['practice', 'practiceExpert', 'practiceTimer30', 'practiceTimer10', 'practiceTimer5']) assert.equal(P.buy(s, id).ok, true, id);
+  for (const id of ['practiceExpert', 'practiceTimer30', 'practiceTimer10', 'practiceTimer5']) assert.equal(P.buy(s, id).ok, true, id);
   // mastering Easy's 5 s doesn't give Medium's
   assert.equal(P.practiceTimerId(5, 'medium'), 'practiceTimer5.medium');
   assert.equal(P.isUnlocked(s, 'practiceTimer5.medium'), false);
@@ -388,7 +383,7 @@ test('expert practice timers are unlocked separately for each difficulty', () =>
 test('practice lengths are unlocked separately for each difficulty', () => {
   const s = P.createProgress();
   s.wallet = 5000;
-  for (const id of ['practice', 'practice10', 'practice20']) assert.equal(P.buy(s, id).ok, true, id);
+  for (const id of ['practice10', 'practice20']) assert.equal(P.buy(s, id).ok, true, id);
   assert.equal(P.practiceCountId(5, 'hard'), null); // 5 always comes with Practice mode
   assert.equal(P.practiceCountId(20, 'medium'), 'practice20.medium');
   assert.equal(P.isUnlocked(s, 'practice10.medium'), false);
@@ -456,7 +451,7 @@ test('practice sets for Tricky and Legend', () => {
 
 test('IDDQD unlocks everything, and turning it off takes back only what it gave', () => {
   const s = P.createProgress();
-  s.unlocks.push('practice', 'board8');
+  s.unlocks.push('board8');
   assert.equal(P.cheatOn(s, 'iddqd'), true);
   assert.equal(P.cheatOn(s, 'iddqd'), false); // already on
   for (const item of P.SHOP) assert.ok(P.isUnlocked(s, item.id), item.id);
@@ -465,7 +460,7 @@ test('IDDQD unlocks everything, and turning it off takes back only what it gave'
   const saved = P.normalize(JSON.parse(JSON.stringify(s)));
   assert.deepEqual(P.activeCheats(saved), ['iddqd']);
   assert.equal(P.cheatOff(saved, 'iddqd'), true);
-  assert.deepEqual(saved.unlocks.sort(), ['board8', 'practice']);
+  assert.deepEqual(saved.unlocks.sort(), ['board8', 'practice', 'table1']);
   assert.deepEqual(P.activeCheats(saved), []);
   assert.equal(P.cheatOn(saved, 'idkfa'), false); // not a code
 });
@@ -489,7 +484,7 @@ test('FIVEMOREMINUTESMOM makes every timer 5 minutes, and no timer stays no time
 
 test('homework options: only what the player has unlocked; a class gets what everyone has', () => {
   const fresh = P.availableOptions(null);
-  assert.deepEqual(fresh, { practice: false, difficulties: ['easy'], boards: [6], tables: [] });
+  assert.deepEqual(fresh, { practice: true, difficulties: ['easy'], boards: [6], tables: [1] });
   const a = P.createProgress();
   a.unlocks = ['practice', 'table1', 'table2', 'table3', 'difficulty.medium', 'board8', 'board10'];
   const b = P.createProgress();

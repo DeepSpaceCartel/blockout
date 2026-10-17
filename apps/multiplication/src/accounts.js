@@ -214,7 +214,7 @@ function renderMenu() {
   const served = Auth.served();
   el.accountBtn.hidden = !served;
   const u = Auth.user();
-  el.accountBtn.replaceChildren(u ? `${ROLE[u.role].emoji} ${u.name}` : '👤 Sign in');
+  el.accountBtn.replaceChildren(...(u ? [`${ROLE[u.role].emoji} ${u.name}`] : [Game.icon('user'), ' Sign in']));
   el.accountBtn.title = u ? `${ROLE[u.role].label} account: tap for yours` : 'Sign in (you can always play as a guest)';
   const role = Auth.role();
   el.homeworkBtn.hidden = !['guest', 'student'].includes(role); // (guests too: today's practice)

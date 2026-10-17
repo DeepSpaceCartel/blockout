@@ -105,15 +105,31 @@ export function timerHelp(timer) {
 
 // The questions are picked from the player's weakest facts (in the tables
 // chosen). Returns the round; round.current is the first question.
-export function createRound(state, { name = 'You', difficulty = 'easy', count = 5, tables = [], level = 'learn', timer = 0, rng = Math.random, now = Date.now } = {}) {
+// journeyLevel: a Practice Journey round, the ×n table (see journeyQueue).
+export function createRound(state, { name = 'You', difficulty = 'easy', count = 5, tables = [], level = 'learn', timer = 0, journeyLevel = null, rng = Math.random, now = Date.now } = {}) {
   const expert = level === 'expert';
   const facts = playerFacts(state, name);
-  const queue = Progress.pickPracticeFacts(facts, Progress.practiceSet(difficulty), count, rng, tables);
+  if (journeyLevel) tables = [journeyLevel];
+  const queue = journeyLevel ? journeyQueue(facts, journeyLevel, count, rng) : Progress.pickPracticeFacts(facts, Progress.practiceSet(difficulty), count, rng, tables);
   const before = {};
   for (const [a, b] of queue) before[Progress.factKey(a, b)] = Progress.factStatus(facts[Progress.factKey(a, b)]);
-  const round = { name, max: practiceMax(difficulty), count, tables, expert, timer: expert ? timer : 0, difficulty, startedAt: now(), times: [], queue, index: 0, requeued: new Set(), before, firstTry: 0, answered: 0, streak: 0, bestStreak: 0, points: 0, current: null, done: false };
+  const round = { name, max: journeyLevel ? 12 : practiceMax(difficulty), journeyLevel, count, tables, expert, timer: expert ? timer : 0, difficulty, startedAt: now(), times: [], queue, index: 0, requeued: new Set(), before, firstTry: 0, answered: 0, streak: 0, bestStreak: 0, points: 0, current: null, done: false };
   ask(round);
   return round;
+}
+
+// A Practice Journey round on the ×n table: its facts (×1 to ×12, both ways
+// round), and about one question in five reviewing the tables before it.
+export const REVIEW_SHARE = 1 / 5;
+export function journeyQueue(facts, n, count, rng = Math.random) {
+  const all = Progress.practiceSet('hard'); // (1 to 12 each way)
+  const reviews = n > 1 ? Math.round(count * REVIEW_SHARE) : 0;
+  const main = Progress.pickPracticeFacts(facts, all, count - reviews, rng, [n]);
+  const earlier = Array.from({ length: n - 1 }, (_, i) => i + 1);
+  const review = reviews ? Progress.pickPracticeFacts(facts, all, reviews * 4, rng, earlier).filter(([a, b]) => a !== n && b !== n).slice(0, reviews) : [];
+  const queue = [...main];
+  for (const fact of review) queue.splice(1 + Math.floor(rng() * queue.length), 0, fact); // (never first)
+  return queue;
 }
 
 // The question at the round's index (or none: the round is done). A retry is a
@@ -222,6 +238,9 @@ export function finish(state, round, now = Date.now) {
   }
   Progress.noteActivity(state, { kind: 'practice', difficulty: round.difficulty, count: round.count, expert: round.expert, finished: true, firstTry: round.firstTry });
   const earned = Progress.awardAchievements(state, { event: 'practice' });
+  // a Practice Journey round: moving up to the next table, or what it still takes
+  const journey = round.journeyLevel ? Progress.recordPracticeLevel(state, round.journeyLevel, round) : null;
+  if (journey) earned.push(...journey.earned);
   const retries = round.queue.length - round.count; // missed facts asked again
   const sub =
     (round.expert ? '🧠 Expert · ' : '') +
@@ -235,10 +254,11 @@ export function finish(state, round, now = Date.now) {
     .sort((x, y) => STATUS_ORDER[y.now] - STATUS_ORDER[y.was] - (STATUS_ORDER[x.now] - STATUS_ORDER[x.was]))
     .map((c) => ({ ...c, up: STATUS_ORDER[c.now] > STATUS_ORDER[c.was] }));
   const at = now();
-  const record = { kind: 'practice', at, duration: at - round.startedAt, name: round.name, size: round.max, level: round.expert ? 'expert' : 'learn', tables: round.tables, count: round.count, firstTry: round.firstTry, times: round.times, points: round.points };
+  const record = { kind: 'practice', at, ...(round.journeyLevel ? { journeyLevel: round.journeyLevel } : {}), duration: at - round.startedAt, name: round.name, size: round.max, level: round.expert ? 'expert' : 'learn', tables: round.tables, count: round.count, firstTry: round.firstTry, times: round.times, points: round.points };
   return {
     points: round.points,
     finish: finishBonus,
+    journey,
     finishToast: finishBonus ? [`🏁 Finished all ${round.count} questions!`, `+${finishBonus} bonus points${round.expert ? ` (×${PRACTICE_EXPERT_BONUS} Expert)` : ''}`] : null,
     earned,
     sub,

@@ -4,14 +4,14 @@
 // An ES module (@blockout/progress), used by the games and the server.
 
 import * as Core from '@blockout/engine';
-import { LEVELS, DONE, levelGranting, grantsUpTo } from './levels.js';
+import { LEVELS, DONE, levelGranting, grantsUpTo, PRACTICE_LEVELS, PRACTICE_DONE, practiceLevelGranting, practiceGrantsUpTo } from './levels.js';
 
 function createProgress() {
   return {
     version: 1,
     wallet: 0, // points available to spend
     earned: 0, // all points ever earned
-    unlocks: [], // shop item ids
+    unlocks: ['practice', 'table1'], // shop item ids (Practice Level 1's come free)
     achievements: {}, // id -> time earned
     checkIn: { last: null, streak: 0 },
     daily: { day: null, task: null, done: false, streak: 0, lastDone: null }, // today's practice (daily.js)
@@ -25,6 +25,8 @@ function createProgress() {
     gameExpertV1: true, // …or from before single player had Learn / Expert
     journeyV1: true, // …or from before boards and difficulties were Journey levels
     journey: { level: 1 }, // the Journey level reached (see levels.js)
+    practiceJourneyV1: true, // …or from before Practice had its own Journey
+    practiceJourney: { level: 1 }, // Practice's Journey level: the ×n table
     stickers: {}, // sticker id -> how many
     boardWins: {}, // board size -> wins against the CPU on it
     helpedFacts: {}, // '6 × 7' -> true after "Help me count" on it, until it's answered right first time
@@ -87,6 +89,7 @@ function normalize(saved) {
     stickers: saved.stickers || {},
     boardWins: saved.boardWins || {},
     journey: { level: 1, ...(saved.journey || {}) },
+    practiceJourney: { level: 1, ...(saved.practiceJourney || {}) },
     helpedFacts: saved.helpedFacts || {},
     cheats: saved.cheats || {},
     activity: Array.isArray(saved.activity) ? saved.activity : [],
@@ -141,6 +144,14 @@ function normalize(saved) {
     state.journeyV1 = true;
   }
   grantJourney(state);
+  // Practice and its times tables became Practice Journey levels: an older
+  // save starts on the highest table it owns (and Practice is free).
+  if (!saved.practiceJourneyV1) {
+    const owned = state.unlocks.map(practiceLevelGranting).filter(Boolean);
+    state.practiceJourney.level = Math.max(state.practiceJourney.level, ...owned);
+    state.practiceJourneyV1 = true;
+  }
+  grantPracticeJourney(state);
   // The old all-in-one timer unlock (10/20/30 s) becomes the 30 s and 10 s unlocks.
   if (state.unlocks.includes('answerTime')) {
     state.unlocks = state.unlocks.filter((id) => id !== 'answerTime');
@@ -280,7 +291,7 @@ const SHOP = [
   { id: 'multiplayer', group: 'Modes', name: 'Multiplayer (2 players)', price: 150 },
   { id: 'players3', group: 'Modes', name: 'Multiplayer: 3 players', price: 100, requires: 'multiplayer' },
   { id: 'players4', group: 'Modes', name: 'Multiplayer: 4 players', price: 100, requires: 'players3' },
-  { id: 'practice', group: 'Modes', name: 'Practice mode (5 questions)', price: 100 },
+  { id: 'practice', group: 'Modes', name: 'Practice mode (5 questions)', price: 0, practiceJourney: practiceLevelGranting('practice') },
   // Skill-tree chains: each one needs the one before it (`requires`); the UI only
   // shows the next step, the rest are locked placeholders.
   // Boards and difficulties aren't bought: reaching a Journey level unlocks them
@@ -329,13 +340,13 @@ const SHOP = [
   // Expert practice timers: a chain per difficulty (30 s, then 10 s, then 5 s),
   // since being quick on ×6 facts isn't being quick on ×12 ones. See practiceTimerId.
   ...PRACTICE_TIMER_CHAINS,
-  // Times tables to practice, one at a time: ×1 first, then ×2, …
+  // Times tables to practice: each one comes with its Practice Journey level
   ...Array.from({ length: 12 }, (_, i) => ({
     id: `table${i + 1}`,
     group: 'Times tables',
     name: `Practice the ×${i + 1} table`,
-    price: 10 + 5 * i,
-    requires: i ? `table${i}` : 'practice',
+    price: 0,
+    practiceJourney: practiceLevelGranting(`table${i + 1}`),
   })),
   { id: 'timesMastered', group: 'Stats', name: 'Best times on Mastered cells', price: 50 },
   { id: 'timesLearning', group: 'Stats', name: 'Best times on Learning cells', price: 50 },
@@ -358,6 +369,7 @@ function canBuy(state, id, now = new Date()) {
   if (isUnlocked(state, id)) return { ok: false, reason: 'owned' };
   if (item.available && !item.available(now)) return { ok: false, reason: 'season', when: item.seasonLabel };
   if (item.journey) return { ok: false, reason: 'journey', level: item.journey };
+  if (item.practiceJourney) return { ok: false, reason: 'journey', level: item.practiceJourney, path: 'practice' };
   if (item.requires && !isUnlocked(state, item.requires)) return { ok: false, reason: 'requires', requires: item.requires };
   if (state.wallet < item.price) return { ok: false, reason: 'points', missing: item.price - state.wallet };
   return { ok: true };
@@ -405,7 +417,7 @@ function tableReady(state, spec, name = 'You') {
 function isHidden(state, id) {
   if (!id || isUnlocked(state, id)) return false;
   const item = shopItem(id);
-  if (item && item.journey) return true;
+  if (item && (item.journey || item.practiceJourney)) return true;
   return nextInChain(state, id) !== id;
 }
 
@@ -456,6 +468,35 @@ function recordLevelGame(state, level, game) {
   out.reward = levelUpReward(from);
   addPoints(state, out.reward);
   out.earned = awardAchievements(state, { event: 'level', level: out.to });
+  return out;
+}
+
+// Practice's Journey: level n is the ×n table. A round with 80 % of its
+// questions right first try moves you up and unlocks the next table.
+const practiceLevelUpReward = (level) => 5 * level;
+const practiceLevel = (state) => Math.min(PRACTICE_DONE, Math.max(1, Number(state.practiceJourney && state.practiceJourney.level) || 1));
+
+function grantPracticeJourney(state) {
+  for (const id of practiceGrantsUpTo(practiceLevel(state))) if (!state.unlocks.includes(id)) state.unlocks.push(id);
+}
+
+// A finished round on Practice level `level`: { count, firstTry } →
+// { accuracy, passed, missing, current, advanced, from, to, grants, reward, earned }
+function recordPracticeLevel(state, level, { count = 0, firstTry = 0 }) {
+  const accuracy = count ? firstTry / count : 0;
+  const passed = accuracy >= LEVEL_GOAL.firstTry;
+  const from = practiceLevel(state);
+  const out = { accuracy, passed, missing: passed ? null : 'accuracy', current: level === from && from < PRACTICE_DONE, advanced: false, from, to: from, grants: [], reward: 0, earned: [] };
+  if (!out.current || !passed) return out;
+  const before = new Set(state.unlocks);
+  state.practiceJourney = { ...state.practiceJourney, level: from + 1 };
+  grantPracticeJourney(state);
+  out.advanced = true;
+  out.to = from + 1;
+  out.grants = state.unlocks.filter((id) => !before.has(id));
+  out.reward = practiceLevelUpReward(from);
+  addPoints(state, out.reward);
+  out.earned = awardAchievements(state, { event: 'practiceLevel', level: out.to });
   return out;
 }
 
@@ -692,6 +733,8 @@ const JOURNEY_ACHIEVEMENTS = [
   { id: 'journey_6', icon: '🧗', name: 'On your way', desc: 'Reach Level 6 on your Journey.', reward: 30, check: (c) => c.event === 'level' && c.level >= 6 },
   { id: 'journey_12', icon: '⛰️', name: 'Twelve by twelve', desc: 'Reach Level 12 on your Journey.', reward: 100, check: (c) => c.event === 'level' && c.level >= 12 },
   { id: 'journey_done', icon: '🏔️', name: 'Top of the mountain', desc: 'Finish every level of your Journey.', reward: 300, check: (c) => c.event === 'level' && c.level >= DONE },
+  { id: 'ptables_6', icon: '📗', name: 'Halfway there', desc: 'Reach the ×6 table on your Practice Journey.', reward: 30, check: (c) => c.event === 'practiceLevel' && c.level >= 6 },
+  { id: 'ptables_done', icon: '📚', name: 'Every times table', desc: 'Finish the ×12 table on your Practice Journey.', reward: 150, check: (c) => c.event === 'practiceLevel' && c.level >= PRACTICE_DONE },
 ].map((a) => ({ ...a, group: 'Journey' }));
 
 const SCORE_ACHIEVEMENTS = SCORE_TIERS.map((t) => ({
@@ -815,6 +858,8 @@ function mergeProgress(a, b) {
   out.boardWins = maxOf(x.boardWins, y.boardWins);
   out.journey = { ...out.journey, level: Math.max(journeyLevel(x), journeyLevel(y)) };
   grantJourney(out);
+  out.practiceJourney = { ...out.practiceJourney, level: Math.max(practiceLevel(x), practiceLevel(y)) };
+  grantPracticeJourney(out);
   out.checkIn = (x.checkIn.last || '') >= (y.checkIn.last || '') ? x.checkIn : y.checkIn;
   // today's practice: the later day's, and on the same day the one that's done
   const dx = x.daily || {};
@@ -1009,6 +1054,11 @@ export {
   journeyLevel,
   levelResult,
   recordLevelGame,
+  PRACTICE_LEVELS,
+  PRACTICE_DONE,
+  practiceLevel,
+  practiceLevelUpReward,
+  recordPracticeLevel,
   tableReady,
   noteHelp,
   learnedAfterHelp,

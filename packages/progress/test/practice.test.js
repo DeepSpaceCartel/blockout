@@ -25,7 +25,7 @@ test('the tables: chosen ones that are unlocked, or else every unlocked one; the
   assert.deepEqual(Practice.tableChoices('easy'), [1, 2, 3, 4, 5, 6]);
   assert.deepEqual(Practice.roundTables(s, 'easy'), [1, 2, 3]);
   assert.deepEqual(Practice.roundTables(s, 'easy', [3, 5]), [3], '×5 is still locked');
-  assert.equal(Practice.preview(Progress.createProgress(), 'easy'), null, 'nothing unlocked: no round');
+  assert.equal(Practice.preview({ ...Progress.createProgress(), unlocks: [] }, 'easy'), null, 'nothing unlocked: no round');
   assert.match(Practice.preview(s, 'easy', [3]), /^×3 up to 6 \(11 facts\): 0 need practice, 0 learning, 11 not seen yet, 0 mastered\.$/);
   assert.match(Practice.preview(s, 'easy'), /^All your unlocked tables \(×1, ×2 and ×3\), up to 6/);
 });
@@ -100,4 +100,24 @@ test('practice: a helped question earns its point but no bonus', () => {
   assert.equal(res.firstTry, false);
   assert.equal(res.bonus.total, 0);
   assert.equal(round.streak, 0);
+});
+
+test('a Practice Journey round: the ×n table with a little review, and a good round moves you up', () => {
+  const s = Progress.createProgress();
+  s.practiceJourney.level = 7;
+  const r = Practice.createRound(s, { count: 10, journeyLevel: 7, rng: seeded(3) });
+  assert.deepEqual(r.tables, [7]);
+  const sevens = r.queue.filter(([a, b]) => a === 7 || b === 7);
+  assert.equal(sevens.length, 8, 'two in ten review the tables before');
+  assert.ok(r.queue.every(([a, b]) => a <= 12 && b <= 12));
+  assert.ok(r.queue[0][0] === 7 || r.queue[0][1] === 7, 'the round starts on the new table');
+  while (r.current) {
+    Practice.answer(s, r, r.current.area);
+    Practice.next(r);
+  }
+  const end = Practice.finish(s, r);
+  assert.deepEqual([end.journey.advanced, end.journey.to], [true, 8]);
+  assert.ok(Progress.isUnlocked(s, 'table8'));
+  assert.equal(end.record.journeyLevel, 7);
+  assert.equal(Practice.journeyQueue({}, 1, 5, seeded()).length, 5, '×1 has nothing to review');
 });

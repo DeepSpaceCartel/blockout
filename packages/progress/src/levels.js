@@ -34,4 +34,18 @@ function levelGranting(id) {
 // Every Shop id unlocked by the time a player reaches `level`
 const grantsUpTo = (level) => [...LEVELS.filter((l) => l.level <= level).flatMap((l) => l.grants), ...(level >= DONE ? DONE_GRANTS : [])];
 
-export { LEVELS, DONE, DONE_GRANTS, tierFor, levelGranting, grantsUpTo };
+// Practice's Journey: level n is the ×n times table (with a little review of
+// the tables before it). Reaching a level unlocks its table for Free practice;
+// level 1 is where Practice itself starts.
+const PRACTICE_LEVELS = Array.from({ length: 12 }, (_, i) => ({ level: i + 1, table: i + 1, difficulty: tierFor(i + 1), grants: [...(i ? [] : ['practice']), `table${i + 1}`] }));
+const PRACTICE_DONE = PRACTICE_LEVELS.length + 1;
+
+// The Practice level that unlocks a Shop id (null: not a Practice Journey unlock)
+function practiceLevelGranting(id) {
+  const l = PRACTICE_LEVELS.find((x) => x.grants.includes(id));
+  return l ? l.level : null;
+}
+
+const practiceGrantsUpTo = (level) => PRACTICE_LEVELS.filter((l) => l.level <= level).flatMap((l) => l.grants);
+
+export { LEVELS, DONE, DONE_GRANTS, tierFor, levelGranting, grantsUpTo, PRACTICE_LEVELS, PRACTICE_DONE, practiceLevelGranting, practiceGrantsUpTo };

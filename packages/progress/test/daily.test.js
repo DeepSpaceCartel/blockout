@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as Progress from '../src/progress.js';
 import * as Daily from '../src/daily.js';
 
-const flags = { boardsV2: true, practiceV2: true, placeAutoV1: true, gameExpertV1: true, practiceTimersV1: true, boardWinsFromHistory: true };
+const flags = { boardsV2: true, practiceV2: true, placeAutoV1: true, gameExpertV1: true, practiceTimersV1: true, journeyV1: true, practiceJourneyV1: true, boardWinsFromHistory: true };
 const save = (unlocks = []) => Progress.normalize({ ...Progress.createProgress(), ...flags, unlocks });
 const tables = (n) => ['practice', ...Array.from({ length: n }, (_, i) => `table${i + 1}`)];
 // answer a fact enough times to reach a status
@@ -43,8 +43,9 @@ test('then the lowest table not mastered, then a taste of the next one', () => {
   assert.deepEqual([nine.tables, nine.difficulty], [[9], 'hard'], 'a taste of ×9 comes from Hard’s dice');
 });
 
-test('without practice: a game on a board not won yet', () => {
-  const s = save(['board8']);
+test('every table mastered: a game on a board not won yet', () => {
+  const s = save([...tables(12), 'board8']);
+  for (let n = 1; n <= 12; n++) for (let m = 1; m <= 12; m++) answer(s, n, m, { times: 6 });
   assert.deepEqual(Daily.pickTask(s), { kind: 'game', size: 6, difficulty: 'easy', why: 'board' });
   s.boardWins = { 6: 1 };
   assert.equal(Daily.pickTask(s).size, 8);
