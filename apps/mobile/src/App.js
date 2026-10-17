@@ -6,11 +6,13 @@ import { ActivityIndicator, Animated, StyleSheet, Text, View } from 'react-nativ
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Progress from '@blockout/progress';
 import * as Shop from '@blockout/progress/shop';
+import * as Views from '@blockout/progress/views';
 import * as Account from './account';
 import Game from './Game';
 import Home from './Home';
 import { BOARDS, DIFFICULTIES, boardOpen, difficultyOpen, modeOpen } from './rewards';
 import { ShopScreen, UnlockSheet } from './Shop';
+import { AchievementsScreen, StickersScreen } from './Collection';
 import { useTheme } from './theme';
 
 const CHOICE_KEY = 'blockout.mobile.choice';
@@ -40,7 +42,7 @@ function Main() {
   const [progress, setProgress] = useState(null);
   const [choice, setChoice] = useState(DEFAULT_CHOICE);
   const [game, setGame] = useState(null); // { key, setup }
-  const [screen, setScreen] = useState('menu'); // 'menu' | 'shop' (a game is on top of either)
+  const [screen, setScreen] = useState('menu'); // 'menu' | 'shop' | 'achievements' | 'stickers' (a game is on top)
   const [offer, setOffer] = useState(null); // the unlock sheet: Shop.unlockOffer's answer
   const [signingIn, setSigningIn] = useState(false);
   const [accountError, setAccountError] = useState(null);
@@ -73,6 +75,12 @@ function Main() {
     AsyncStorage.setItem(CHOICE_KEY, JSON.stringify(next));
   };
 
+  // New achievements: a banner each, and the sticker each big one drops (as on the web)
+  function celebrate(earned) {
+    for (const a of earned) toasts.show(`${a.icon} ${a.name}`, `Achievement! +${a.reward} points`);
+    for (const drop of Views.grantStickers(progress, earned)) toasts.show(...drop.toast);
+  }
+
   // Tapped a locked thing, or a Shop row: what can be done about it
   const ask = (itemId) => setOffer(Shop.unlockOffer(progress, itemId));
 
@@ -82,7 +90,7 @@ function Main() {
     const bought = Shop.purchase(progress, itemId);
     if (!bought.ok) return;
     toasts.show(...bought.toast);
-    for (const a of bought.earned) toasts.show(`${a.icon} ${a.name}`, `Achievement! +${a.reward} points`);
+    celebrate(bought.earned);
     save();
     const on = Shop.activation(itemId) || {};
     const part = {};
@@ -128,9 +136,26 @@ function Main() {
     <SafeAreaView style={[styles.fill, { backgroundColor: t.bg }]}>
       <StatusBar style="auto" />
       {game ? (
-        <Game key={game.key} setup={game.setup} progress={progress} onSave={save} toast={toasts.show} onExit={() => setGame(null)} onAgain={play} />
+        <Game key={game.key} setup={game.setup} progress={progress} onSave={save} toast={toasts.show} onEarned={celebrate} onExit={() => setGame(null)} onAgain={play} />
       ) : screen === 'shop' ? (
         <ShopScreen progress={progress} onAsk={ask} onClose={() => setScreen('menu')} />
+      ) : screen === 'achievements' ? (
+        <AchievementsScreen progress={progress} onClose={() => setScreen('menu')} />
+      ) : screen === 'stickers' ? (
+        <StickersScreen
+          progress={progress}
+          onClose={() => setScreen('menu')}
+          onSeen={(ids) => {
+            Shop.markSeen(progress, 'stickers', ids);
+            save();
+          }}
+          onSwap={() => {
+            const swap = Views.swapSpares(progress, Shop.formatPoints);
+            if (!swap.points) return;
+            toasts.show(...swap.toast);
+            save();
+          }}
+        />
       ) : (
         <Home
           progress={progress || Progress.createProgress()}
@@ -144,6 +169,8 @@ function Main() {
           accountError={accountError}
           onLocked={ask}
           onShop={() => setScreen('shop')}
+          onAchievements={() => setScreen('achievements')}
+          onStickers={() => setScreen('stickers')}
         />
       )}
       <UnlockSheet offer={offer} onBuy={buy} onClose={() => setOffer(null)} />

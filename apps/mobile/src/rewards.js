@@ -4,18 +4,15 @@
 // towards stats and achievements; two players on one phone only earn points.
 // Each function changes the save and returns the achievements it earned.
 import * as Progress from '@blockout/progress';
+import * as Views from '@blockout/progress/views';
 
 export const STATS_NAME = 'You'; // whose times tables the single player's answers count towards
 
 export const countsForStats = (match) => match.mode === 'single';
 
 // The biggest times table this player has unlocked: achievements for
-// "every fact up to…" only count facts in reach
-export function tableSize(progress) {
-  if (Progress.isUnlocked(progress, 'difficulty.hard')) return 12;
-  if (Progress.isUnlocked(progress, 'difficulty.medium')) return 8;
-  return 6;
-}
+// "every fact up to…" only count facts in reach (shared with the web game)
+export const tableSize = Views.tableSize;
 
 const facts = (progress) => (progress.facts[Progress.playerKey(STATS_NAME)] || { facts: {} }).facts;
 

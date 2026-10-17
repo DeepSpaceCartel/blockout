@@ -12,9 +12,10 @@ const MODES = [
 ];
 
 // onLocked(itemId): a locked choice was tapped (offer it); onShop(): open the Shop
-export default function Home({ progress, user, choice, onChoose, onPlay, onSignIn, onSignOut, signingIn, accountError, onLocked, onShop }) {
+export default function Home({ progress, user, choice, onChoose, onPlay, onSignIn, onSignOut, signingIn, accountError, onLocked, onShop, onAchievements, onStickers }) {
   const t = useTheme();
   const newUnlocks = Shop.affordableCount(progress);
+  const stickerNews = Shop.newStickers(progress) + Shop.spareStickers(progress);
   const anyLocked = DIFFICULTIES.some((d) => !difficultyOpen(progress, d.id)) || BOARDS.some((n) => !boardOpen(progress, n));
   return (
     <View style={[styles.fill, { backgroundColor: t.bg }]}>
@@ -50,6 +51,11 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onSignI
           <SmallButton testID={user ? 'sign-out' : 'sign-in'} title={user ? 'Sign out' : signingIn ? 'Signing in…' : 'Sign in'} onPress={user ? onSignOut : onSignIn} disabled={signingIn} />
         </View>
         {accountError ? <Text style={[styles.error, { color: t.bad }]}>{accountError}</Text> : null}
+
+        <View style={styles.more}>
+          <MenuButton testID="achievements" label="🏆 Achievements" onPress={onAchievements} />
+          <MenuButton testID="stickers" label="🎁 Stickers" badge={stickerNews} onPress={onStickers} />
+        </View>
 
         <Section title="Play">
           <Segments items={MODES.map((x) => ({ id: x.id, label: x.label, open: modeOpen(progress, x.id) }))} value={choice.mode} onPick={(mode) => onChoose({ mode })} onLocked={() => onLocked(itemFor.mode())} />
@@ -123,6 +129,29 @@ function Segments({ items, value, onPick, onLocked }) {
   );
 }
 
+// One of the menu's row of extras, with a count badge when there's something new
+function MenuButton({ label, badge = 0, onPress, testID }) {
+  const t = useTheme();
+  return (
+    <Pressable
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={`${label.replace(/^\S+ /, '')}${badge ? `, ${badge} new` : ''}`}
+      onPress={onPress}
+      style={({ pressed }) => [styles.menuBtn, { backgroundColor: t.surface, borderColor: t.line, transform: [{ scale: pressed ? 0.97 : 1 }] }]}
+    >
+      <Text style={[styles.smallText, { color: t.ink }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+        {label}
+      </Text>
+      {badge ? (
+        <View style={[styles.badge, { backgroundColor: t.bad }]}>
+          <Text style={styles.badgeText}>{badge}</Text>
+        </View>
+      ) : null}
+    </Pressable>
+  );
+}
+
 function SmallButton({ title, onPress, disabled, testID }) {
   const t = useTheme();
   return (
@@ -160,6 +189,8 @@ const styles = StyleSheet.create({
   segmentSub: { fontSize: 12, marginTop: 2 },
   note: { fontSize: 13, textAlign: 'center' },
   bottom: { padding: 16, paddingTop: 8 },
+  more: { flexDirection: 'row', gap: 8 },
+  menuBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 44, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth * 2 },
   small: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth * 2 },
   smallText: { fontSize: 15, fontWeight: '700' },
 });

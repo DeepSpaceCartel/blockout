@@ -36,9 +36,10 @@ const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const article = (n) => (/^(8|11|18)$/.test(String(n)) || /^8\d$/.test(String(n)) ? 'an' : 'a');
 
 // setup: { mode, difficulty, size, players }; progress: the save (changed in
-// place); onSave() after every change to it; toast(title, text) for bonuses
-// and achievements; onExit() back to the menu; onAgain() a new game.
-export default function Game({ setup, progress, onSave, toast, onExit, onAgain }) {
+// place); onSave() after every change to it; toast(title, text) for bonuses;
+// onEarned(achievements) for their banners and stickers; onExit() back to the
+// menu; onAgain() a new game.
+export default function Game({ setup, progress, onSave, toast, onEarned, onExit, onAgain }) {
   const t = useTheme();
   const [, setTick] = useState(0);
   const redraw = () => setTick((n) => n + 1);
@@ -75,9 +76,7 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
 
   const who = (p) => (match.mode === 'single' && !p.cpu ? 'You' : p.name);
   const mine = () => !Match.currentPlayer(match).cpu;
-  const award = (earned) => {
-    for (const a of earned) toast(`${a.icon} ${a.name}`, `Achievement! +${a.reward} points`);
-  };
+  const award = (earned) => onEarned(earned);
 
   // ---- turns
 

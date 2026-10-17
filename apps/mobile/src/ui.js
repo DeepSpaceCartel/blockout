@@ -30,6 +30,22 @@ export function Button({ title, onPress, kind = 'primary', disabled = false, sty
   );
 }
 
+// A screen's top bar: ✕ back, the title, and something on the right (points)
+export function ScreenHeader({ title, onClose, right = null, closeLabel = 'Back to the menu' }) {
+  const t = useTheme();
+  return (
+    <View style={styles.header}>
+      <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel={closeLabel} hitSlop={10} style={[styles.close, { borderColor: t.line, backgroundColor: t.surface }]}>
+        <Text style={[styles.closeText, { color: t.ink }]}>✕</Text>
+      </Pressable>
+      <Text style={[styles.headerTitle, { color: t.ink }]} numberOfLines={1}>
+        {title}
+      </Text>
+      {right}
+    </View>
+  );
+}
+
 // Pips for 1 to 6, as on a real die; bigger numbers are written out
 const PIPS = {
   1: [[1, 1]],
@@ -86,6 +102,10 @@ export function Keypad({ onKey, disabled }) {
 }
 
 const styles = StyleSheet.create({
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 8 },
+  close: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  closeText: { fontSize: 18, fontWeight: '800' },
+  headerTitle: { flex: 1, fontSize: 26, fontWeight: '900' },
   button: { height: 52, paddingHorizontal: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   primary: { shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
   buttonText: { fontSize: 17, fontWeight: '700', letterSpacing: 0.2 },
