@@ -34,6 +34,10 @@ data:
       -s "attributes.\"post.logout.redirect.uris\"=${logout%##}"
     echo "client {{ .Values.keycloak.clientId }}: $URLS"
 
+    # Keycloak's own admin signs in on the master realm: guessing is slowed down there too
+    kc update realms/master -s bruteForceProtected=true -s failureFactor=5 -s waitIncrementSeconds=60 -s maxFailureWaitSeconds=3600
+    echo "master realm: brute-force protection"
+
     # Admins are the only role Keycloak keeps for Blockout (ADR-0008)
     kc get "roles/admin" -r "$REALM" >/dev/null 2>&1 || kc create roles -r "$REALM" -s name=admin -s 'description=Blockout admin: accounts and roles, teacher codes, schools.'
     echo "realm role admin"

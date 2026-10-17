@@ -134,6 +134,9 @@
                   "name"
                 ]
               }
+            },
+            "adminConsole": {
+              "type": "boolean"
             }
           }
         },

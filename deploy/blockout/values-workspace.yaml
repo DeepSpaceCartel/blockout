@@ -13,6 +13,8 @@ keycloak:
   # Development servers sign in here too
   extraRedirectUrls: [http://localhost:8080, http://localhost:5173]
   httpRoute:
+    # https://id.deepspacecartel.com/admin
+    adminConsole: true
     parentRefs:
       - name: rts-gateway
         namespace: gateway

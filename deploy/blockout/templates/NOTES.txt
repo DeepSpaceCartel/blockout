@@ -6,9 +6,12 @@ Blockout {{ .Chart.AppVersion }} is on its way: {{ .Values.publicUrl }}
 {{- end }}
 {{- if .Values.keycloak.enabled }}
 
-Keycloak: {{ .Values.keycloak.url }} (sign-in only). Its admin console isn't public:
-  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ .Release.Name }}-keycloakx-http 8180:80
-  then http://localhost:8180/admin, user admin, password:
+Keycloak: {{ .Values.keycloak.url }}
+{{- if .Values.keycloak.httpRoute.adminConsole }}
+Its admin console: {{ .Values.keycloak.url | trimSuffix "/" }}/admin, user admin, password:
+{{- else }} (sign-in only; set keycloak.httpRoute.adminConsole for the admin console)
+Its admin console's password (user admin):
+{{- end }}
   kubectl -n {{ .Release.Namespace }} get secret {{ .Release.Name }}-keycloak-admin -o jsonpath='{.data.password}' | base64 -d
 
 The first admin: give your account the realm role "admin" (docs/guides/set-up-keycloak.md).

@@ -51,7 +51,7 @@ npm run dev         # Vite dev servers (multiplication on :5173, proxying /api) 
 cloudflared tunnel --url http://localhost:8080
 op run --env-file=deploy/blockout/.env.1password -- deploy/blockout/install.sh 0.5.0   # install or update everything (values-workspace.yaml); secrets from 1Password
 npm run services    # forward the development MongoDB and Valkey (release blockout-dev) to localhost; prints the URLs
-npm run keycloak    # the workspace Keycloak's admin console on http://localhost:8180/admin
+# Keycloak admin console: https://id.deepspacecartel.com/admin (user admin; password in Secret blockout-keycloak-admin)
 BLOCKOUT_AUTH=keycloak KEYCLOAK_ISSUER=https://id.deepspacecartel.com/realms/blockout KEYCLOAK_CLIENT_ID=blockout npm start
 ```
 

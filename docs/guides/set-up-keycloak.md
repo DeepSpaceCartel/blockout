@@ -45,11 +45,19 @@ Then open `http://localhost:8080`, **Sign in** › **Sign in** › **Google**. C
 
 ## The admin console
 
-It isn't public. Forward it and leave the forward running:
+In the workspace cluster it's at `https://id.deepspacecartel.com/admin` (`keycloak.httpRoute.adminConsole` in `values-workspace.yaml`), user `admin`:
 
 ```sh
-npm run keycloak          # http://localhost:8180/admin, user admin
 kubectl -n blockout get secret blockout-keycloak-admin -o jsonpath='{.data.password}' | base64 -d
+```
+
+Its login is the `master` realm's, with brute-force protection (5 wrong passwords lock it for a while), and the password is 32 random characters. Where `adminConsole` is off (the default, and production), the console can't be reached at all: Keycloak sends it to its public address, which then doesn't route `/admin`. Use the admin CLI in the pod instead:
+
+```sh
+kubectl -n blockout exec -it blockout-keycloakx-0 -c keycloak -- bash -c '
+  kc() { /opt/keycloak/bin/kcadm.sh "$@" --config /tmp/kcadm.config; }
+  kc config credentials --server http://localhost:8080 --realm master --user admin --password "$KC_BOOTSTRAP_ADMIN_PASSWORD" &&
+  kc add-roles -r blockout --uusername <username> --rolename admin'
 ```
 
 ## Make someone an admin
@@ -57,7 +65,7 @@ kubectl -n blockout get secret blockout-keycloak-admin -o jsonpath='{.data.passw
 Blockout keeps everyone's role itself: anyone who signs in is a student, and one-time codes make teachers and grown-ups ([Admins](admins.md)). Keycloak only says who's an **admin**:
 
 1. Open [the admin console](#the-admin-console) and switch to the **blockout** realm.
-2. **Users** › the person › **Role mapping** › **Assign role** › `admin`.
+2. **Users** › the person › **Role mapping** › **Assign role** › `admin` (switch the dialog's filter to realm roles).
 3. They sign out of Blockout and in again, and find **Admin** on their account page (or go to `/admin/`).
 
 They need to have signed in once first, so that Keycloak has their account. Taking the role away works the same way, and counts from their next token (15 minutes at most).

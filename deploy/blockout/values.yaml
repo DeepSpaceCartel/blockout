@@ -197,10 +197,13 @@ keycloak:
     password: ""
     # or a Secret you made, with the keys host, port, from, user and password
     existingSecret: ""
-  # Its public address on the gateway: sign-in only (the admin console isn't
-  # routed; admins use a port-forward)
+  # Its public address on the gateway: sign-in, and the admin console only with
+  # adminConsole (its login is the master realm's, with brute-force protection;
+  # without it, Keycloak still sends the console to the public address, so it
+  # can't be reached at all)
   httpRoute:
     enabled: true
+    adminConsole: false
     parentRefs: []
   postgres:
     image: postgres:17.11-alpine

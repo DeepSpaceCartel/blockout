@@ -95,7 +95,7 @@ helm -n blockout rollback blockout <revision>
 | StatefulSet `blockout-valkey` | Valkey 8.1, no volume (live classes only last hours). |
 | StatefulSet `blockout-keycloakx` | Keycloak 26 (the `codecentric/keycloakx` chart), production mode behind the gateway. |
 | StatefulSet `blockout-keycloak-db` | Postgres 17 for Keycloak, 10 GB volume. |
-| HTTPRoute `blockout-keycloak` | Keycloak's hostname: sign-in only (`/realms/blockout`, `/resources`). The admin console isn't public. |
+| HTTPRoute `blockout-keycloak` | Keycloak's hostname: sign-in (`/realms/blockout`, `/resources`), and the admin console with `keycloak.httpRoute.adminConsole` (on in the workspace cluster). |
 | Job `blockout-keycloak-realm` | After every install and upgrade: the realm's redirect addresses, the `admin` role, brute-force protection, mail. |
 | CronJobs `blockout-backup-*`, `blockout-restore-check` | With `backup.enabled`: nightly encrypted dumps, and the monthly restore check ([Run it day to day](operate.md#backups)). |
 | Secrets | `blockout-mongo` and `blockout-redis` (passwords and `url`), `blockout-keycloak-db`, `blockout-keycloak-admin`, `blockout-keycloak-google`, `blockout-pull`. |
