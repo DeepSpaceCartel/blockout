@@ -8,3 +8,6 @@ site/
 deploy/blockout/charts/
 # values with secrets, passed at install time
 secrets*.yaml
+
+# Expo (the phone app) on this machine
+.expo/
