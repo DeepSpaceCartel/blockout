@@ -31,8 +31,10 @@
 	// or dev server fails on its own instead of taking the whole container (every
 	// terminal and session) down with it. Processes that set their own limit (VS
 	// Code's servers) keep theirs; native memory (bundler workers) isn't covered.
+	// Clocks and logs in Los Angeles time (CI stays on UTC).
 	"containerEnv": {
-		"NODE_OPTIONS": "--max-old-space-size=1536"
+		"NODE_OPTIONS": "--max-old-space-size=1536",
+		"TZ": "America/Los_Angeles"
 	},
 
 	// The Blockout server (npm start), the Vite dev server (npm run dev), the
