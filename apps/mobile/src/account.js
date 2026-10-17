@@ -103,6 +103,10 @@ export async function signOut() {
   await flushProgress();
   const ended = session;
   await saveSession(null);
+  await endKeycloakSession(ended);
+}
+
+async function endKeycloakSession(ended) {
   if (!ended || !ended.refresh) return;
   try {
     const { discovery: d } = await discovery();
@@ -199,6 +203,23 @@ export async function syncProgress() {
   await writeJson(progressKey(user()), result);
   if (push) await api('PUT', '/api/me/progress', { progress: Progress.withoutCheats(result) });
   return result;
+}
+
+// The account as the server has it now (a teacher's or a grown-up's code changes its role)
+export async function refreshUser() {
+  const { user: who } = await api('GET', '/api/me');
+  if (session) await saveSession({ ...session, user: who });
+  return who;
+}
+
+// Deleting your own account (teachers and grown-ups; a child's is removed by
+// their grown-up): everything on the server, and its save on this phone
+export async function deleteAccount() {
+  const ended = session;
+  await api('DELETE', '/api/me');
+  await writeJson(progressKey(ended.user), null);
+  await saveSession(null);
+  await endKeycloakSession(ended);
 }
 
 // Which Google (or other) sign-in the account came from, for the account screen

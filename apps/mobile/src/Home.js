@@ -7,6 +7,7 @@ import * as Setup from '@blockout/progress/setup';
 import * as Practice from '@blockout/progress/practice';
 import { BOARDS, DIFFICULTIES, PLAYER_COUNTS, boardOpen, difficultyOpen, itemFor, modeOpen, playersOpen } from './rewards';
 import { useTheme } from './theme';
+import { ROLE } from './AccountScreen';
 import { Button } from './ui';
 
 const MODES = [
@@ -20,7 +21,7 @@ const LEVELS = [
 ];
 
 // onLocked(itemId): a locked choice was tapped (offer it); onShop(): open the Shop
-export default function Home({ progress, user, choice, onChoose, onPlay, onSignIn, onSignOut, signingIn, accountError, onLocked, onShop, onWardrobe, onAchievements, onStats, onStickers, onSettings }) {
+export default function Home({ progress, user, choice, onChoose, onPlay, onSignIn, onAccount, onHomework, homeworkCount = 0, signingIn, accountError, onLocked, onShop, onWardrobe, onAchievements, onStats, onStickers, onSettings }) {
   const t = useTheme();
   const newUnlocks = Shop.affordableCount(progress);
   const stickerNews = Shop.newStickers(progress) + Shop.spareStickers(progress);
@@ -59,16 +60,21 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onSignI
 
         <View style={[styles.account, { backgroundColor: t.paper, borderColor: t.line }]}>
           {user ? (
-            <Text style={[styles.accountText, { color: t.ink }]} numberOfLines={1}>
-              Signed in as <Text style={styles.bold}>{user.firstName || user.name || 'you'}</Text>
-              {user.role && user.role !== 'student' ? ` (${user.role})` : ''}
-            </Text>
+            <>
+              <Text testID="signed-in" style={[styles.accountText, { color: t.ink }]} numberOfLines={1}>
+                {(ROLE[user.role] || ROLE.student).emoji} <Text style={styles.bold}>{user.name || user.firstName || 'You'}</Text>
+              </Text>
+              {user.role === 'student' ? <SmallButton testID="homework" title="📚 Homework" badge={homeworkCount} onPress={onHomework} /> : null}
+              <SmallButton testID="account" title="Account" onPress={onAccount} />
+            </>
           ) : (
-            <Text style={[styles.accountText, { color: t.muted }]} numberOfLines={2}>
-              Sign in to keep your points on every device.
-            </Text>
+            <>
+              <Text style={[styles.accountText, { color: t.muted }]} numberOfLines={2}>
+                Sign in to keep your points on every device.
+              </Text>
+              <SmallButton testID="sign-in" title={signingIn ? 'Signing in…' : 'Sign in'} onPress={onSignIn} disabled={signingIn} />
+            </>
           )}
-          <SmallButton testID={user ? 'sign-out' : 'sign-in'} title={user ? 'Sign out' : signingIn ? 'Signing in…' : 'Sign in'} onPress={user ? onSignOut : onSignIn} disabled={signingIn} />
         </View>
         {accountError ? <Text style={[styles.error, { color: t.bad }]}>{accountError}</Text> : null}
 
@@ -266,7 +272,7 @@ function MenuButton({ label, badge = 0, onPress, testID }) {
   );
 }
 
-function SmallButton({ title, onPress, disabled, testID }) {
+function SmallButton({ title, onPress, disabled, testID, badge = 0 }) {
   const t = useTheme();
   return (
     <Pressable
@@ -277,6 +283,11 @@ function SmallButton({ title, onPress, disabled, testID }) {
       style={({ pressed }) => [styles.small, { backgroundColor: t.soft, borderColor: t.line, opacity: disabled ? 0.5 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] }]}
     >
       <Text style={[styles.smallText, { color: t.ink }]}>{title}</Text>
+      {badge ? (
+        <View style={[styles.badge, styles.cornerBadge, { backgroundColor: t.bad }]}>
+          <Text style={styles.badgeText}>{badge}</Text>
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -295,7 +306,7 @@ const styles = StyleSheet.create({
   badgeText: { color: '#fff', fontSize: 12, fontWeight: '800' },
   // (on the corner, like an app's badge, so the label keeps its room)
   cornerBadge: { position: 'absolute', top: -7, right: -5 },
-  account: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth * 2 },
+  account: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth * 2 },
   accountText: { flex: 1, fontSize: 15 },
   bold: { fontWeight: '700' },
   error: { fontSize: 14, textAlign: 'center' },

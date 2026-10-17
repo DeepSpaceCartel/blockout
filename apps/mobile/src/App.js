@@ -2,13 +2,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Linking, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Progress from '@blockout/progress';
 import * as Shop from '@blockout/progress/shop';
 import * as Views from '@blockout/progress/views';
 import * as Settings from '@blockout/progress/settings';
 import * as Wardrobe from '@blockout/progress/wardrobe';
+import * as Homework from '@blockout/progress/homework';
 import * as Account from './account';
 import Game from './Game';
 import Home from './Home';
@@ -21,6 +22,9 @@ import PracticeScreen from './PracticeScreen';
 import * as Practice from '@blockout/progress/practice';
 import SettingsScreen from './SettingsScreen';
 import WardrobeScreen from './Wardrobe';
+import AccountScreen, { redeemCode } from './AccountScreen';
+import HomeworkScreen from './HomeworkScreen';
+import { parseLink } from './links';
 import { DEFAULT_LOOKS, Looks } from './looks';
 import { ThemeSetting, useTheme } from './theme';
 
@@ -74,6 +78,10 @@ function Main({ onTheme }) {
   const [game, setGame] = useState(null); // { key, setup }
   const [screen, setScreen] = useState('menu'); // 'menu' | 'shop' | 'wardrobe' | 'stats' | 'achievements' | 'stickers' | 'settings' (a game is on top)
   const [wardrobeNew, setWardrobeNew] = useState([]); // (the looks new when the Wardrobe opened)
+  const [homeworkCount, setHomeworkCount] = useState(0); // (a student's homework still to do)
+  const pendingLink = useRef(null); // (a code's link that came before signing in)
+  const live = useRef({}); // (the latest user, for link events)
+  live.current.user = user;
   const [offer, setOffer] = useState(null); // the unlock sheet: Shop.unlockOffer's answer
   const [signingIn, setSigningIn] = useState(false);
   const [accountError, setAccountError] = useState(null);
@@ -112,6 +120,43 @@ function Main({ onTheme }) {
       setReady(true);
     })();
   }, []);
+
+  // A student's homework badge: at start, after signing in, and back on the menu
+  useEffect(() => {
+    if (!ready || !user || user.role !== 'student' || game || screen !== 'menu') return;
+    Account.api('GET', '/api/me/homework')
+      .then(({ homework }) => setHomeworkCount(Homework.openCount(homework)))
+      .catch(() => {}); // (offline: no badge)
+  }, [ready, user, game, screen]);
+
+  // Links into the app: a one-time code, or a class to join (links.js)
+  useEffect(() => {
+    if (!ready) return undefined;
+    Linking.getInitialURL()
+      .then((url) => followLink(parseLink(url)))
+      .catch(() => {});
+    const sub = Linking.addEventListener('url', ({ url }) => followLink(parseLink(url)));
+    return () => sub.remove();
+  }, [ready]);
+
+  function followLink(link) {
+    if (!link) return;
+    const who = live.current.user;
+    if (link.kind === 'code') {
+      if (!who) {
+        pendingLink.current = link;
+        return toasts.show('🔑 Sign in first', 'Then the code is used for your account.');
+      }
+      return redeemCode(link.code, { toast: toasts.show, onUser: setUser }).catch((e) => toasts.show('🔑 That code didn’t work', e.message));
+    }
+    if (!who || who.role !== 'student') {
+      if (!who) pendingLink.current = link;
+      return toasts.show(`🏫 To join class ${link.code}`, 'Sign in with your school account.');
+    }
+    Account.api('POST', '/api/me/classes', { code: link.code })
+      .then((r) => toasts.show('🏫 You joined', r.class.name))
+      .catch((e) => toasts.show('🏫 Couldn’t join', e.message));
+  }
 
   const save = () => {
     Account.saveProgress(progress);
@@ -185,6 +230,10 @@ function Main({ onTheme }) {
         const synced = await Account.syncProgress();
         setProgress(synced);
         setSettings((s) => Settings.enforce(s, synced)); // (this save's unlocks)
+        live.current.user = who;
+        const link = pendingLink.current;
+        pendingLink.current = null;
+        followLink(link); // (a code's link that came before signing in)
       }
     } catch (e) {
       setAccountError(e.message || 'Signing in didn’t work.');
@@ -194,13 +243,16 @@ function Main({ onTheme }) {
   }
 
   async function signOut() {
+    setScreen('menu');
     await Account.signOut();
     setUser(null);
+    setHomeworkCount(0);
     const guest = await Account.loadProgress(); // back to this phone's guest save
     setProgress(guest);
     setSettings((s) => Settings.enforce(s, guest)); // (its unlocks)
   }
 
+  live.current.choice = choice;
   if (!ready) {
     return (
       <View style={[styles.center, { backgroundColor: t.bg }]}>
@@ -209,8 +261,30 @@ function Main({ onTheme }) {
     );
   }
 
+  // The account was deleted: back to this phone's guest save
+  async function deleted() {
+    setScreen('menu');
+    setUser(null);
+    const guest = await Account.loadProgress();
+    setProgress(guest);
+    setSettings((s) => Settings.enforce(s, guest));
+    toasts.show('👋 Account deleted', 'Everything in it is gone.');
+  }
+
+  // Homework's Play ›: set the menu up for it, then start
+  function playHomework(goal) {
+    const c = Homework.homeworkChoice(progress, goal);
+    const next = { ...choice, mode: c.mode };
+    if (c.difficulty) next.difficulty = c.difficulty;
+    if (c.size) next.size = c.size;
+    if (c.tables) next.practice = { ...(choice.practice || {}), tables: c.tables };
+    choose(next);
+    setScreen('menu');
+    play(next);
+  }
+
   // Play a game, or a practice round (the round's options from the menu)
-  const play = () => {
+  const play = (choice = live.current.choice) => {
     if (choice.mode === 'practice' && modeOpen(progress, 'practice')) {
       const d = difficultyOpen(progress, choice.difficulty) ? choice.difficulty : 'easy';
       const pr = Practice.practiceChoice(progress, d, choice.practice || {});
@@ -226,11 +300,15 @@ function Main({ onTheme }) {
     <SafeAreaView style={[styles.fill, { backgroundColor: t.bg }]}>
       <StatusBar style="auto" />
       {game && game.practice ? (
-        <PracticeScreen key={game.key} options={game.practice} progress={progress} settings={settings} onSave={save} toast={toasts.show} onEarned={celebrate} onExit={() => setGame(null)} onAgain={play} />
+        <PracticeScreen key={game.key} options={game.practice} progress={progress} settings={settings} onSave={save} toast={toasts.show} onEarned={celebrate} onExit={() => setGame(null)} onAgain={() => play()} />
       ) : game ? (
-        <Game key={game.key} setup={game.setup} settings={settings} progress={progress} onSave={save} toast={toasts.show} onEarned={celebrate} onExit={() => setGame(null)} onAgain={play} />
+        <Game key={game.key} setup={game.setup} settings={settings} progress={progress} onSave={save} toast={toasts.show} onEarned={celebrate} onExit={() => setGame(null)} onAgain={() => play()} />
       ) : screen === 'shop' ? (
         <ShopScreen progress={progress} onAsk={ask} onClose={() => setScreen('menu')} />
+      ) : screen === 'account' && user ? (
+        <AccountScreen user={user} toast={toasts.show} onUser={setUser} onSignOut={signOut} onDeleted={deleted} onClose={() => setScreen('menu')} />
+      ) : screen === 'homework' && user ? (
+        <HomeworkScreen onPlay={playHomework} onCount={setHomeworkCount} onClose={() => setScreen('menu')} />
       ) : screen === 'wardrobe' ? (
         <WardrobeScreen progress={progress} newKeys={wardrobeNew} onWear={wear} onAsk={ask} onClose={() => setScreen('menu')} />
       ) : screen === 'stats' ? (
@@ -260,9 +338,11 @@ function Main({ onTheme }) {
           user={user}
           choice={choice}
           onChoose={choose}
-          onPlay={play}
+          onPlay={() => play()}
           onSignIn={signIn}
-          onSignOut={signOut}
+          onAccount={() => setScreen('account')}
+          onHomework={() => setScreen('homework')}
+          homeworkCount={homeworkCount}
           signingIn={signingIn}
           accountError={accountError}
           onLocked={ask}
