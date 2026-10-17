@@ -3,6 +3,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Rect } from 'react-native-svg';
 import { useTheme } from './theme';
 
+// primary: the one thing to do next (solid, with a soft shadow); secondary:
+// everything else (a light fill and a thin edge)
 export function Button({ title, onPress, kind = 'primary', disabled = false, style, testID }) {
   const t = useTheme();
   const primary = kind === 'primary';
@@ -10,15 +12,19 @@ export function Button({ title, onPress, kind = 'primary', disabled = false, sty
     <Pressable
       testID={testID}
       accessibilityRole="button"
+      accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
-        { backgroundColor: primary ? t.accentButton : t.surface, borderColor: primary ? t.accentButton : t.line, opacity: disabled ? 0.45 : pressed ? 0.8 : 1 },
+        primary ? [styles.primary, { backgroundColor: t.accentButton, shadowColor: t.accentButton }] : { backgroundColor: t.soft, borderColor: t.line, borderWidth: StyleSheet.hairlineWidth * 2 },
+        { opacity: disabled ? 0.45 : 1, transform: [{ scale: pressed && !disabled ? 0.97 : 1 }] },
         style,
       ]}
     >
-      <Text style={[styles.buttonText, { color: primary ? t.accentInk : t.ink }]}>{title}</Text>
+      <Text numberOfLines={1} style={[styles.buttonText, { color: primary ? t.accentInk : t.ink }]}>
+        {title}
+      </Text>
     </Pressable>
   );
 }
@@ -79,8 +85,9 @@ export function Keypad({ onKey, disabled }) {
 }
 
 const styles = StyleSheet.create({
-  button: { paddingVertical: 14, paddingHorizontal: 20, borderRadius: 14, borderWidth: 2, alignItems: 'center' },
-  buttonText: { fontSize: 18, fontWeight: '700' },
+  button: { height: 52, paddingHorizontal: 20, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  primary: { shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
+  buttonText: { fontSize: 17, fontWeight: '700', letterSpacing: 0.2 },
   dieNumber: { textAlign: 'center', fontWeight: '800' },
   keypad: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
   key: { width: '30%', paddingVertical: 12, borderRadius: 12, borderWidth: 2, alignItems: 'center' },

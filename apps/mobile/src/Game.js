@@ -488,7 +488,7 @@ function Results({ over, match, who, onAgain, onExit }) {
       {match.mode === 'multi' ? <Text style={[styles.resultSub, { color: t.muted }]}>Two-player games are just for fun: they don’t count towards stats or achievements.</Text> : null}
       <View style={styles.resultActions}>
         <Button title="Play again" onPress={onAgain} style={styles.flex} testID="again" />
-        <Button kind="secondary" title="Main menu" onPress={onExit} style={styles.flex} />
+        <Button kind="secondary" title="Menu" onPress={onExit} style={styles.flex} />
       </View>
     </View>
   );
@@ -531,5 +531,5 @@ const styles = StyleSheet.create({
   resultLine: { flexDirection: 'row', justifyContent: 'space-between' },
   resultName: { fontSize: 17, fontWeight: '700' },
   bar: { height: 10, borderRadius: 5, overflow: 'hidden' },
-  resultActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  resultActions: { flexDirection: 'row', gap: 12, marginTop: 8 },
 });
