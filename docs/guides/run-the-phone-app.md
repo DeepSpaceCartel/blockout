@@ -16,7 +16,7 @@ The shop, practice, classes and the other games are still to come. Difficulties 
 
 ## Try it in Expo Go
 
-1. Install **Expo Go** on the phone, from the App Store or Google Play. It must support Expo SDK 58, which the app uses: the store version does.
+1. Install **Expo Go** on the phone, from the App Store or Google Play. The app uses Expo SDK 57, the newest one the App Store's Expo Go runs. (Expo Go runs one SDK at a time: move the app to a newer SDK only once the stores' Expo Go supports it, or a phone shows "Project is incompatible with this version of Expo Go".)
 2. In the dev container, start the app with a tunnel. The phone can't reach the container directly:
    ```sh
    npm run tunnel --workspace @blockout/mobile
@@ -25,7 +25,7 @@ The shop, practice, classes and the other games are still to come. Difficulties 
 
 Changes to the code reload the app on the phone by themselves.
 
-`--tunnel ngrok` needs no Expo account. Plain `--tunnel` (Expo's signed tunnel) needs `npx expo login` first.
+The tunnel (ngrok, through `@expo/ngrok`) needs no Expo account.
 
 ## Signing in
 
