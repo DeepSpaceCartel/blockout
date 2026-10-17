@@ -48,14 +48,13 @@ function newCode(taken, rng = secureRandom) {
 }
 
 // Pacing, set by the teacher for everyone in the class (no shop unlocks needed):
-//   placeMode: 'choice' (each student's own setting) | 'draw' | 'click' | 'auto'
+//   placeMode: 'choice' (each student's own setting) | 'draw' | 'auto'
 //   answerTime: seconds to answer, 0 = no timer
 //   autoRoll (pairs): roll by itself when your turn starts
-//   fitRolls (pairs): only deal rolls that fit — 'end' (near the end), 'always', 'never'
 //   cpuSpeed (pairs, CPU opponent): 'slow' | 'normal' | 'fast'
-const PLACE_MODES = ['choice', 'draw', 'click', 'auto'];
+// (Pairs only ever roll what fits, as every game does now; 'click' placing is gone.)
+const PLACE_MODES = ['choice', 'draw', 'auto'];
 const ANSWER_TIMES = [0, 30, 20, 10];
-const FIT_MODES = ['end', 'always', 'never'];
 const CPU_SPEEDS = ['slow', 'normal', 'fast'];
 const pick = (value, allowed, fallback) => (allowed.includes(value) ? value : fallback);
 // Pairs and tournaments: end a match after this many turns in all (0 = when the board is full)
@@ -71,7 +70,6 @@ function cleanSettings(s = {}) {
     placeMode: pick(s.placeMode, PLACE_MODES, 'choice'),
     answerTime: pick(Number(s.answerTime), ANSWER_TIMES, 0),
     autoRoll: s.autoRoll === true,
-    fitRolls: pick(s.fitRolls, FIT_MODES, 'end'),
     cpuSpeed: pick(s.cpuSpeed, CPU_SPEEDS, 'normal'),
     format: pick(s.format, Tournament.FORMATS, 'knockout'),
     matchTurns: pick(Number(s.matchTurns), MATCH_TURNS, 0),
@@ -533,7 +531,7 @@ function myTurn(room, player) {
 function pairRoll(room, player, rng = Math.random) {
   const m = myTurn(room, player);
   if (m.roll) return { roll: m.roll, passed: false };
-  const roll = Core.rollForBoard(m.board, Core.diceFromState(m.bag, rng), rng, room.settings.fitRolls);
+  const roll = Core.rollForBoard(m.board, Core.diceFromState(m.bag, rng), rng);
   if (!canFit(m.board, roll)) {
     player.passes++;
     m.passes++;

@@ -40,7 +40,6 @@
   /* board canvas */
   --board-bg: #ffffff;
   --board-grid: #d9d2c3;
-  --board-hint: #9a9589;
   --board-edge: #2b2a33;
   --board-fade: rgba(255, 255, 255, 0.62);
   --board-wrong: #8a8578;
@@ -89,7 +88,6 @@
     --swatch-edge: rgba(255, 255, 255, 0.2);
     --board-bg: #1d1b22;
     --board-grid: #3a3643;
-    --board-hint: #7d7889;
     --board-edge: #57525f;
     --board-fade: rgba(22, 21, 27, 0.65);
     --board-wrong: #8f8a99;
@@ -135,7 +133,6 @@
   --swatch-edge: rgba(255, 255, 255, 0.2);
   --board-bg: #1d1b22;
   --board-grid: #3a3643;
-  --board-hint: #7d7889;
   --board-edge: #57525f;
   --board-fade: rgba(22, 21, 27, 0.65);
   --board-wrong: #8f8a99;

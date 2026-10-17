@@ -376,17 +376,22 @@ test('practice lengths are reached separately for each difficulty, on its first 
   assert.match(P.shopItem('practice20.hard').name, /\(Hard\)/);
 });
 
-test('placing rectangles: Click first, then Auto; old owners keep both', () => {
+test('placing rectangles: Auto is its own unlock (Click to place is gone)', () => {
   const s = P.createProgress();
   s.wallet = 500;
-  assert.equal(P.isHidden(s, 'placeAuto'), true);
-  assert.equal(P.buy(s, 'placeAuto').reason, 'requires');
-  assert.equal(P.buy(s, 'placeMode').ok, true);
+  assert.equal(P.isHidden(s, 'placeAuto'), false);
   assert.equal(P.buy(s, 'placeAuto').ok, true);
-  const old = P.normalize({ unlocks: ['placeMode'] });
-  assert.equal(P.isUnlocked(old, 'placeAuto'), true);
-  const fresh = P.normalize({ ...P.normalize(null), unlocks: ['placeMode'] });
-  assert.equal(P.isUnlocked(fresh, 'placeAuto'), false);
+  assert.equal(P.shopItem('placeMode'), null);
+});
+
+test('settings that are gone: Click to place becomes Auto, the others are refunded, once', () => {
+  const flags = { placeAutoV1: true, practiceV2: true, boardsV2: true };
+  const click = P.normalize({ ...flags, wallet: 5, unlocks: ['placeMode'] });
+  assert.deepEqual([click.unlocks.includes('placeAuto'), click.unlocks.includes('placeMode'), click.wallet], [true, false, 5]);
+  const both = P.normalize({ ...flags, wallet: 5, unlocks: ['placeMode', 'placeAuto', 'diceMode', 'fitRolls', 'firstInCorner'] });
+  assert.equal(both.wallet, 5 + 40 + 60 + 40 + 30);
+  assert.ok(['placeMode', 'diceMode', 'fitRolls', 'firstInCorner'].every((id) => !both.unlocks.includes(id)));
+  assert.equal(P.normalize(both).wallet, both.wallet, 'only once');
 });
 
 test('single player Expert and its timers are unlocked for each difficulty; old Settings timers carry over', () => {

@@ -40,7 +40,7 @@ import { ThemeSetting, useTheme } from './theme';
 const CHOICE_KEY = 'blockout.mobile.choice';
 const SETTINGS_KEY = 'blockout.settings'; // (on this phone only, like the web game's)
 // play: single player's 'journey' (level by level) or 'free' (pick the board);
-// practicePlay: Practice's 'journey' (a table a level) or 'free' (pick the tables)
+// practicePlay: Practice's 'journey' (a table a level) or 'free' (Auto: the facts you need)
 const DEFAULT_CHOICE = { mode: 'single', play: 'journey', practicePlay: 'journey', difficulty: 'easy', size: 6, level: 'learn', timer: 0, players: 2 };
 
 // The game to start from the menu's choice (falling back to what's unlocked).
@@ -316,13 +316,14 @@ function Main({ onTheme }) {
     play(next);
   }
 
-  // Homework's Play ›: set the menu up for it, then start
+  // Homework's Play ›: a times table's practice straight away; otherwise set
+  // the menu up for it (a game in Free play, not the Journey's level), then start
   function playHomework(goal) {
     const c = Homework.homeworkChoice(progress, goal);
-    const next = { ...choice, mode: c.mode };
+    if (c.tables) return setGame({ key: Date.now(), practice: { difficulty: c.difficulty || 'easy', count: 5, tables: c.tables, level: 'learn', timer: 0 } });
+    const next = { ...choice, mode: c.mode, ...(c.mode === 'single' ? { play: 'free' } : {}) };
     if (c.difficulty) next.difficulty = c.difficulty;
     if (c.size) next.size = c.size;
-    if (c.tables) next.practice = { ...(choice.practice || {}), tables: c.tables };
     choose(next);
     setScreen('menu');
     play(next);
@@ -338,11 +339,11 @@ function Main({ onTheme }) {
       return setGame({ key: Date.now(), practice: { difficulty: Journey.practiceTier(journeyLevel), count: round.count, tables: [], level: round.expert ? 'expert' : 'learn', timer: round.timer, journeyLevel } });
     }
     if (choice.mode === 'practice' && modeOpen(progress, 'practice')) {
-      const d = difficultyOpen(progress, choice.difficulty) ? choice.difficulty : 'easy';
+      // Auto: the facts you need from every table you've reached, with the
+      // menu's length, Learn or Expert and timer (as far as they're unlocked)
+      const d = Practice.autoDifficulty(progress);
       const pr = Practice.practiceChoice(progress, d, choice.practice || {});
-      // (the tables picked, or else every unlocked one: locked tables never come up)
-      const tables = Practice.roundTables(progress, d, (choice.practice && choice.practice.tables) || []);
-      return setGame({ key: Date.now(), practice: { difficulty: d, count: pr.count, tables, level: pr.level, timer: pr.timer } });
+      return setGame({ key: Date.now(), practice: { difficulty: d, count: pr.count, tables: [], level: pr.level, timer: pr.timer, auto: true } });
     }
     setGame({ key: Date.now(), setup: setupFor(choice, progress, settings, looks) });
   };

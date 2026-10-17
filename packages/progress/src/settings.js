@@ -3,18 +3,17 @@
 // on the device (they're not part of the save); the unlocks are the save's.
 import * as Progress from './progress.js';
 
+// (No more: the corner rule, real dice, "only roll what fits" and click to
+// place. Games always roll in the app, only rolls that fit, anywhere.)
 export const DEFAULT_SETTINGS = {
-  firstInCorner: false,
   cpuSpeed: 'normal',
-  placeMode: 'draw',
-  diceMode: 'virtual',
+  placeMode: 'draw', // 'draw': drag it out; 'auto': placed for you
   cpuEnd: 'auto', // 'auto': next turn starts by itself; 'button': wait for "My turn"
   showProgress: false, // "Board: X of Y filled" meter in the header
   answerTime: '0', // seconds to answer the multiplication; '0' = no timer
   difficulty: 'easy', // easy d6, medium d8, hard d12
   cpuSteps: 'show', // 'show': CPU explains step by step; 'instant': CPU plays straight away
   autoRoll: 'manual', // 'manual': press Roll dice; 'auto': the dice roll by themselves
-  fitRolls: 'end', // "no room": only roll what fits 'end' (near the end), 'always' or 'never'
   // Times-table grid cells: 'icon' (✓ ~ !) or 'time' (best time), per status
   timesMastered: 'icon',
   timesLearning: 'icon',
@@ -31,17 +30,27 @@ export function unlockFor(key, value) {
   if (key === 'difficulty') return `difficulty.${value}`;
   if (key === 'cpuSteps') return 'cpuInstant';
   if (key === 'answerTime') return `answerTime${value}`; // each length is its own unlock
-  if (key === 'placeMode') return value === 'auto' ? 'placeAuto' : 'placeMode'; // Click, then Auto
+  if (key === 'placeMode') return 'placeAuto';
   return key;
 }
 
 export const allowed = (state, key, value) => Progress.isUnlocked(state, unlockFor(key, value));
 
+// Settings that are gone: dropped from a saved copy
+export const GONE = ['firstInCorner', 'diceMode', 'fitRolls'];
+
 // The settings with anything not unlocked (saved before it was locked, or a
-// save swapped by signing in) back to the default
+// save swapped by signing in), or no longer a choice (Click to place), back
+// to the default; settings that are gone are dropped (anything else, like the
+// Wardrobe's cosmetics, is kept as it is)
 export function enforce(settings, state) {
   const out = { ...DEFAULT_SETTINGS, ...settings };
-  for (const key of Object.keys(DEFAULT_SETTINGS)) if (!allowed(state, key, out[key])) out[key] = DEFAULT_SETTINGS[key];
+  for (const key of GONE) delete out[key];
+  for (const key of Object.keys(DEFAULT_SETTINGS)) {
+    const def = SETTINGS.find((s) => s.key === key);
+    const choice = !def || def.options.some((o) => String(o.value) === String(out[key]));
+    if (!choice || !allowed(state, key, out[key])) out[key] = DEFAULT_SETTINGS[key];
+  }
   return out;
 }
 
@@ -49,11 +58,8 @@ export function enforce(settings, state) {
 // the stored ones (booleans for the yes/no settings).
 export const SETTINGS = [
   { key: 'theme', label: 'Theme', help: '"Auto" follows your device\'s light or dark mode.', options: [['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']] },
-  { key: 'firstInCorner', label: 'First rectangle', help: '"Top-left corner" is the original rule: it stops Player 1 from grabbing the best spot.', options: [[false, 'Anywhere'], [true, 'Top-left corner']] },
-  { key: 'diceMode', label: 'Dice', help: '"Real dice": roll your own dice at the table and tap the numbers you got. CPU players still roll their own dice in the app.', options: [['virtual', 'Roll in the app'], ['real', 'Real dice']] },
-  { key: 'autoRoll', label: 'Rolling', help: '"Auto roll": your dice roll by themselves at the start of each turn. (With real dice you still roll at the table.)', options: [['manual', 'Press to roll'], ['auto', 'Auto roll']] },
-  { key: 'fitRolls', label: 'Only roll what fits', help: '"No room" means your roll doesn\'t fit anywhere, so you pass. Near the end: when the board is nearly full, only rolls that fit (adjusts to board size and difficulty). Always: nobody ever passes. Never: the original rules.', options: [['end', 'Near the end'], ['always', 'Always'], ['never', 'Never']] },
-  { key: 'placeMode', label: 'Placing rectangles', help: '"Draw it": press and drag to draw a rectangle of the right size. "Click to place": the rectangle is made for you, you pick the spot. "Auto": the game places it for you, so you only do the math.', options: [['draw', 'Draw it'], ['click', 'Click to place'], ['auto', 'Auto']] },
+  { key: 'autoRoll', label: 'Rolling', help: '"Auto roll": your dice roll by themselves at the start of each turn.', options: [['manual', 'Press to roll'], ['auto', 'Auto roll']] },
+  { key: 'placeMode', label: 'Placing rectangles', help: '"Draw it": press and drag to draw a rectangle of the right size. "Auto": the game places it for you, so you only do the math.', options: [['draw', 'Draw it'], ['auto', 'Auto']] },
   { key: 'cpuSpeed', label: 'CPU explanations', help: 'How long each step of a CPU turn takes — every message, every square it draws and every number it counts. Slow: 2 seconds · Normal: 1 second · Fast: ½ second.', options: [['slow', 'Slow'], ['normal', 'Normal'], ['fast', 'Fast']] },
   { key: 'cpuSteps', label: 'CPU turns', help: '"Instant": the CPU plays its turn straight away without explaining, and it\'s your go again.', options: [['show', 'Show steps'], ['instant', 'Instant']] },
   { key: 'cpuEnd', label: 'After a CPU turn', help: '"Press a button" keeps the CPU\'s explanation on screen until you press the button to go on.', options: [['auto', 'Continue automatically'], ['button', 'Press a button']] },

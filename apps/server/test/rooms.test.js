@@ -26,18 +26,18 @@ test('codes are four easy-to-read letters; settings are cleaned', () => {
     placeMode: 'choice',
     answerTime: 0,
     autoRoll: false,
-    fitRolls: 'end',
     cpuSpeed: 'normal',
     format: 'knockout',
     matchTurns: 0,
     swissRounds: 3,
     kothMatches: 10,
   });
-  Rooms.setSettings(room, { placeMode: 'auto', answerTime: 20, autoRoll: true, fitRolls: 'always', cpuSpeed: 'fast' });
+  Rooms.setSettings(room, { placeMode: 'auto', answerTime: 20, autoRoll: true, fitRolls: 'never', cpuSpeed: 'fast' });
+  assert.equal(room.settings.fitRolls, undefined, 'gone: pairs only roll what fits');
   assert.equal(room.settings.placeMode, 'auto');
   assert.equal(room.settings.answerTime, 20);
   assert.equal(room.settings.autoRoll, true);
-  Rooms.setSettings(room, { answerTime: 7, placeMode: 'teleport' }); // not allowed: back to the defaults
+  Rooms.setSettings(room, { answerTime: 7, placeMode: 'click' }); // not allowed (any more): back to the defaults
   assert.equal(room.settings.answerTime, 0);
   assert.equal(room.settings.placeMode, 'choice');
   assert.equal(room.settings.difficulty, 'hard'); // untouched

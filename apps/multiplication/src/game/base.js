@@ -47,7 +47,7 @@ const $ = (id) => document.getElementById(id);
 // multiKind: 'local' (one screen) or 'classroom' (not built yet)
 // level/timer: single player's Learn / Expert and Expert's answer timer (seconds)
 // play: single player's 'journey' (level by level) or 'free' (pick the board)
-// practicePlay: Practice's 'journey' (a table a level) or 'free' (pick the tables)
+// practicePlay: Practice's 'journey' (a table a level) or 'free' (Auto: the facts you need)
 const setup = { mode: 'single', play: 'journey', practicePlay: 'journey', multiKind: 'local', level: 'learn', timer: 0, count: 2, size: 6, names: ['', '', '', ''], types: ['human', 'human', 'human', 'human'] };
 
 // What this part does when the page loads (main.js runs every part in order)
@@ -152,7 +152,6 @@ export function run() {
     gameTimerHelp: $('game-timer-help'),
     boardSizeHelp: $('board-size-help'),
     journeyCard: $('journey-card'),
-    practiceTablesField: $('practice-tables-field'),
     practiceCountField: $('practice-count-field'),
     practiceLevelField: $('practice-level-field'),
     pdJourney: $('pd-journey'),
@@ -178,7 +177,6 @@ export function run() {
     dieB: $('die-b'),
     turnMsg: $('turn-msg'),
     rollBtn: $('roll-btn'),
-    rotateBtn: $('rotate-btn'),
     math: $('math'),
     mathQ: $('math-q'),
     answerBox: $('answer-box'),
@@ -187,9 +185,6 @@ export function run() {
     keypad: $('keypad'),
     helpBtn: $('help-btn'),
     steps: $('steps'),
-    diceEntry: $('dice-entry'),
-    diePicks: document.querySelectorAll('.die-pick'),
-    useDiceBtn: $('use-dice'),
     continueBtn: $('continue-btn'),
     timer: $('timer'),
     timerFill: $('timer-fill'),
@@ -237,7 +232,6 @@ export function run() {
     practiceTimer: $('practice-timer'),
     practiceTimerHelp: $('practice-timer-help'),
     practicePreview: $('practice-preview'),
-    practiceTables: $('practice-tables'),
     practiceLevel: $('practice-level'),
     practiceLevelHelp: $('practice-level-help'),
     difficultyField: $('difficulty-field'),
@@ -309,7 +303,6 @@ export function run() {
     inviteStart: $('invite-start'),
     inviteCancel: $('invite-cancel'),
     settingsDone: $('settings-done'),
-    cornerRuleHint: $('corner-rule-hint'),
   };
 
   ctx = el.canvas.getContext('2d');

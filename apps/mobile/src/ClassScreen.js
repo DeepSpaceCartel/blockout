@@ -134,7 +134,7 @@ function setupFor(view, next, settings, looks) {
       : view.match.players.map((p, i) => (i === next.me ? mine({ name: p.name }) : { name: p.isTeacher ? 'Teacher' : p.name, avatar: p.avatar, title: p.title })); // (the server plays a CPU partner's turns)
   return {
     setup: { mode: next.kind, difficulty: s.difficulty, size: s.size, players, timer, timerMs: timer * 1000 },
-    cfg: { ...settings, ...Live.classCfg(s, settings.placeMode), autoRoll: 'manual', fitRolls: 'never' },
+    cfg: { ...settings, ...Live.classCfg(s, settings.placeMode), autoRoll: 'manual' },
   };
 }
 

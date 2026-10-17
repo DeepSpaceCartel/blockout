@@ -5,12 +5,12 @@ import * as Views from '@blockout/progress/views';
 import * as Settings from '@blockout/progress/settings';
 import * as Wardrobe from '@blockout/progress/wardrobe';
 import * as Setup from '@blockout/progress/setup';
-import { BOARD_UNLOCK, DEFAULT_NAMES, DEFAULT_SETTINGS, el, setup } from './base.js';
+import { BOARD_UNLOCK, DEFAULT_NAMES, el, setup } from './base.js';
 import { formatPoints, progress, saveProgress, toast, updateMenuBadges } from './wallet.js';
 import { saveSettings, settings } from './settings.js';
 import { game, make, startGame } from './play.js';
 import { confirmUnlock, filterNote, markSeen, refreshOpenNudges, renderWalletBar, seenList, wardrobeKeys } from './shop.js';
-import { practiceLevel, practiceRoundSize, practiceTableList, practiceTimerSecs, startPractice, startPracticeJourney, updatePracticePreview } from './practice.js';
+import { startPracticeAuto, startPracticeJourney, updatePracticePreview } from './practice.js';
 import { checkClassroom } from './classroom.js';
 import { journeyDifficulty, practiceJourneyOn, renderJourney } from './journey.js';
 import { drawBoard, render, renderDie } from './render.js';
@@ -198,13 +198,12 @@ function closeStickers() {
 // Shop item that unlocks a setting's choice; null when it's free (the default).
 const unlockFor = Settings.unlockFor;
 
-const isAllowed = (key, value) => Settings.allowed(progress, key, value);
-
 // Anything saved before it was locked (or not yet bought) falls back to the default.
+// (and settings that are gone dropped, choices that are gone back to the default)
 function enforceLocks() {
-  for (const key of Object.keys(DEFAULT_SETTINGS)) {
-    if (!isAllowed(key, settings[key])) settings[key] = DEFAULT_SETTINGS[key];
-  }
+  const out = Settings.enforce(settings, progress);
+  for (const key of Settings.GONE) delete settings[key];
+  Object.assign(settings, out);
 }
 
 // A Lucide icon from the sprite in index.html, e.g. icon('lock').
@@ -251,7 +250,6 @@ function syncSettingsUI() {
       setLockBadge(btn, unlockFor(key, btn.dataset.value));
     }
   }
-  el.cornerRuleHint.hidden = !settings.firstInCorner;
 }
 
 // Setting buttons live in the Settings dialog and (difficulty) on the main menu.
@@ -286,7 +284,7 @@ function openSettings(opener) {
   if (inGame) {
     el.settingsNote.textContent = game.invite
       ? 'You’re playing an invite, so its rules stay the same until the game ends. Theme changes apply now.'
-      : 'Theme, CPU speed and the progress bar change now. Other changes start from the next turn. The corner rule applies to new games.';
+      : 'Theme, CPU speed and the progress bar change now. Other changes start from the next turn.';
   }
   syncSettingsUI();
   el.settingsDialog.hidden = false;
@@ -307,12 +305,10 @@ function applySettingsForTurn() {
   if (!game || game.invite || game.fixed) return;
   applySettingsNow();
   game.placeMode = settings.placeMode;
-  game.diceMode = settings.diceMode;
   game.autoRoll = settings.autoRoll === 'auto';
   game.cpuInstant = settings.cpuSteps === 'instant';
   // single player uses its own Expert timer; the Settings timer is for Home multiplayer
   game.answerTime = game.mode === 'single' ? game.levelTimer : Number(settings.answerTime) || 0;
-  game.fitMode = settings.fitRolls;
 }
 
 function selectIn(container, button) {
@@ -647,12 +643,8 @@ export function run() {
     e.preventDefault();
     if (setup.mode === 'multi' && setup.multiKind === 'classroom') return; // not built yet
     if (setup.mode === 'practice') {
-      if (practiceJourneyOn()) return startPracticeJourney(el.practiceName.value.trim() || 'You');
-      const tables = practiceTableList();
-      if (!tables.length) return;
-      const expert = practiceLevel === 'expert';
-      startPractice(el.practiceName.value.trim() || 'You', practiceRoundSize, tables, expert, expert ? practiceTimerSecs : 0);
-      return;
+      const name = el.practiceName.value.trim() || 'You';
+      return practiceJourneyOn() ? startPracticeJourney(name) : startPracticeAuto(name);
     }
     saveNameInputs();
     if (!el.customSize.hidden) setCustomSize(readCustomSize());

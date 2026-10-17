@@ -34,15 +34,14 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onClass
   const playSwitch = choice.mode === 'single' && Journey.freePlayOpen(progress) && !Journey.isDone(progress);
   // Practice's Journey: the level picks the times table
   const practiceLevel = choice.mode === 'practice' && Journey.onPracticeJourney(progress, choice.practicePlay) ? Journey.practiceLevel(progress) : null;
-  const practiceSwitch = choice.mode === 'practice' && Journey.freePracticeOpen(progress) && !Journey.practiceDone(progress);
-  const d = journeyLevel ? Journey.levelSetup(journeyLevel).difficulty : practiceLevel ? Journey.practiceTier(practiceLevel) : choice.difficulty;
+  const practiceSwitch = choice.mode === 'practice' && Journey.autoPracticeOpen(progress) && !Journey.practiceDone(progress);
+  // (Practice on Auto goes by its biggest reached table's difficulty)
+  const d = journeyLevel ? Journey.levelSetup(journeyLevel).difficulty : practiceLevel ? Journey.practiceTier(practiceLevel) : choice.mode === 'practice' ? Practice.autoDifficulty(progress) : choice.difficulty;
   const level = Setup.gameLevel(progress, d, choice); // (what's unlocked on this difficulty)
   const practicing = choice.mode === 'practice';
   const pr = Practice.practiceChoice(progress, d, choice.practice || {});
-  const picked = (choice.practice && choice.practice.tables) || [];
-  const prPreview = practicing && !practiceLevel ? Practice.preview(progress, d, picked) : null;
   const warning = practicing || journeyLevel ? null : Setup.boardWarning(d, choice.size);
-  const setPractice = (part) => onChoose({ practice: { ...pr, tables: picked, ...part } });
+  const setPractice = (part) => onChoose({ practice: { ...pr, ...part } });
   return (
     <View style={[styles.fill, { backgroundColor: t.bg }]}>
       <ScrollView contentContainerStyle={styles.page} bounces={false}>
@@ -105,7 +104,7 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onClass
               prefix="play-"
               items={[
                 { id: 'journey', label: '🧗 Journey', open: true },
-                { id: 'free', label: practicing ? '🎲 Free practice' : '🎲 Free play', open: true },
+                { id: 'free', label: practicing ? '✨ Auto' : '🎲 Free play', open: true },
               ]}
               value={journeyLevel || practiceLevel ? 'journey' : 'free'}
               onPick={(play) => onChoose(practicing ? { practicePlay: play } : { play })}
@@ -170,7 +169,8 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onClass
           ) : null}
         </Section>
 
-        {journeyLevel || practiceLevel ? null : (
+        {/* (practice has no difficulty: the Journey's table or Auto picks the facts) */}
+        {journeyLevel || practicing ? null : (
           <Section title="Difficulty">
             {/* (only what the Journey has reached) */}
             <Segments
@@ -185,31 +185,10 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onClass
 
         {practicing ? (
           practiceLevel ? null : (
-          <Section title="Times tables">
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-              {/* (only the tables Practice's Journey has reached) */}
-              {Practice.tableChoices(d).filter((n) => Practice.tableOpen(progress, n)).map((n) => {
-                const on = picked.includes(n);
-                const open = Practice.tableOpen(progress, n);
-                return (
-                  <Pressable
-                    key={n}
-                    testID={`table-${n}`}
-                    accessibilityRole="checkbox"
-                    accessibilityLabel={`${n} times table${open ? '' : ', locked'}`}
-                    accessibilityState={{ checked: on }}
-                    onPress={() => (open ? setPractice({ tables: on ? picked.filter((x) => x !== n) : [...picked, n] }) : onLocked(Practice.tableItem(n)))}
-                    style={[styles.chip, { backgroundColor: on ? t.accentSoft : t.surface, borderColor: on ? t.accent : t.line, opacity: open ? 1 : 0.5 }]}
-                  >
-                    <Text style={[styles.chipText, { color: t.ink }]}>{open ? `×${n}` : '🔒'}</Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-            <Text testID="practice-preview" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={[styles.preview, { color: prPreview ? t.muted : t.bad }]}>
-              {prPreview || 'Unlock a times table to practice: tap ×1 to start.'}
-            </Text>
-          </Section>
+          // Auto: what it will ask (the facts you need, from every table you've reached)
+          <Text testID="practice-preview" style={[styles.preview, { color: t.muted }]}>
+            {Practice.autoPreview(progress)}
+          </Text>
           )
         ) : journeyLevel ? null : (
           <Section title="Board">
@@ -230,7 +209,7 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onClass
         ))}
         <View style={styles.playRow}>
           <Button testID="class" kind="secondary" title="🏫 Class" onPress={() => onClass('')} style={styles.classBtn} />
-          <Button testID="play" title={practiceLevel ? `▶ Practice ×${Journey.practiceSetup(practiceLevel).table}` : practicing ? 'Practice' : journeyLevel ? `▶ Play Level ${journeyLevel}` : 'Play'} onPress={onPlay} disabled={Boolean(warning) || (practicing && !practiceLevel && !prPreview)} style={styles.flex} />
+          <Button testID="play" title={practiceLevel ? `▶ Practice ×${Journey.practiceSetup(practiceLevel).table}` : practicing ? 'Practice' : journeyLevel ? `▶ Play Level ${journeyLevel}` : 'Play'} onPress={onPlay} disabled={Boolean(warning)} style={styles.flex} />
         </View>
       </View>
     </View>
@@ -245,7 +224,7 @@ function JourneyCard({ progress, practice = false }) {
   const done = practice ? Journey.practiceDone(progress) : Journey.isDone(progress);
   const steps = practice ? Journey.practiceSteps(progress) : Journey.steps(progress);
   const line = practice
-    ? done ? 'You finished every times table. Pick any of them in Free practice!' : Journey.practiceLine(level)
+    ? done ? 'You finished every times table. Auto keeps you sharp!' : Journey.practiceLine(level)
     : done ? 'You finished every level. Pick any board and dice in Free play!' : Journey.levelLine(level);
   return (
     <View testID="journey-card" style={[styles.journey, { backgroundColor: t.accentSoft, borderColor: t.accent }]}>

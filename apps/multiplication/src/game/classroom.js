@@ -16,7 +16,7 @@ import { currentPlayer, game, gameId, humanRoll, make, renderStats, resetTurn, r
 import { loadHistory, saveHistory } from './stats.js';
 import { refreshNudges, tap } from './shop.js';
 import { drawQr } from './invites.js';
-import { dragRect, humanPreview, setDetailsOpen, toMenu } from './input.js';
+import { dragRect, setDetailsOpen, toMenu } from './input.js';
 import { render, renderDie, resizeBoard, setMsg } from './render.js';
 
 const HOST_SETTINGS = Hosting.HOST_SETTINGS; // the lobby's settings ([value, label, detail]; `only`: some game types)
@@ -216,7 +216,7 @@ function startClassGame(view) {
   const you = view.you;
   const { size, difficulty } = view.settings;
   startGame([{ name: you.name, statsName: el.singleName.value.trim() || 'You', cpu: false }], size, 'class', null, {
-    cfg: { ...classCfg(view.settings), difficulty, autoRoll: 'off', fitRolls: 'never' }, // the teacher rolls
+    cfg: { ...classCfg(view.settings), difficulty, autoRoll: 'off' }, // the teacher rolls
     classroom: { session: classSession, game: view.game, round: 0, reported: true, view },
   });
   // Rejoining mid-game: put your rectangles back and pick up your score.
@@ -371,7 +371,7 @@ async function animatePartnerRoll([a, b]) {
 }
 
 // Your turn in pairs: tell your partner what you're doing (the rectangle you're
-// dragging or aiming, then the one you're answering), when it changes, a few
+// dragging, then the one you're answering), when it changes, a few
 // times a second at most. Called from render().
 const LIVE_EVERY_MS = 120;
 let liveSent = '';
@@ -380,7 +380,7 @@ function pairLiveTick() {
   if (!game || game.mode !== 'pair' || game.phase === 'over') return;
   const c = game.classroom;
   if (game.current !== c.me || !['place', 'answer'].includes(game.phase)) return;
-  const rect = game.phase === 'answer' ? game.pending && game.pending.rect : game.drag ? dragRect() : humanPreview();
+  const rect = game.phase === 'answer' ? game.pending && game.pending.rect : game.drag ? dragRect() : null;
   const payload = { phase: game.phase === 'answer' ? 'answer' : 'place', rect: rect ? { x: rect.x, y: rect.y, w: rect.w, h: rect.h } : null };
   const key = JSON.stringify(payload);
   if (key === liveSent) return;

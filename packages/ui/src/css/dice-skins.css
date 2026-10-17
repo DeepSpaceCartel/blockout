@@ -66,10 +66,7 @@
 a.btn { color: inherit; text-decoration: none; display: inline-block; }
 .btn-small { padding: 0.35rem 0.8rem; font-size: 0.9rem; }
 
-/* Real dice entry */
-.dice-entry { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 4px 0 12px; }
-.die-pick-label { font-size: 0.8rem; font-weight: 800; color: var(--muted); }
-.die-pick { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+/* Small dice (the Wardrobe's dice looks) */
 .die.mini {
   width: 36px;
   height: 36px;
@@ -82,7 +79,6 @@ a.btn { color: inherit; text-decoration: none; display: inline-block; }
 .die.mini.selected { background: var(--turn-color, var(--accent)); }
 .die.mini.selected .pip { background: #fff; }
 .die.mini:active { transform: translateY(2px); box-shadow: none; }
-#use-dice { margin-top: 6px; }
 
 /* Math panel (human answers) */
 .math { margin: 4px 0 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; }

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Practice's second mode is **Auto** instead of Free practice: no tables or difficulty to pick, the game asks what you need from every table you've reached (your facts to practice, then the ones that need practice, then Learning and new facts mixed; mastered facts only once everything else is), with the length, level and timer you choose.
+
+### Fixed
+- Homework for a times table started a Journey round instead of that table, and homework for a game played the Journey's level instead of its board. Table homework now starts its round straight away, and game homework plays in Free play.
+
+### Removed
+- Four settings: *First rectangle* (the corner rule), *Dice* (real dice), *Only roll what fits* and *Click to place*. Every game now rolls in the app, only rolls what fits (nobody passes while anything fits), and lets the first rectangle go anywhere; placing is *Draw it* or *Auto*. Players who bought Click to place get Auto (or their points back if they had it); Real dice and the *No room* options are refunded. In the web game, the phone app and live classes (teachers no longer pick *Only rolls that fit*). Old invite links still open.
+
 ## [0.9.2] - 2026-10-17
 
 ### Changed

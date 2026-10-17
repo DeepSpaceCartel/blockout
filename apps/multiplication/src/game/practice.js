@@ -15,15 +15,14 @@ import { confirmUnlock, refreshNudges } from './shop.js';
 import { completeDaily } from './daily.js';
 import { practiceJourneyDifficulty, practiceJourneyOn, renderJourney } from './journey.js';
 
-let practiceTables;
 
 // (a round's rules, words and setup are shared with the phone app: @blockout/progress/practice)
 
 let practiceRoundSize = 5;
 
 // Whose unlocks Practice's Expert, timers and lengths go by: on the Journey
-// the table's difficulty, else the menu's
-const practiceDifficulty = () => practiceJourneyDifficulty() || settings.difficulty;
+// the table's difficulty, on Auto the biggest reached table's
+const practiceDifficulty = () => practiceJourneyDifficulty() || Practice.autoDifficulty(progress);
 
 // 5 comes with Practice mode; 10 and 20 are unlocked for each difficulty
 const countUnlock = (count) => Practice.countItem(practiceDifficulty(), count);
@@ -77,44 +76,18 @@ function playerFacts(name) {
 // about a third of the rolls would be weak facts (this makes it ~70%).
 const weakFactWeight = (player) => Setup.masterWeight(progress, player ? player.name : 'You');
 
-// Practice table size follows Difficulty: Easy 6, Medium 8, Hard 12 (and
-
-// The difficulty's table chips: ×1 … ×max, Tricky's hard tables, Legend's ×2 … ×9
-const practiceChips = () => Practice.tableChoices(settings.difficulty);
-
-// Chips for the difficulty's tables; choices it doesn't have are dropped.
-function renderPracticeTables() {
-  const chips = practiceChips();
-  for (const n of [...practiceTables]) if (!chips.includes(n) || !tableUnlocked(n)) practiceTables.delete(n);
-  el.practiceTables.innerHTML = '';
-  for (const n of chips) {
-    const btn = make('button', null, `×${n}`);
-    btn.type = 'button';
-    btn.dataset.table = n;
-    btn.setAttribute('aria-pressed', String(practiceTables.has(n)));
-    btn.setAttribute('aria-label', `${n} times table`);
-    setLockBadge(btn, `table${n}`);
-    el.practiceTables.append(btn);
-  }
-}
-
-// "×3 and ×4 (11 facts): 2 need practice, 5 learning, 4 not seen yet, 0 mastered."
+// "×3 and ×4"
 const tablesLabel = Shop.tablesLabel;
 
-// The tables a round asks about: the ones picked, or else every unlocked one.
-function practiceTableList() {
-  return Practice.roundTables(progress, settings.difficulty, [...practiceTables]);
-}
-
+// Practice is the Journey (a table a level) or Auto (the facts you need, from
+// every table you've reached): the menu shows what Auto will ask
 function updatePracticePreview() {
   if (el.practiceSetup.hidden) return;
   renderPracticeLevel();
   renderPracticeCount();
-  renderPracticeTables();
   if (practiceJourneyOn()) return renderJourney(); // (the level picks the table)
-  const text = Practice.preview(progress, settings.difficulty, [...practiceTables], el.practiceName.value.trim() || 'You');
-  el.startBtn.disabled = !text;
-  el.practicePreview.textContent = text || 'Unlock a times table to practice: tap ×1 to start.';
+  el.startBtn.disabled = false;
+  el.practicePreview.textContent = Practice.autoPreview(progress, el.practiceName.value.trim() || 'You');
 }
 
 function renderPracticeCount() {
@@ -127,9 +100,6 @@ function renderPracticeCount() {
   el.practiceCountHelp.textContent = Practice.countHelp(practiceRoundSize, practiceLevel === 'expert');
 }
 
-// Times tables are unlocked one by one (×1, then ×2, …)
-const tableUnlocked = (n) => Practice.tableOpen(progress, n);
-
 // A Practice Journey round: the level reached sets the ×n table, the length,
 // Learn or Expert and the timer
 function startPracticeJourney(name) {
@@ -138,15 +108,23 @@ function startPracticeJourney(name) {
   startPractice(name, round.count, [], round.expert, round.timer, Journey.practiceTier(level), level);
 }
 
+// An Auto round: the facts you need from every table you've reached, with
+// the menu's length, Learn or Expert and timer (as far as they're unlocked)
+function startPracticeAuto(name) {
+  const d = Practice.autoDifficulty(progress);
+  const c = Practice.practiceChoice(progress, d, { level: practiceLevel, timer: practiceTimerSecs, count: practiceRoundSize });
+  startPractice(name, c.count, [], c.level === 'expert', c.timer, d, null, true);
+}
+
 // difficulty: whose dice the questions come from (today's practice may pick one)
-// journeyLevel: a Practice Journey round on the ×n table
-function startPractice(name, count, tables = [], expert = false, timer = 0, difficulty = settings.difficulty, journeyLevel = null) {
+// journeyLevel: a Practice Journey round on the ×n table; auto: an Auto round
+function startPractice(name, count, tables = [], expert = false, timer = 0, difficulty = settings.difficulty, journeyLevel = null, auto = false) {
   stopPracticeTimer();
   cancelContinue();
   stopTimer();
   setGameId(gameId + 1); // cancels anything still waiting from a game
   setGame(null);
-  practice = Practice.createRound(progress, { name, difficulty, count, tables, level: expert ? 'expert' : 'learn', timer, journeyLevel });
+  practice = Practice.createRound(progress, { name, difficulty, count, tables, level: expert ? 'expert' : 'learn', timer, journeyLevel, auto });
   practice.earned = [];
   el.startScreen.hidden = true;
   el.gameScreen.hidden = true;
@@ -417,18 +395,6 @@ export function run() {
     renderPracticeCount(); // Expert doubles the finishing bonus
   });
 
-  practiceTables = new Set();
-
-  el.practiceTables.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-table]');
-    if (!btn) return;
-    if (btn.dataset.unlock) return confirmUnlock(btn.dataset.unlock, btn);
-    const n = Number(btn.dataset.table);
-    if (practiceTables.has(n)) practiceTables.delete(n);
-    else practiceTables.add(n);
-    updatePracticePreview();
-  });
-
   el.practiceName.addEventListener('input', updatePracticePreview);
 
   el.practiceCount.addEventListener('click', (e) => {
@@ -450,6 +416,7 @@ export function run() {
   el.pdAgain.addEventListener('click', () => {
     // a Journey round goes on with the level reached (the next table, after a good round)
     if (practice.journeyLevel && !Journey.practiceDone(progress)) return startPracticeJourney(practice.name);
+    if (practice.auto) return startPracticeAuto(practice.name); // (picked again: what you need now)
     startPractice(practice.name, practice.count, practice.tables, practice.expert, practice.timer, practice.difficulty);
   });
 
@@ -477,4 +444,4 @@ export function run() {
   });
 }
 
-export { playerFacts, practiceLevel, practiceRoundSize, practiceTableList, practiceTimerSecs, setPractice, startPractice, startPracticeJourney, stopPracticeTimer, tablesLabel, timerText, updatePracticePreview, weakFactWeight };
+export { playerFacts, practiceLevel, practiceRoundSize, practiceTimerSecs, setPractice, startPractice, startPracticeAuto, startPracticeJourney, stopPracticeTimer, tablesLabel, timerText, updatePracticePreview, weakFactWeight };

@@ -49,13 +49,13 @@ export function goneToast(reason, wasIn) {
 }
 
 // The teacher's settings for everyone (no shop locks); placing is the
-// student's own choice unless the teacher picked one
-export const classCfg = (s, ownPlaceMode) => ({
-  answerTime: s.answerTime || 0,
-  placeMode: s.placeMode && s.placeMode !== 'choice' ? s.placeMode : ownPlaceMode,
-  firstInCorner: false,
-  diceMode: 'virtual',
-});
+// student's own choice unless the teacher picked one (Draw or Auto: a class
+// set to Click before it went draws)
+const PLACE_MODES = ['draw', 'auto'];
+export const classCfg = (s, ownPlaceMode) => {
+  const mode = s.placeMode && s.placeMode !== 'choice' ? s.placeMode : ownPlaceMode;
+  return { answerTime: s.answerTime || 0, placeMode: PLACE_MODES.includes(mode) ? mode : 'draw' };
+};
 
 // ---- the board
 

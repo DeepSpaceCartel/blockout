@@ -15,7 +15,8 @@ test('the waiting screen and the tournament line', () => {
   assert.equal(Live.tournamentLine({ status: 'finished', champion: 'Ana', place: 2, of: 8, wins: 2, losses: 1 }), 'Ana won the tournament. You finished 2nd of 8 (2–1).');
   assert.equal(Live.goneToast('closed', false), null, 'an old class: just forgotten');
   assert.deepEqual(Live.goneToast('closed', true), ['👋 Your teacher closed the class', 'Thanks for playing!']);
-  assert.deepEqual(Live.classCfg({ placeMode: 'choice', answerTime: 10 }, 'auto'), { answerTime: 10, placeMode: 'auto', firstInCorner: false, diceMode: 'virtual' });
+  assert.deepEqual(Live.classCfg({ placeMode: 'choice', answerTime: 10 }, 'auto'), { answerTime: 10, placeMode: 'auto' });
+  assert.deepEqual(Live.classCfg({ placeMode: 'click' }, 'auto'), { answerTime: 0, placeMode: 'draw' }, 'a class set to Click before it went');
 });
 
 test('pairs: the partner’s rectangles, passes and the turn come from the server', () => {

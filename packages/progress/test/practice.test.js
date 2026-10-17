@@ -128,3 +128,37 @@ test('a Practice Journey round: the ×n table with a little review, its round’
   for (let i = 0; i < 50; i++) for (const [a, b] of Practice.journeyQueue({}, 6, 10, Math.random)) assert.ok(a <= 6 && b <= 6, `${a} × ${b}`);
   for (let i = 0; i < 20; i++) assert.ok(Practice.journeyQueue({}, 10, 10, Math.random).every(([a, b]) => a <= 12 && b <= 12));
 });
+
+test('Auto: facts to practice first, then the ones that need practice, then Learning and new ones mixed', () => {
+  const s = withTables(1, 2, 3);
+  const said = (a, b, { right, times }) => {
+    for (let i = 0; i < times; i++) Progress.recordAnswer(s, 'You', { a, b, firstTry: right, correct: true, wrongAnswers: right ? [] : [a * b + 1], ms: 2000 });
+  };
+  said(7, 8, { right: false, times: 1 }); // missed in a game: a fact to practice (not even a reached table)
+  said(7, 8, { right: true, times: 1 });
+  said(2, 3, { right: false, times: 3 }); // needs practice (and missed: a fact to practice too)
+  said(3, 3, { right: true, times: 4 }); // mastered
+  const g = Practice.autoGroups(s);
+  assert.deepEqual(g.toPractice, ['2 × 3', '7 × 8'], 'most missed first');
+  assert.ok(!g.needs.includes('2 × 3'), 'once is enough');
+  assert.ok(g.fresh.includes('1 × 5') && g.fresh.includes('6 × 3'), 'learning and not seen yet, from ×1 to ×3 up to 6');
+  assert.ok(g.mastered.includes('3 × 3'));
+  assert.ok(!g.fresh.includes('4 × 4'), 'not a reached table');
+  const q = Practice.autoQueue(s, 'You', 5, seeded(2)).map(([a, b]) => `${a} × ${b}`);
+  assert.equal(q.length, 5);
+  assert.ok(q.includes('2 × 3') && q.includes('7 × 8'));
+  assert.ok(!q.includes('3 × 3'), 'no mastered ones while anything else is left');
+  // only a few weak facts left: they come again, not mastered ones
+  const m = withTables(1);
+  for (let b = 1; b <= 6; b++) for (const [x, y] of [[1, b], [b, 1]]) for (let i = 0; i < 4; i++) Progress.recordAnswer(m, 'You', { a: x, b: y, firstTry: !(x === 1 && y === 4), correct: true, wrongAnswers: x === 1 && y === 4 ? [5] : [], ms: 2000 });
+  const few = Practice.autoQueue(m, 'You', 5, seeded(4)).map(([a, b]) => `${a} × ${b}`);
+  assert.deepEqual(few, Array(5).fill('1 × 4'), 'the one weak fact, five times');
+  // everything mastered: mastered it is
+  const all = withTables(1);
+  for (let b = 1; b <= 6; b++) for (const [x, y] of [[1, b], [b, 1]]) for (let i = 0; i < 4; i++) Progress.recordAnswer(all, 'You', { a: x, b: y, firstTry: true, correct: true, wrongAnswers: [], ms: 2000 });
+  assert.equal(Practice.autoQueue(all, 'You', 5, seeded(4)).length, 5);
+  assert.match(Practice.autoPreview(s), /^First 2 facts to practice; then Learning and new facts from ×1 to ×3\.$/);
+  assert.equal(Practice.autoDifficulty(s), 'easy');
+  const r = Practice.createRound(s, { auto: true, count: 10, rng: seeded(3) });
+  assert.deepEqual([r.queue.length, r.auto, r.tables], [10, true, [1, 2, 3]]);
+});

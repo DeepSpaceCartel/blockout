@@ -148,11 +148,6 @@
             </div>
             <p class="setting-help" id="practice-count-help"></p>
           </div>
-          <div class="field" id="practice-tables-field">
-            <span>Times tables to practice</span>
-            <div class="table-chips" id="practice-tables" role="group" aria-label="Times tables to practice"></div>
-            <p class="setting-help">Unlock tables one at a time, then pick as many as you like. None picked: questions come from all your unlocked tables, focusing on the facts you find hardest.</p>
-          </div>
           <p class="practice-preview" id="practice-preview"></p>
         </div>
 
@@ -334,15 +329,6 @@
           </div>
           <div class="turn-msg" id="turn-msg" aria-live="polite"></div>
 
-          <!-- Human with real dice: enter what was rolled -->
-          <div class="dice-entry" id="dice-entry" hidden>
-            <div class="die-pick-label">Die 1</div>
-            <div class="die-pick" role="group" aria-label="First die"></div>
-            <div class="die-pick-label">Die 2</div>
-            <div class="die-pick" role="group" aria-label="Second die"></div>
-            <button type="button" class="btn btn-primary" id="use-dice" disabled>Use these</button>
-          </div>
-
           <!-- Human: work out the points -->
           <div class="math" id="math" hidden>
             <div class="timer" id="timer" hidden>
@@ -378,7 +364,6 @@
           <div class="turn-actions">
             <button type="button" class="btn btn-primary" id="roll-btn"><svg class="icon" aria-hidden="true"><use href="#i-dices"></use></svg> Roll dice</button>
             <button type="button" class="btn btn-primary" id="continue-btn" hidden>My turn <svg class="icon" aria-hidden="true"><use href="#i-chevron-right"></use></svg></button>
-            <button type="button" class="btn" id="rotate-btn" hidden><svg class="icon" aria-hidden="true"><use href="#i-rotate-cw"></use></svg> Rotate</button>
           </div>
         </div>
 
@@ -462,14 +447,13 @@
         <ul>
           <li>On your turn, roll two dice. Draw a rectangle with those side lengths — a 3 and a 6 makes a 3×6 (or 6×3) rectangle.</li>
           <li>Rectangles can't overlap anything already on the board.</li>
-          <li id="corner-rule-hint">Player 1's first rectangle must go in the top-left corner.</li>
-          <li>If your rectangle doesn't fit anywhere, you pass. When every player passes in a row, the game is over.</li>
+          <li>The dice only roll rectangles that fit, so there's always somewhere to put yours. (In a whole-class game the teacher's roll is the same for everyone: if it doesn't fit on your board, you pass.) When the board is full, or nobody can place anything, the game is over.</li>
           <li>After you draw your rectangle, work out how many squares it has (like 3 × 4 = 12). Get it right to score those points!</li>
           <li>You score one point per square. Most squares wins!</li>
           <li>Watch the CPU — it shows how it counts its squares step by step.</li>
           <li>Practice mode drills the times-table facts you find hardest, based on how you've answered before.</li>
         </ul>
-        <p class="keys">Keys: <kbd>Space</kbd> roll · <kbd>R</kbd> rotate (click-to-place mode) · type your answer + <kbd>Enter</kbd> (<kbd>Esc</kbd> clears it)</p>
+        <p class="keys">Keys: <kbd>Space</kbd> roll · type your answer + <kbd>Enter</kbd> (<kbd>Esc</kbd> clears it)</p>
         <p class="keys">Drawing: press on a square and drag to the opposite corner. You can change this in Settings.</p>
       <div class="dialog-actions">
         <button type="button" class="btn btn-primary" id="howto-done">Got it</button>
@@ -494,50 +478,21 @@
       </div>
 
       <div class="setting">
-        <div class="setting-label">First rectangle</div>
-        <div class="segmented" data-setting="firstInCorner">
-          <button type="button" data-value="false">Anywhere</button>
-          <button type="button" data-value="true">Top-left corner</button>
-        </div>
-        <p class="setting-help">"Top-left corner" is the original rule: it stops Player 1 from grabbing the best spot.</p>
-      </div>
-
-      <div class="setting">
-        <div class="setting-label">Dice</div>
-        <div class="segmented" data-setting="diceMode">
-          <button type="button" data-value="virtual"><svg class="icon" aria-hidden="true"><use href="#i-dices"></use></svg> Roll in the app</button>
-          <button type="button" data-value="real"><svg class="icon" aria-hidden="true"><use href="#i-hand"></use></svg> Real dice</button>
-        </div>
-        <p class="setting-help">"Real dice": roll your own dice at the table and tap the numbers you got. CPU players still roll their own dice in the app.</p>
-      </div>
-
-      <div class="setting">
         <div class="setting-label">Rolling</div>
         <div class="segmented" data-setting="autoRoll">
           <button type="button" data-value="manual"><svg class="icon" aria-hidden="true"><use href="#i-mouse-pointer-click"></use></svg> Press to roll</button>
           <button type="button" data-value="auto"><svg class="icon" aria-hidden="true"><use href="#i-zap"></use></svg> Auto roll</button>
         </div>
-        <p class="setting-help">"Auto roll": your dice roll by themselves at the start of each turn. (With real dice you still roll at the table.)</p>
-      </div>
-
-      <div class="setting">
-        <div class="setting-label">Only roll what fits</div>
-        <div class="segmented" data-setting="fitRolls">
-          <button type="button" data-value="end"><svg class="icon" aria-hidden="true"><use href="#i-flag"></use></svg> Near the end</button>
-          <button type="button" data-value="always"><svg class="icon" aria-hidden="true"><use href="#i-circle-check"></use></svg> Always</button>
-          <button type="button" data-value="never"><svg class="icon" aria-hidden="true"><use href="#i-scroll-text"></use></svg> Never</button>
-        </div>
-        <p class="setting-help">"No room" means your roll doesn't fit anywhere, so you pass. Near the end: when the board is nearly full, only rolls that fit (adjusts to board size and difficulty). Always: nobody ever passes. Never: the original rules.</p>
+        <p class="setting-help">"Auto roll": your dice roll by themselves at the start of each turn.</p>
       </div>
 
       <div class="setting">
         <div class="setting-label">Placing rectangles</div>
         <div class="segmented" data-setting="placeMode">
           <button type="button" data-value="draw"><svg class="icon" aria-hidden="true"><use href="#i-pencil"></use></svg> Draw it</button>
-          <button type="button" data-value="click"><svg class="icon" aria-hidden="true"><use href="#i-mouse-pointer-click"></use></svg> Click to place</button>
           <button type="button" data-value="auto"><svg class="icon" aria-hidden="true"><use href="#i-bot"></use></svg> Auto</button>
         </div>
-        <p class="setting-help">"Draw it": press and drag to draw a rectangle of the right size. "Click to place": the rectangle is made for you, you pick the spot. "Auto": the game places it for you, so you only do the math.</p>
+        <p class="setting-help">"Draw it": press and drag to draw a rectangle of the right size. "Auto": the game places it for you, so you only do the math.</p>
       </div>
 
       <div class="setting">
@@ -671,11 +626,9 @@
         <label class="field"><span>Board</span><select id="invite-board"><option value="6">6×6</option><option value="8">8×8</option><option value="10">10×10</option><option value="12" selected>12×12</option><option value="16">16×16</option><option value="20">20×20</option><option value="24">24×24</option><option value="custom">Custom…</option></select></label>
         <label class="field" id="invite-custom-field" hidden><span>Board size (6–30)</span><input type="number" id="invite-custom" min="6" max="30" value="14" inputmode="numeric" /></label>
         <label class="field"><span>Difficulty</span><select id="invite-difficulty"><option value="easy">Easy (6-sided)</option><option value="medium">Medium (8-sided)</option><option value="hard">Hard (12-sided)</option><option value="tricky">Tricky (no easy facts)</option><option value="master">Master (weak facts)</option><option value="legend">Legend (teens × 2–9)</option></select></label>
-        <label class="field"><span>Placing</span><select id="invite-placeMode"><option value="draw">Draw it</option><option value="click">Click to place</option><option value="auto">Auto</option></select></label>
+        <label class="field"><span>Placing</span><select id="invite-placeMode"><option value="draw">Draw it</option><option value="auto">Auto</option></select></label>
         <label class="field"><span>Answer timer</span><select id="invite-answerTime"><option value="0">Off</option><option value="30">30 s</option><option value="10">10 s</option><option value="5">5 s</option></select></label>
-        <label class="field"><span>Dice</span><select id="invite-diceMode"><option value="virtual">Roll in the app</option><option value="real">Real dice</option></select></label>
         <label class="field"><span>Rolling</span><select id="invite-autoRoll"><option value="manual">Press to roll</option><option value="auto">Auto roll</option></select></label>
-        <label class="field"><span>Only roll what fits</span><select id="invite-fitRolls"><option value="end">Near the end</option><option value="always">Always</option><option value="never">Never (original rules)</option></select></label>
         <label class="field"><span>CPU turns</span><select id="invite-cpuSteps"><option value="show">Show steps</option><option value="instant">Instant</option></select></label>
       </div>
       <label class="check-row"><input type="checkbox" id="invite-seed" checked /> Same dice rolls for everyone who uses this invite</label>

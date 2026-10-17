@@ -18,8 +18,7 @@ export function dragRect({ c0, r0, c1, r1 }) {
 export function drawnMessage(rect, dice, verdict) {
   const [a, b] = dice;
   if (!verdict.rightSize) return `That's ${rect.w} by ${rect.h}, but you rolled ${a} and ${b}. Try again!`;
-  if (!verdict.fits) return 'Right size, but it bumps into another rectangle. Try a different spot!';
-  return 'Right size! But the first rectangle has to start in the top-left corner.';
+  return 'Right size, but it bumps into another rectangle. Try a different spot!';
 }
 
 // The board fills the width it's given, in whole pixels per square.

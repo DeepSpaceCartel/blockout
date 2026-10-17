@@ -9,17 +9,18 @@ const NAME_MAX = 14;
 // Every setting an invite may set, with its allowed values.
 const SETTING_VALUES = {
   difficulty: ['easy', 'medium', 'hard', 'tricky', 'master', 'legend'],
-  placeMode: ['draw', 'click', 'auto'],
-  diceMode: ['virtual', 'real'],
+  placeMode: ['draw', 'auto'],
   autoRoll: ['manual', 'auto'],
-  fitRolls: ['end', 'always', 'never'],
   answerTime: ['0', '30', '10', '5', '20'], // 20 s is no longer offered but old invites still open
-  firstInCorner: [false, true],
   cpuSpeed: ['slow', 'normal', 'fast'],
   cpuSteps: ['show', 'instant'],
   cpuEnd: ['auto', 'button'],
   showProgress: [false, true],
 };
+
+// Settings the game no longer has (the corner rule, real dice, when rolls fit):
+// old invites may still carry them, so they're ignored and those links still open.
+const REMOVED_SETTINGS = ['firstInCorner', 'diceMode', 'fitRolls'];
 
 // Invite shape (short keys keep links short):
 //   { v: 1, m: 'single'|'multi', b: boardSize, p: [{ n: name, c: isCpu }],
@@ -41,7 +42,9 @@ function validate(raw) {
     players.push({ n: name, c: cpu });
   }
   const s = {};
-  for (const [key, value] of Object.entries(raw.s || {})) {
+  for (const [key, given] of Object.entries(raw.s || {})) {
+    if (REMOVED_SETTINGS.includes(key)) continue;
+    const value = key === 'placeMode' && given === 'click' ? 'draw' : given; // Click to place is gone: draw it
     if (!SETTING_VALUES[key] || !SETTING_VALUES[key].includes(value)) return null;
     s[key] = value;
   }

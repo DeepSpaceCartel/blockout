@@ -584,24 +584,23 @@ async function openHomework() {
   }
 }
 
-// Tapping a homework: set the menu up for it (Homework.homeworkChoice: mode,
-// difficulty, board, table) and start. Homework only asks for what the
-// student has unlocked, so nothing here should be locked.
+// Tapping a homework: start it (Homework.homeworkChoice: mode, difficulty,
+// board, table). A times table's practice starts straight away; a game sets
+// the menu up for it in Free play (not the Journey's level) and starts.
+// Homework only asks for what the student has unlocked, so nothing here
+// should be locked.
 function playHomework(goal) {
   homework.close();
   const tap = (selector) => {
     const b = document.querySelector(selector);
-    if (b && !b.dataset.unlock) b.click();
+    if (b && !b.dataset.unlock && !b.closest('[hidden]')) b.click();
   };
   const choice = Homework.homeworkChoice(Game.progress(), goal);
+  if (choice.tables) return Game.startPractice('You', 5, choice.tables, false, 0, choice.difficulty || 'easy');
   tap(`[data-mode="${choice.mode}"]`);
+  if (choice.mode === 'single') tap('#play-kind [data-play="free"]');
   if (choice.difficulty) tap(`[data-setting="difficulty"] [data-value="${choice.difficulty}"]`);
   if (choice.size) tap(`#board-size [data-size="${choice.size}"]`);
-  if (choice.tables) {
-    // just these tables
-    for (const on of document.querySelectorAll('#practice-tables [aria-pressed="true"]')) on.click();
-    for (const n of choice.tables) tap(`#practice-tables [data-table="${n}"]`);
-  }
   const start = document.getElementById('start-btn');
   if (!start.disabled) start.click();
 }

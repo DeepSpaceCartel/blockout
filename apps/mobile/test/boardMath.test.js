@@ -18,7 +18,6 @@ test('the reason a drawn rectangle is turned down', () => {
   const rect = { w: 3, h: 3 };
   assert.match(drawnMessage(rect, [2, 3], { rightSize: false }), /3 by 3, but you rolled 2 and 3/);
   assert.match(drawnMessage(rect, [3, 3], { rightSize: true, fits: false }), /bumps into/);
-  assert.match(drawnMessage(rect, [3, 3], { rightSize: true, fits: true, corner: false }), /top-left corner/);
 });
 
 test('the board fits the width in whole pixels per square', () => {

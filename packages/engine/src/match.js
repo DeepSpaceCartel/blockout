@@ -17,7 +17,7 @@ const noBonus = () => ({ total: 0, parts: [] });
 
 // players: [{ name, cpu }]. mode: 'single' (you vs the CPU) or 'multi' (one screen).
 // sides: numbered dice other than the difficulty's (a Journey level's d1 … d12).
-function createMatch({ size = 6, difficulty = 'easy', sides = null, players, mode = 'single', expert = false, bonusMultiplier = 1, firstInCorner = false, fitMode = 'end', weight = null, rng = Math.random, answerBonus = noBonus, now = Date.now } = {}) {
+function createMatch({ size = 6, difficulty = 'easy', sides = null, players, mode = 'single', expert = false, bonusMultiplier = 1, fitMode = 'always', weight = null, rng = Math.random, answerBonus = noBonus, now = Date.now } = {}) {
   if (!players || !players.length) throw new Error('a match needs players');
   const pairDice = Core.usesPairDice(difficulty);
   return {
@@ -30,7 +30,7 @@ function createMatch({ size = 6, difficulty = 'easy', sides = null, players, mod
     answerBonus,
     rng,
     fitMode,
-    board: Core.createBoard(size, { firstInCorner }),
+    board: Core.createBoard(size),
     faces: Core.diceFaces(difficulty, sides),
     sides: pairDice ? null : sides || Core.DIFFICULTY_SIDES[difficulty] || 6,
     diceBag: pairDice ? Core.createPairDice(size, rng, difficulty, weight) : Core.createDice(size, rng, sides || Core.DIFFICULTY_SIDES[difficulty] || 6),
@@ -59,7 +59,6 @@ function createMatch({ size = 6, difficulty = 'easy', sides = null, players, mod
 }
 
 const currentPlayer = (m) => m.players[m.current];
-const mustUseCorner = (m) => Core.mustUseCorner(m.board);
 
 function expect(m, ...phases) {
   if (!phases.includes(m.phase)) throw new Error(`not now: the match is at ${m.phase}, not ${phases.join(' or ')}`);
@@ -75,13 +74,12 @@ function roll(m, forced = null) {
 }
 
 // How a drawn rectangle ({ x, y, w, h }) compares to the roll: the right size
-// either way round, in free squares, and in the corner when it's the first.
+// either way round, and in free squares.
 function judge(m, { x, y, w, h }) {
   const [a, b] = m.dice;
   const rightSize = (w === a && h === b) || (w === b && h === a);
   const fits = Core.fits(m.board, x, y, w, h);
-  const corner = !mustUseCorner(m) || (x === 0 && y === 0);
-  return { rightSize, fits, corner, ok: rightSize && fits && corner };
+  return { rightSize, fits, ok: rightSize && fits };
 }
 
 function putDown(m, { x, y, w, h }) {
@@ -92,20 +90,6 @@ function putDown(m, { x, y, w, h }) {
   m.passes = 0;
   return rect;
 }
-
-// Tap to place: the rolled rectangle (rotated: the other way round) centred on
-// the square tapped ({ c, r }), kept on the board, or in the corner when it's
-// the first one. Returns { x, y, w, h, valid }.
-function previewAt(m, { c, r }, rotated = false) {
-  const [a, b] = m.dice;
-  const [w, h] = rotated ? [b, a] : [a, b];
-  const clamp = (v, max) => Math.max(0, Math.min(v, max));
-  const at = mustUseCorner(m) ? { x: 0, y: 0 } : { x: clamp(c - Math.floor((w - 1) / 2), m.size - w), y: clamp(r - Math.floor((h - 1) / 2), m.size - h) };
-  return { ...at, w, h, valid: Core.isValidPlacement(m.board, at.x, at.y, w, h) };
-}
-
-// Which way round to start a preview: the rolled way, unless only the other one fits
-const startRotated = (m) => !Core.validPlacements(m.board, ...m.dice).some((o) => o.w === m.dice[0] && o.h === m.dice[1]);
 
 // Auto placing: where the CPU would put it (snug against the others)
 const autoSpot = (m) => Core.chooseComputerMove(m.board, ...m.dice, m.rng);
@@ -294,4 +278,4 @@ function results(m) {
   };
 }
 
-export { PHASES, createMatch, currentPlayer, firstTry, mustUseCorner, roll, judge, previewAt, startRotated, autoSpot, award, noteMiss, place, answer, answerDecided, help, countPlan, legendSplit, timeout, pass, cpuTurn, isOver, endTurn, results };
+export { PHASES, createMatch, currentPlayer, firstTry, roll, judge, autoSpot, award, noteMiss, place, answer, answerDecided, help, countPlan, legendSplit, timeout, pass, cpuTurn, isOver, endTurn, results };

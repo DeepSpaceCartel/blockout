@@ -3,9 +3,8 @@
 
 const EMPTY = -1;
 
-// firstInCorner: the very first rectangle of the game must go in the top-left corner.
-function createBoard(size, { firstInCorner = false } = {}) {
-  return { size, firstInCorner, cells: new Array(size * size).fill(EMPTY), rects: [] };
+function createBoard(size) {
+  return { size, cells: new Array(size * size).fill(EMPTY), rects: [] };
 }
 
 function fits(board, x, y, w, h) {
@@ -19,14 +18,8 @@ function fits(board, x, y, w, h) {
   return true;
 }
 
-function mustUseCorner(board) {
-  return board.firstInCorner && board.rects.length === 0;
-}
-
-function isValidPlacement(board, x, y, w, h) {
-  if (mustUseCorner(board) && (x !== 0 || y !== 0)) return false;
-  return fits(board, x, y, w, h);
-}
+// (Once, the first rectangle of a game had to go in the top-left corner.)
+const isValidPlacement = (board, x, y, w, h) => fits(board, x, y, w, h);
 
 // Both orientations of an a-by-b roll (only one when a === b).
 function orientations(a, b) {
@@ -267,8 +260,9 @@ function diceFromState(state, rng = Math.random) {
 const createDice = (boardSize, rng = Math.random, sides = 6) => diceFromState(diceState(boardSize, sides), rng);
 
 // "No room": when a roll doesn't fit anywhere the player has to pass. To keep
-// that from happening while there's still space, rolls can be limited to ones
-// that fit. Modes: 'end' (only near the end of the game), 'always', 'never'.
+// that from happening, rolls can be limited to ones that fit. Modes: 'always'
+// (what every game plays now: nobody passes while anything fits), 'end' (only
+// near the end of the game) and 'never' (the original rules).
 // "Near the end" means fewer empty squares than the larger of the biggest
 // possible rectangle (36 / 64 / 144 for 6 / 8 / 12-sided dice) and a fifth of
 // the board, so it scales with both board size and difficulty.
@@ -314,7 +308,7 @@ function fittingRolls(board, sides = 6) {
 const PREFERENCE_REROLLS = 20;
 const hasOne = ([a, b]) => a === 1 || b === 1;
 const shape = ([a, b]) => (a <= b ? `${a}x${b}` : `${b}x${a}`);
-function rollForBoard(board, bag, rng = Math.random, mode = 'end') {
+function rollForBoard(board, bag, rng = Math.random, mode = 'always') {
   const seen = bag.seen || (bag.seen = []);
   const options = (bag.rollPair ? bag.pairs : fittingRolls(board, bag.sides || 6)).filter(([a, b]) => canFit(board, a, b));
   const fresh = (r) => !hasOne(r) && !seen.includes(shape(r));
@@ -370,7 +364,6 @@ export {
   EMPTY,
   createBoard,
   fits,
-  mustUseCorner,
   isValidPlacement,
   orientations,
   validPlacements,

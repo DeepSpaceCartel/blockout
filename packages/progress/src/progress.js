@@ -22,6 +22,7 @@ function createProgress() {
     practiceV2: true, // …or from before practice lengths and times tables were unlocked separately
     practiceTimersV1: true, // …or from before Expert practice had its own timers
     placeAutoV1: true, // …or from before Auto placing was a separate unlock
+    settingsGoneV1: true, // …or from before the corner rule, real dice, "only roll what fits" and click to place went
     gameExpertV1: true, // …or from before single player had Learn / Expert
     journeyV1: true, // …or from before boards and difficulties were Journey levels
     journeyV2: true, // …or from before each board had three stages
@@ -77,6 +78,9 @@ const activeCheats = (state) => Object.keys(state.cheats || {}).filter((code) =>
 // How long an answer timer really runs: its own length, or 5 minutes with
 // FIVEMOREMINUTESMOM on. No timer stays no timer.
 const timerLength = (state, secs) => (secs && state.cheats && state.cheats.fivemoreminutesmom ? CHEAT_CODES.fivemoreminutesmom.timerSecs : secs);
+
+// What the settings that are gone cost (refunded once, see normalize)
+const GONE_PRICES = { placeMode: 40, diceMode: 60, fitRolls: 40, firstInCorner: 30 };
 
 function normalize(saved) {
   const fresh = createProgress();
@@ -173,6 +177,17 @@ function normalize(saved) {
   }
   state.practiceJourneyV1 = state.practiceJourneyV2 = state.practiceJourneyV3 = true;
   grantPracticeJourney(state);
+  // The corner rule, real dice, "only roll what fits" and click to place are
+  // gone. Whoever bought them gets the points back; Click to place came before
+  // Auto, so its owners get Auto instead (or the points, if they have it).
+  if (!saved.settingsGoneV1) {
+    const has = (id) => state.unlocks.includes(id);
+    if (has('placeMode') && !has('placeAuto')) state.unlocks.push('placeAuto');
+    else if (has('placeMode')) state.wallet += GONE_PRICES.placeMode;
+    for (const id of ['diceMode', 'fitRolls', 'firstInCorner']) if (has(id)) state.wallet += GONE_PRICES[id];
+    state.unlocks = state.unlocks.filter((id) => !(id in GONE_PRICES));
+    state.settingsGoneV1 = true;
+  }
   // The old all-in-one timer unlock (10/20/30 s) becomes the 30 s and 10 s unlocks.
   if (state.unlocks.includes('answerTime')) {
     state.unlocks = state.unlocks.filter((id) => id !== 'answerTime');
@@ -330,11 +345,8 @@ const SHOP = [
   { id: 'difficulty.master', group: 'Difficulty', name: 'Master: the dice go after your weakest facts', price: 0, journey: levelGranting('difficulty.master') },
   { id: 'difficulty.legend', group: 'Difficulty', name: 'Legend: two-digit × one-digit (like 14 × 7) mixed with Tricky facts', price: 0, journey: levelGranting('difficulty.legend') },
   // Placing rectangles: Click first, then Auto (drawing is free)
-  { id: 'placeMode', group: 'Settings', name: 'Placing: click to place', price: 40 },
-  { id: 'placeAuto', group: 'Settings', name: 'Placing: auto (placed for you)', price: 60, requires: 'placeMode' },
-  { id: 'diceMode', group: 'Settings', name: 'Real dice', price: 60 },
+  { id: 'placeAuto', group: 'Settings', name: 'Placing: auto (placed for you)', price: 60 },
   { id: 'autoRoll', group: 'Settings', name: 'Auto roll', price: 40 },
-  { id: 'fitRolls', group: 'Settings', name: '"No room" options: Always fit & Original rules', price: 40 },
   // (Home multiplayer; single player has its own timers under Expert)
   { id: 'answerTime30', group: 'Settings', name: 'Home multiplayer answer timer: 30 seconds', price: 30, perk: `Answer quickly for a timer bonus of up to +${TIMER_BONUS_MAX[30]} each.` },
   { id: 'answerTime10', group: 'Settings', name: 'Home multiplayer answer timer: 10 seconds', price: 50, requires: 'answerTime30', perk: `Answer quickly for a timer bonus of up to +${TIMER_BONUS_MAX[10]} each.` },
@@ -343,7 +355,6 @@ const SHOP = [
   { id: 'cpuEnd', group: 'Settings', name: 'Press a button after CPU turns', price: 40 },
   { id: 'cpuInstant', group: 'Settings', name: 'Instant CPU turns', price: 80 },
   { id: 'showProgress', group: 'Settings', name: 'Board progress bar', price: 30 },
-  { id: 'firstInCorner', group: 'Settings', name: 'Corner rule', price: 30 },
   // perk: what the unlock gives you, shown when you buy it
   ...GAME_CHAINS,
   // Longer practice rounds, per difficulty: reached on Practice's Journey. See practiceCountId.

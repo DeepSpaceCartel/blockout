@@ -2,23 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert';
 import * as Core from '../src/core.js';
 
-test('first rectangle may go anywhere by default', () => {
+test('the first rectangle may go anywhere', () => {
   const b = Core.createBoard(12);
-  assert.equal(Core.mustUseCorner(b), false);
   assert.equal(Core.isValidPlacement(b, 3, 3, 2, 5), true);
   assert.equal(Core.validPlacements(b, 2, 5).length, 11 * 8 + 8 * 11);
 });
 
-test('corner rule: first rectangle must go in the top-left corner', () => {
-  const b = Core.createBoard(12, { firstInCorner: true });
-  assert.equal(Core.isValidPlacement(b, 3, 3, 2, 5), false);
-  assert.equal(Core.isValidPlacement(b, 0, 0, 2, 5), true);
-  const opts = Core.validPlacements(b, 2, 5);
-  assert.deepEqual(opts, [{ x: 0, y: 0, w: 2, h: 5 }, { x: 0, y: 0, w: 5, h: 2 }]);
-});
-
 test('rectangles cannot overlap or leave the board', () => {
-  const b = Core.createBoard(12, { firstInCorner: true });
+  const b = Core.createBoard(12);
   Core.place(b, 0, 0, 3, 4, 0);
   assert.equal(Core.isValidPlacement(b, 2, 3, 2, 2), false);
   assert.equal(Core.isValidPlacement(b, 3, 0, 2, 2), true);

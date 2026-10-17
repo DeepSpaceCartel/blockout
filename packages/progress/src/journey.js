@@ -86,12 +86,13 @@ export const { practiceLevel, recordPracticeLevel } = Progress;
 
 const practiceInfo = (level) => PRACTICE_LEVELS[Math.min(level, PRACTICE_LEVELS.length) - 1];
 
-// Free practice (picking your own tables and difficulty) opens on the ×2
-// table, once there's more than one table to pick from
-export const FREE_PRACTICE_LEVEL = practiceLevelOfTable(2);
-export const freePracticeOpen = (state) => practiceLevel(state) >= FREE_PRACTICE_LEVEL;
+// Auto practice (the game picks the facts you need from every table you've
+// reached, see Practice.autoQueue) opens on the ×2 table, once there's more
+// than one table. play: 'journey' or 'free' (Auto; the name it had as Free practice).
+export const AUTO_PRACTICE_LEVEL = practiceLevelOfTable(2);
+export const autoPracticeOpen = (state) => practiceLevel(state) >= AUTO_PRACTICE_LEVEL;
 export const practiceDone = (state) => practiceLevel(state) >= PRACTICE_DONE;
-export const onPracticeJourney = (state, play) => !practiceDone(state) && (play !== 'free' || !freePracticeOpen(state));
+export const onPracticeJourney = (state, play) => !practiceDone(state) && (play !== 'free' || !autoPracticeOpen(state));
 
 // What a Practice level's round is: { table, count, expert, timer (s, 0: none) }
 export const practiceSetup = (level) => {

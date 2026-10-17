@@ -133,7 +133,7 @@ test('Practice Journey: each table in five rounds (5, 10, 20, Expert, Expert wit
   // the timer gets shorter along each difficulty's tables
   assert.deepEqual([1, 3, 5, 7, 8, 9, 10, 11, 12].map((t) => Journey.practiceSetup(practiceLevelOfTable(t) + 4).timer), [30, 10, 5, 10, 5, 30, 10, 5, 5]);
   const s = Progress.createProgress();
-  assert.equal(Journey.freePracticeOpen(s), false);
+  assert.equal(Journey.autoPracticeOpen(s), false);
   assert.equal(Journey.onPracticeJourney(s, 'free'), true, 'nothing to pick yet');
   assert.equal(Journey.recordPracticeLevel(s, 1, { count: 5, firstTry: 3 }).missing, 'accuracy');
   const r = Journey.recordPracticeLevel(s, 1, { count: 5, firstTry: 4 });
@@ -148,7 +148,7 @@ test('Practice Journey: each table in five rounds (5, 10, 20, Expert, Expert wit
   const t = Journey.recordPracticeLevel(s, 5, { count: 10, firstTry: 8 });
   assert.deepEqual(t.grants, ['table2']);
   assert.match(Journey.practiceResultMessage(t).title, /×2 unlocked/);
-  assert.equal(Journey.freePracticeOpen(s), true);
+  assert.equal(Journey.autoPracticeOpen(s), true);
   assert.equal(Journey.practiceTier(practiceLevelOfTable(7)), 'medium');
   assert.equal(Journey.practiceLine(14), 'The ×3 table up to 3 × 6 · round 4 of 5: 10 questions, Expert');
   assert.deepEqual(Journey.practiceSteps(s).slice(0, 2).map((x) => [x.label, x.done, x.current]), [['×1', true, false], ['×2', false, true]]);

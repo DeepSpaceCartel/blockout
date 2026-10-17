@@ -4,9 +4,9 @@ import * as Core from '@blockout/engine';
 import { PIPS, ctx, el } from './base.js';
 import { settings } from './settings.js';
 import { look } from './wardrobe.js';
-import { currentDims, currentPlayer, game, make } from './play.js';
+import { currentPlayer, game, make } from './play.js';
 import { ordinal, pairLiveTick } from './classroom.js';
-import { dragRect, humanPreview, judgeDrawn } from './input.js';
+import { dragRect, judgeDrawn } from './input.js';
 
 function setMsg(text) {
   el.turnMsg.textContent = text;
@@ -63,17 +63,7 @@ function render() {
           ? 'Your turn'
           : `${p.name}'s turn`;
   el.rollBtn.disabled = game.phase !== 'roll';
-  const realDice = game.diceMode === 'real';
-  el.rollBtn.hidden = p.cpu || realDice || game.mode === 'class' || !['roll', 'rolling'].includes(game.phase);
-  el.diceEntry.hidden = p.cpu || !realDice || game.phase !== 'roll';
-  const dims = currentDims();
-  el.rotateBtn.hidden = !(
-    game.phase === 'place' &&
-    game.placeMode === 'click' &&
-    dims &&
-    dims[0] !== dims[1] &&
-    !Core.mustUseCorner(game.board)
-  );
+  el.rollBtn.hidden = p.cpu || game.mode === 'class' || !['roll', 'rolling'].includes(game.phase);
   el.progress.hidden = !game.showProgress;
   if (game.showProgress) renderProgress();
   el.canvas.style.cursor = game.phase === 'place' ? 'crosshair' : 'default';
@@ -181,7 +171,6 @@ function readPalette() {
   pal = {
     bg: v('--board-bg'),
     grid: v('--board-grid'),
-    hint: v('--board-hint'),
     edge: v('--board-edge'),
     fade: v('--board-fade'),
     wrong: v('--board-wrong'),
@@ -326,14 +315,6 @@ function drawBoard() {
   }
   ctx.stroke();
 
-  if (Core.mustUseCorner(game.board)) {
-    ctx.fillStyle = pal.hint;
-    ctx.font = `700 ${Math.max(8, cell * 0.2)}px system-ui, sans-serif`;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ['Start', 'here'].forEach((t, i) => ctx.fillText(t, 4, 4 + i * cell * 0.24));
-  }
-
   for (const rect of game.board.rects) {
     drawRect(rect, game.players[rect.player].color, cell, rect === game.lastRect);
   }
@@ -343,8 +324,7 @@ function drawBoard() {
     drawPartnerLive(game.partnerLive, game.players[1 - game.classroom.me].color, cell);
   }
 
-  const preview = game.cpuPreview ? { ...game.cpuPreview, valid: true } : humanPreview();
-  if (preview) drawPreview(preview, currentPlayer().color, cell);
+  if (game.cpuPreview) drawPreview({ ...game.cpuPreview, valid: true }, currentPlayer().color, cell);
   if (game.phase === 'place' && game.placeMode === 'draw') {
     if (game.drag) drawDragging(dragRect(), currentPlayer().color, cell);
     else if (game.hover) drawHoverCell(game.hover, currentPlayer().color, cell);

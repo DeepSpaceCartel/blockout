@@ -94,7 +94,7 @@ test('a purchase switches on the obvious choice, for every item that names one',
   assert.equal(Shop.activation('cpuSpeed'), null, 'no clear favourite: left alone');
   // every id it knows exists in the Shop
   for (const item of Progress.SHOP) Shop.activation(item.id);
-  for (const id of ['multiplayer', 'players3', 'players4', 'practice', 'diceMode', 'autoRoll', 'fitRolls', 'answerTime30', 'cpuInstant', 'cpuEnd', 'showProgress', 'firstInCorner', 'timesMastered']) {
+  for (const id of ['multiplayer', 'players3', 'players4', 'practice', 'autoRoll', 'answerTime30', 'cpuInstant', 'cpuEnd', 'showProgress', 'timesMastered']) {
     assert.ok(Progress.shopItem(id), `${id} is a Shop item`);
   }
 });

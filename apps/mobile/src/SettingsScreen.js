@@ -7,7 +7,7 @@ import { useTheme } from './theme';
 import { ScreenHeader } from './ui';
 
 // (all of them; the order and words are the web game's)
-const IN_THE_APP = ['theme', 'firstInCorner', 'diceMode', 'autoRoll', 'fitRolls', 'placeMode', 'cpuSpeed', 'cpuSteps', 'cpuEnd', 'answerTime', 'showProgress', 'timesMastered', 'timesLearning', 'timesPractice'];
+const IN_THE_APP = ['theme', 'autoRoll', 'placeMode', 'cpuSpeed', 'cpuSteps', 'cpuEnd', 'answerTime', 'showProgress', 'timesMastered', 'timesLearning', 'timesPractice'];
 
 // onSet(key, value): pick a choice; onLocked(itemId): a locked one was tapped
 export default function SettingsScreen({ progress, settings, onSet, onLocked, onClose }) {

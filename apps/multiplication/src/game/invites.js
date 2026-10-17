@@ -8,7 +8,7 @@ import { clampCustom, saveNameInputs } from './wardrobe.js';
 import { make, startGame } from './play.js';
 
 // Settings an invite can set from the "Make an invite" form (select id = invite-<key>).
-const INVITE_FORM_SETTINGS = ['difficulty', 'placeMode', 'answerTime', 'diceMode', 'autoRoll', 'fitRolls', 'cpuSteps'];
+const INVITE_FORM_SETTINGS = ['difficulty', 'placeMode', 'answerTime', 'autoRoll', 'cpuSteps'];
 
 const INVITE_LABELS = {
   difficulty: {
@@ -19,11 +19,9 @@ const INVITE_LABELS = {
     master: 'Master (your weakest facts)',
     legend: 'Legend (teens × 2–9)',
   },
-  placeMode: { draw: 'You draw each rectangle', click: 'Click to place rectangles', auto: 'Rectangles are placed for you' },
-  diceMode: { virtual: null, real: 'Roll real dice and tap what you got' },
+  placeMode: { draw: 'You draw each rectangle', auto: 'Rectangles are placed for you' },
   cpuSteps: { show: null, instant: 'CPU plays instantly' },
   autoRoll: { manual: null, auto: 'Dice roll by themselves' },
-  fitRolls: { end: null, always: 'Every roll fits on the board', never: 'Original rules: a roll may not fit, and you pass' },
 };
 
 // Players from the main-menu setup, in invite form.
@@ -47,7 +45,7 @@ function describeInvite(inv) {
     INVITE_LABELS.placeMode[s.placeMode],
   ];
   if (s.answerTime !== '0') lines.push(`${s.answerTime} seconds to answer each question`);
-  for (const key of ['diceMode', 'autoRoll', 'fitRolls', 'cpuSteps']) if (INVITE_LABELS[key][s[key]]) lines.push(INVITE_LABELS[key][s[key]]);
+  for (const key of ['autoRoll', 'cpuSteps']) if (INVITE_LABELS[key][s[key]]) lines.push(INVITE_LABELS[key][s[key]]);
   if (inv.r !== undefined) lines.push('Same dice rolls as everyone else with this invite');
   return lines;
 }

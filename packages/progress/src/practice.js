@@ -106,7 +106,8 @@ export function timerHelp(timer) {
 // The questions are picked from the player's weakest facts (in the tables
 // chosen). Returns the round; round.current is the first question.
 // journeyLevel: a Practice Journey round, its table and its length (see journeyQueue).
-export function createRound(state, { name = 'You', difficulty = 'easy', count = 5, tables = [], level = 'learn', timer = 0, journeyLevel = null, rng = Math.random, now = Date.now } = {}) {
+// auto: an Auto round, the facts you need from the tables you've reached (see autoQueue).
+export function createRound(state, { name = 'You', difficulty = 'easy', count = 5, tables = [], level = 'learn', timer = 0, journeyLevel = null, auto = false, rng = Math.random, now = Date.now } = {}) {
   const facts = playerFacts(state, name);
   // a Journey round: the level sets the table, the length, Expert and the timer
   const journey = journeyLevel ? Progress.PRACTICE_LEVELS[journeyLevel - 1] : null;
@@ -117,10 +118,11 @@ export function createRound(state, { name = 'You', difficulty = 'easy', count = 
     timer = journey.timer;
   }
   const expert = level === 'expert';
-  const queue = journey ? journeyQueue(facts, journey.table, count, rng) : Progress.pickPracticeFacts(facts, Progress.practiceSet(difficulty), count, rng, tables);
+  if (auto) tables = reachedTables(state);
+  const queue = journey ? journeyQueue(facts, journey.table, count, rng) : auto ? autoQueue(state, name, count, rng) : Progress.pickPracticeFacts(facts, Progress.practiceSet(difficulty), count, rng, tables);
   const before = {};
   for (const [a, b] of queue) before[Progress.factKey(a, b)] = Progress.factStatus(facts[Progress.factKey(a, b)]);
-  const round = { name, max: journey ? journey.upTo : practiceMax(difficulty), journeyLevel, count, tables, expert, timer: expert ? timer : 0, difficulty, startedAt: now(), times: [], queue, index: 0, requeued: new Set(), before, firstTry: 0, answered: 0, streak: 0, bestStreak: 0, points: 0, current: null, done: false };
+  const round = { name, max: journey ? journey.upTo : auto ? autoUpTo(tables) : practiceMax(difficulty), journeyLevel, auto, count, tables, expert, timer: expert ? timer : 0, difficulty, startedAt: now(), times: [], queue, index: 0, requeued: new Set(), before, firstTry: 0, answered: 0, streak: 0, bestStreak: 0, points: 0, current: null, done: false };
   ask(round);
   return round;
 }
@@ -139,6 +141,81 @@ export function journeyQueue(facts, n, count, rng = Math.random) {
   for (const fact of review) queue.splice(1 + Math.floor(rng() * queue.length), 0, fact); // (never first)
   return queue;
 }
+
+// ---- Auto: the facts you need, from every table you've reached
+
+// The tables unlocked so far (×1, ×2, …), and how far each goes: up to its
+// difficulty's dice, as on the Journey (6 for ×1–×6, 8 for ×7–×8, 12 from ×9)
+const reachedTables = (state) => Array.from({ length: 12 }, (_, i) => i + 1).filter((n) => tableOpen(state, n));
+const upToOf = (n) => Progress.PRACTICE_LEVELS.find((l) => l.table === n).upTo;
+const autoUpTo = (tables) => (tables.length ? Math.max(...tables.map(upToOf)) : 6);
+
+// Every fact of the reached tables, both ways round: n × 1 … n × upTo
+function reachedFacts(state) {
+  const keys = new Set();
+  for (const n of reachedTables(state)) for (let m = 1; m <= upToOf(n); m++) keys.add(Progress.factKey(n, m)).add(Progress.factKey(m, n));
+  return [...keys];
+}
+
+const shuffled = (list, rng) => {
+  const out = [...list];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+};
+
+// What an Auto round asks, in this order until it has enough: your "Facts to
+// practice" (missed before and not mastered since, most missed first), then
+// the facts that "Need practice", then Learning and Not seen yet facts of the
+// reached tables mixed together. Short of those, it asks them again rather
+// than mastered ones: a mastered fact only comes up when everything reached
+// is mastered. The round then asks them in a shuffled order. [[a, b], …]
+export function autoGroups(state, name = 'You') {
+  const facts = playerFacts(state, name);
+  const status = (k) => Progress.factStatus(facts[k]);
+  const missed = (f) => (f ? f.wrong + f.timeouts : 0);
+  const toPractice = Object.keys(facts).filter((k) => missed(facts[k]) > 0 && status(k) !== 'mastered').sort((x, y) => missed(facts[y]) - missed(facts[x]));
+  const reached = reachedFacts(state).filter((k) => !toPractice.includes(k));
+  return {
+    toPractice,
+    needs: reached.filter((k) => status(k) === 'practice'),
+    fresh: reached.filter((k) => status(k) === 'learning' || status(k) === 'unseen'),
+    mastered: reached.filter((k) => status(k) === 'mastered'),
+  };
+}
+
+const pair = (key) => key.split('×').map((n) => Number(n.trim()));
+
+export function autoQueue(state, name, count, rng = Math.random) {
+  const g = autoGroups(state, name);
+  let keys = [...g.toPractice, ...g.needs, ...shuffled(g.fresh, rng)].slice(0, count);
+  if (!keys.length) keys = shuffled(g.mastered, rng).slice(0, count); // (everything reached is mastered)
+  if (!keys.length) keys = [Progress.factKey(1, 1)];
+  while (keys.length < count) keys = [...keys, ...keys].slice(0, count); // (a few weak facts: ask them again)
+  return shuffled(keys, rng).map(pair);
+}
+
+// What Auto will ask, in a few words: "3 facts to practice, 2 that need
+// practice, then Learning and new facts from ×1 to ×5."
+export function autoPreview(state, name = 'You') {
+  const g = autoGroups(state, name);
+  const tables = reachedTables(state);
+  const parts = [];
+  if (g.toPractice.length) parts.push(`${g.toPractice.length} ${g.toPractice.length === 1 ? 'fact' : 'facts'} to practice`);
+  if (g.needs.length) parts.push(`${g.needs.length} that ${g.needs.length === 1 ? 'needs' : 'need'} practice`);
+  const from = tables.length > 1 ? `×${tables[0]} to ×${tables[tables.length - 1]}` : `×${tables[0] || 1}`;
+  const rest = g.fresh.length ? `Learning and new facts from ${from}` : `your facts from ${from}`;
+  return parts.length ? `First ${parts.join(', then ')}; then ${rest}.` : `${rest[0].toUpperCase()}${rest.slice(1)}.`;
+}
+
+// The difficulty an Auto round's length, Expert and timers go by: the
+// biggest reached table's (Easy up to ×6, Medium ×7–×8, Hard from ×9)
+export const autoDifficulty = (state) => {
+  const tables = reachedTables(state);
+  return tables.length ? Progress.PRACTICE_LEVELS.find((l) => l.table === tables[tables.length - 1]).difficulty : 'easy';
+};
 
 // The question at the round's index (or none: the round is done). A retry is a
 // missed fact asked again at the end; it doesn't count towards the score.

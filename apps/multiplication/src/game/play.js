@@ -17,7 +17,7 @@ import { completeDaily } from './daily.js';
 import { journeyGame, renderJourney } from './journey.js';
 import { playerFacts, setPractice, stopPracticeTimer, timerText, weakFactWeight } from './practice.js';
 import { pairRoll, pairTurnOrWait, reportClass } from './classroom.js';
-import { buildDicePicks, setDetailsOpen } from './input.js';
+import { setDetailsOpen } from './input.js';
 import { PLACE_FX_MS, animateBoard, render, renderDie, resizeBoard, setMsg } from './render.js';
 
 let game = null;
@@ -58,12 +58,11 @@ function startGame(playerDefs, size, mode, invite = null, extra = null) {
     size,
     level, // the Journey level this game is (null: Free play, multiplayer, class)
     mode, // 'single' (you vs the CPU), 'multi' (one screen) or 'class' (dice from the teacher)
-    board: Core.createBoard(size, { firstInCorner: cfg.firstInCorner }),
+    board: Core.createBoard(size),
     difficulty: cfg.difficulty,
     sides: (journey && journey.sides) || Core.DIFFICULTY_SIDES[cfg.difficulty] || 6,
     cpuInstant: cfg.cpuSteps === 'instant',
     autoRoll: cfg.autoRoll === 'auto',
-    fitMode: cfg.fitRolls,
     players: playerDefs.map((p, i) => ({
       ...p,
       ...wardrobeLook(p, mode),
@@ -84,16 +83,11 @@ function startGame(playerDefs, size, mode, invite = null, extra = null) {
     current: 0,
     passes: 0,
     dice: null,
-    rotated: false,
     phase: 'roll', // roll | rolling | place | answer | cpu | over
-    hover: null, // { c, r } cell under pointer
+    hover: null, // { c, r } cell under the pointer (draw mode)
     cpuPreview: null,
     lastRect: null,
-    placeMode: cfg.placeMode, // 'draw': drag out the rectangle; 'click': click to drop it
-    // 'virtual': the app rolls; 'real': players roll real dice and enter them
-    // (not after Hard: those dice can't be rolled at the table)
-    diceMode: Core.usesPairDice(cfg.difficulty) ? 'virtual' : cfg.diceMode,
-    picked: [null, null], // real-dice values entered so far
+    placeMode: cfg.placeMode, // 'draw': drag out the rectangle; 'auto': the game places it
     drag: null, // { c0, r0, c1, r1 } while a human is drawing
     pending: null, // human rectangle waiting for its points to be worked out
     counting: null, // { rect, byRows, shown, group } while skip-counting on the board
@@ -111,7 +105,6 @@ function startGame(playerDefs, size, mode, invite = null, extra = null) {
   game.expert = levelled && setup.level === 'expert';
   game.levelTimer = game.expert ? setup.timer : 0;
   if (levelled) game.answerTime = game.levelTimer;
-  buildDicePicks(game.sides);
   el.resultTournament.hidden = true;
   const classroomGame = mode === 'class' || mode === 'pair';
   el.againBtn.hidden = classroomGame; // the teacher starts the next class game
@@ -138,16 +131,9 @@ function currentPlayer() {
   return game.players[game.current];
 }
 
-function currentDims() {
-  if (!game.dice) return null;
-  const [a, b] = game.dice;
-  return game.rotated ? [b, a] : [a, b];
-}
-
 function resetTurn() {
   stopTimer();
   game.dice = null;
-  game.rotated = false;
   game.hover = null;
   game.cpuPreview = null;
   game.drag = null;
@@ -179,20 +165,9 @@ function beginTurn() {
     runComputerTurn();
   } else {
     game.phase = 'roll';
-    const first = Core.mustUseCorner(game.board);
-    const corner = first ? ' Your first rectangle goes in the top-left corner.' : '';
-    if (game.diceMode === 'real') {
-      game.picked = [null, null];
-      renderDicePicks();
-      setMsg(`Roll your two dice, then tap the numbers you got.${corner}`);
-    } else if (game.autoRoll) {
-      setMsg(`Rolling the dice…${corner}`);
-    } else {
-      setMsg(first ? `Roll the dice!${corner}` : 'Roll the dice!');
-    }
+    setMsg(game.autoRoll ? 'Rolling the dice…' : 'Roll the dice!');
     render();
-    // Real dice are rolled at the table, so auto roll only applies to app dice.
-    if (game.autoRoll && game.diceMode !== 'real') waitInGame(AUTO_ROLL_MS).then(humanRoll);
+    if (game.autoRoll) waitInGame(AUTO_ROLL_MS).then(humanRoll);
   }
 }
 
@@ -211,57 +186,17 @@ async function rollDice(forced = null) {
   }
   el.dieA.classList.remove('rolling', rollStyle);
   el.dieB.classList.remove('rolling', rollStyle);
-  game.dice = forced ? [...forced] : Core.rollForBoard(game.board, game.diceBag, game.rng, game.fitMode);
+  game.dice = forced ? [...forced] : Core.rollForBoard(game.board, game.diceBag, game.rng);
   renderDie(el.dieA, game.dice[0]);
   renderDie(el.dieB, game.dice[1]);
   return game.dice;
 }
 
 async function humanRoll() {
-  if (!game || game.phase !== 'roll' || currentPlayer().cpu || game.diceMode === 'real') return;
+  if (!game || game.phase !== 'roll' || currentPlayer().cpu) return;
   if (game.mode === 'pair') return pairRoll(); // the server rolls for a pairs game
   const [a, b] = await rollDice();
   await startPlacing(a, b);
-}
-
-// ---- real dice: the player enters what they rolled
-
-function pickDie(index, value) {
-  if (!game || game.phase !== 'roll' || game.diceMode !== 'real') return;
-  game.picked[index] = value;
-  renderDicePicks();
-}
-
-// Keyboard entry: a digit fills the first empty die (or the second if both are set).
-function typeDie(value) {
-  const i = game.picked[0] === null ? 0 : 1;
-  pickDie(i, value);
-}
-
-function clearLastDie() {
-  if (game.picked[1] !== null) pickDie(1, null);
-  else pickDie(0, null);
-}
-
-async function useRealDice() {
-  if (!game || game.phase !== 'roll' || game.diceMode !== 'real') return;
-  const [a, b] = game.picked;
-  if (!a || !b) return;
-  game.dice = [a, b];
-  await startPlacing(a, b);
-}
-
-function renderDicePicks() {
-  el.diePicks.forEach((row, i) => {
-    for (const btn of row.querySelectorAll('button')) {
-      const on = Number(btn.dataset.value) === game.picked[i];
-      btn.classList.toggle('selected', on);
-      btn.setAttribute('aria-pressed', String(on));
-    }
-  });
-  renderDie(el.dieA, game.picked[0]);
-  renderDie(el.dieB, game.picked[1]);
-  el.useDiceBtn.disabled = !(game.picked[0] && game.picked[1]);
 }
 
 async function startPlacing(a, b) {
@@ -274,8 +209,6 @@ async function startPlacing(a, b) {
     await autoPlace(a, b);
     return;
   }
-  // Start in an orientation that actually fits somewhere.
-  if (!options.some((o) => o.w === a && o.h === b)) game.rotated = true;
   game.phase = 'place';
   setMsg(placeInstructions());
   render();
@@ -297,15 +230,7 @@ async function autoPlace(a, b) {
 function placeInstructions() {
   const [a, b] = game.dice;
   const shape = `a ${a} by ${b} rectangle`;
-  const corner = Core.mustUseCorner(game.board);
-  if (game.placeMode === 'draw') {
-    return corner
-      ? `You rolled ${a} and ${b}. Draw ${shape}: start on the top-left square and drag.`
-      : `You rolled ${a} and ${b}. Draw ${shape}: press on a square and drag.`;
-  }
-  return corner
-    ? `You rolled ${a} and ${b}. Click the board to draw ${shape} in the corner.`
-    : `You rolled ${a} and ${b}. Click the board to draw ${shape}.${a !== b ? ' Press R to rotate.' : ''}`;
+  return `You rolled ${a} and ${b}. Draw ${shape}: press on a square and drag.`;
 }
 
 async function pass(a, b) {
@@ -696,7 +621,7 @@ const INSTANT_CPU_MS = 250; // just long enough for the board to redraw between 
 
 async function runInstantComputerTurn() {
   const p = currentPlayer();
-  const [a, b] = (game.dice = Core.rollForBoard(game.board, game.diceBag, game.rng, game.fitMode));
+  const [a, b] = (game.dice = Core.rollForBoard(game.board, game.diceBag, game.rng));
   renderDie(el.dieA, a);
   renderDie(el.dieB, b);
   const move = Core.chooseComputerMove(game.board, a, b);
@@ -1083,4 +1008,4 @@ function setGame(value) {
 function setGameId(value) {
   return (gameId = value);
 }
-export { FACT_STATUS, answerDecided, cancelContinue, clearLastDie, continueResolve, currentDims, currentPlayer, game, gameId, helpCount, humanRoll, isDefaultPlayer, make, pickDie, placeInstructions, placeRect, pressContinue, renderFactGrid, renderFactLegend, renderPractice, renderStats, resetTurn, rollDice, setGame, setGameId, showRewards, showStreak, startAnswer, startGame, startPlacing, statsName, stopTimer, typeDie, typeKey, unlockedTableSize, useRealDice, waitInGame };
+export { FACT_STATUS, answerDecided, cancelContinue, continueResolve, currentPlayer, game, gameId, helpCount, humanRoll, isDefaultPlayer, make, placeInstructions, placeRect, pressContinue, renderFactGrid, renderFactLegend, renderPractice, renderStats, resetTurn, rollDice, setGame, setGameId, showRewards, showStreak, startAnswer, startGame, startPlacing, statsName, stopTimer, typeKey, unlockedTableSize, waitInGame };

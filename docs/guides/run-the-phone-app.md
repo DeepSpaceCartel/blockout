@@ -6,7 +6,7 @@
 
 **What's in it:** everything in the web game's multiplication, except the other games (addition, fractions and the rest):
 
-- you against the CPU, or 2 to 4 players on one phone; every difficulty, Expert levels and timers, boards up to 24 × 24, real dice, and drawing, tapping or auto placing
+- you against the CPU, or 2 to 4 players on one phone; every difficulty, Expert levels and timers, boards up to 24 × 24, and drawing or auto placing
 - practice, with its tables, question counts and timers
 - the Shop, achievements, stickers, stats, the daily check-in, settings and the Wardrobe
 - signing in with Google (through Keycloak), with the save synced with the web game

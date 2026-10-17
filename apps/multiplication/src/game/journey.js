@@ -46,12 +46,12 @@ function journeyView() {
     const done = Journey.practiceDone(progress);
     const round = Journey.practiceSetup(level);
     return {
-      key: 'practicePlay', done, open: Journey.freePracticeOpen(progress), on: practiceJourneyOn(),
+      key: 'practicePlay', done, open: Journey.autoPracticeOpen(progress), on: practiceJourneyOn(),
       name: Journey.practiceName(level),
-      line: done ? 'You finished every times table. Pick any of them in Free practice!' : Journey.practiceLine(level),
+      line: done ? 'You finished every times table. Auto keeps you sharp!' : Journey.practiceLine(level),
       goal: Journey.practiceGoalLine(),
       steps: Journey.practiceSteps(progress),
-      free: ['Free practice', 'pick tables'],
+      free: ['Auto', 'picks for you'],
       start: `Practice ×${round.table}`,
     };
   }
@@ -94,10 +94,10 @@ function renderJourney() {
   el.journeyGoal.replaceChildren(icon('flag'), ` ${v.goal} to move up.`);
   el.journeyGoal.hidden = v.done;
   renderSteps(v.steps);
-  el.difficultyField.hidden = on;
+  // (practice has no difficulty: the Journey's table or Auto picks the facts)
+  el.difficultyField.hidden = on || setup.mode === 'practice';
   if (setup.mode === 'single') el.boardSizeField.hidden = on;
   else {
-    el.practiceTablesField.hidden = on;
     // (the round sets the length, Learn or Expert and the timer)
     el.practiceCountField.hidden = on;
     el.practiceLevelField.hidden = on;

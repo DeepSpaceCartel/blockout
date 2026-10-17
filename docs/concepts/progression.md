@@ -76,10 +76,15 @@ That makes 60 levels: ×1 is Levels 1–5, ×6 is 26–30, ×12 is 56–60.
 - **Facts go up to the table's dice,** as Practice always did: 6 for ×1–×6 (6 × 1 to 6 × 6), 8 for ×7 and ×8, 12 from ×9.
 - **Review:** about one question in five reviews the tables before, with the same limit.
 - **On the Journey, the round decides everything:** its length, Learn or Expert, and the timer.
-- **Unlocks for Free practice** come with the first round that brings them, for its difficulty:
+- **Unlocks for Auto** come with the first round that brings them, for its difficulty:
   - 10 and 20 questions, and Expert, on a difficulty's first table: ×1 for Easy, ×7 for Medium, ×9 for Hard, ×12 for the ones after Hard.
   - Each timer on the first table that uses it.
-- **Free practice** opens on ×2. You pick your own tables, difficulty, length, level and timer from what you've reached.
+- **Auto** opens on ×2: the game picks the questions from every table you've reached, in this order until the round is full:
+  1. Your *facts to practice*: missed before, and not mastered since (the list Stats shows).
+  2. Facts that *need practice* on your Times Table.
+  3. *Learning* and *not seen yet* facts, mixed.
+
+  Short of those, it asks them again rather than mastered facts: a mastered fact only comes up once everything you've reached is mastered. The round asks them shuffled. You pick the length, Learn or Expert and the timer from what you've unlocked; there's no table or difficulty to pick.
 - **Separate from the game:** the two Journeys move on their own.
 
 ## What's still bought

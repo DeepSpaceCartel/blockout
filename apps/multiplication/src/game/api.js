@@ -7,6 +7,7 @@ export { replaceProgress, saveProgress, toast, celebrate } from './wallet.js';
 export { openHostSetup } from './classroom.js';
 export { renderFactGrid, renderFactLegend, make } from './play.js';
 export { icon } from './wardrobe.js';
+export { startPractice } from './practice.js';
 export { drawQr } from './invites.js';
 export { dailyCard, dailyOpen } from './daily.js';
 

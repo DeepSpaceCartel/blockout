@@ -37,8 +37,6 @@ test('invalid or tampered invites are rejected', () => {
   assert.equal(bad({ r: -1 }), null);
   assert.equal(bad({ s: { autoRoll: 'sometimes' } }), null);
   assert.ok(bad({ s: { autoRoll: 'auto' } }));
-  assert.ok(bad({ s: { fitRolls: 'always' } }));
-  assert.equal(bad({ s: { fitRolls: 'sometimes' } }), null);
   assert.equal(I.decode('%%%'), null);
   assert.equal(I.decode(I.encode({ hello: 'world' })), null);
 });
@@ -65,4 +63,9 @@ test('invites: difficulties after Hard, and Legend only on a board it fits', () 
     assert.ok(I.validate({ ...sample, b: 12, s: { ...sample.s, difficulty } }), difficulty);
   }
   assert.equal(I.validate({ ...sample, b: 8, s: { ...sample.s, difficulty: 'legend' } }), null);
+});
+
+test('old invites with settings the game no longer has still open', () => {
+  const old = I.validate({ ...sample, s: { difficulty: 'easy', firstInCorner: true, diceMode: 'real', fitRolls: 'never', placeMode: 'click' } });
+  assert.deepEqual(old.s, { difficulty: 'easy', placeMode: 'draw' });
 });

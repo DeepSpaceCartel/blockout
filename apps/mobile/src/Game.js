@@ -71,10 +71,8 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
   const m = useRef(null);
   const cfg = useRef(settings).current;
   const CPU_STEP_MS = (Settings.CPU_STEP_MS[cfg.cpuSpeed] || 1000) * pace;
-  const placeMode = cfg.placeMode; // 'draw', 'click' (tap to place) or 'auto'
-  // Real dice: rolled at the table and tapped in (not for the paired dice of Tricky and up)
-  const realDice = cfg.diceMode === 'real' && !Core.usesPairDice(setup.difficulty);
-  if (!m.current) m.current = Match.createMatch({ ...setup, firstInCorner: cfg.firstInCorner === true || cfg.firstInCorner === 'true', fitMode: cfg.fitRolls, answerBonus: Progress.answerBonus });
+  const placeMode = cfg.placeMode; // 'draw' or 'auto'
+  if (!m.current) m.current = Match.createMatch({ ...setup, answerBonus: Progress.answerBonus });
   const match = m.current;
   if (testing) window.BlockoutMobile = { match, Match, live };
   // a live game: the round (or pairs turn) it's at, whether this one's answer
@@ -105,10 +103,7 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
   const [over, setOver] = useState(null); // { results }
   const [helpDone, setHelpDone] = useState(false); // counted: "I know it! ›"
   const [goOn, setGoOn] = useState(null); // after a CPU turn: the "My turn ›" button's label
-  const [picked, setPicked] = useState([null, null]); // real dice: what was tapped in
-  const [tapped, setTapped] = useState(null); // tap to place: the rectangle shown, with valid
-  const [rotated, setRotated] = useState(false);
-  const lastTap = useRef(null);
+  const [tapped, setTapped] = useState(null); // auto placing: the spot shown for a moment
   const goOnPressed = useRef(null);
   const helpStarted = useRef(0);
   const answerStart = useRef(0);
@@ -208,23 +203,16 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
     if (live) return liveTurn();
     if (match.phase === 'cpu') return runCpu();
     const p = Match.currentPlayer(match);
-    const first = Match.mustUseCorner(match) ? ' Your first rectangle goes in the top-left corner.' : '';
-    setPicked([null, null]);
     setTapped(null);
-    if (realDice) {
-      setMsg(`${match.mode === 'multi' ? `${p.name}: roll` : 'Roll'} your two dice, then tap the numbers you got.${first}`);
-      redraw();
-      return;
-    }
     if (cfg.autoRoll === 'auto') {
       // Auto roll: the dice roll by themselves, after a moment to read whose turn it is
-      setMsg(match.mode === 'multi' ? `${p.name}: rolling the dice…${first}` : `Rolling the dice…${first}`);
+      setMsg(match.mode === 'multi' ? `${p.name}: rolling the dice…` : 'Rolling the dice…');
       redraw();
       const turn = turnId.current;
       wait(AUTO_ROLL_MS).then(() => turn === turnId.current && humanRoll());
       return;
     }
-    setMsg(match.mode === 'multi' ? `${p.name}, roll the dice!${first}` : `Roll the dice!${first}`);
+    setMsg(match.mode === 'multi' ? `${p.name}, roll the dice!` : 'Roll the dice!');
     redraw();
   }
 
@@ -246,13 +234,6 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
     return rolledDice(a, b);
   }
 
-  // Real dice: the numbers rolled at the table
-  function useRealDice() {
-    if (match.phase !== 'roll' || !picked[0] || !picked[1]) return;
-    const [a, b] = Match.roll(match, picked);
-    return rolledDice(a, b);
-  }
-
   async function rolledDice(a, b) {
     setDice([a, b]);
     if (match.phase === 'stuck') {
@@ -269,11 +250,10 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
     wait(DRAW_IT_MS).then(() => turn === turnId.current && match.phase === 'place' && toBoard());
   }
 
-  // From the roll to placing it: drawing it, tapping where it goes, or auto
+  // From the roll to placing it: drawing it, or auto
   async function toBoard() {
     if (match.phase !== 'place') return;
     const [a, b] = match.dice;
-    const corner = Match.mustUseCorner(match);
     setRolled(false);
     setView('board');
     if (placeMode === 'auto') {
@@ -285,37 +265,7 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
       setTapped(null);
       return onDraw(spot);
     }
-    if (placeMode === 'click') {
-      setRotated(Match.startRotated(match));
-      lastTap.current = null;
-      setMsg(corner ? `Tap the board to put your ${a} by ${b} rectangle in the top-left corner, then tap it again.` : `Tap where your ${a} by ${b} rectangle goes, then tap it again to place it.`);
-      return;
-    }
-    setMsg(`Draw a ${a} by ${b} rectangle: ${corner ? 'start on the top-left square and drag.' : 'press on a square and drag.'}`);
-  }
-
-  // Tap to place: the first tap shows it there; tapping it again places it
-  function onTap(cell) {
-    if (match.phase !== 'place') return;
-    const inside = tapped && cell.c >= tapped.x && cell.c < tapped.x + tapped.w && cell.r >= tapped.y && cell.r < tapped.y + tapped.h;
-    if (inside && tapped.valid) {
-      const { x, y, w, h } = tapped;
-      setTapped(null);
-      return onDraw({ x, y, w, h });
-    }
-    lastTap.current = cell;
-    const p = Match.previewAt(match, cell, rotated);
-    setTapped(p);
-    showPartner('place', p);
-    setOops(!p.valid);
-    if (!p.valid) setMsg('It bumps into another rectangle there. Tap another spot!');
-    else setMsg('Tap it again to place it here, or tap somewhere else.');
-  }
-
-  function rotate() {
-    const next = !rotated;
-    setRotated(next);
-    if (lastTap.current) setTapped(Match.previewAt(match, lastTap.current, next));
+    setMsg(`Draw a ${a} by ${b} rectangle: press on a square and drag.`);
   }
 
   function onDrag(d) {
@@ -782,45 +732,24 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
           <View style={styles.rollScreen}>
             <View style={styles.bigDice}>
               <Rolling rolling={rolling}>
-                <Die value={realDice && match.phase === 'roll' ? picked[0] : dice[0]} size={Math.min(realDice ? 90 : 130, area.width * 0.32)} />
+                <Die value={dice[0]} size={Math.min(130, area.width * 0.32)} />
               </Rolling>
               <Text style={[styles.bigTimes, { color: t.muted }]}>×</Text>
               <Rolling rolling={rolling}>
-                <Die value={realDice && match.phase === 'roll' ? picked[1] : dice[1]} size={Math.min(realDice ? 90 : 130, area.width * 0.32)} />
+                <Die value={dice[1]} size={Math.min(130, area.width * 0.32)} />
               </Rolling>
             </View>
             <Text testID="turn-msg" style={[styles.rollMsg, { color: t.ink }]}>
               {msg || ' '}
             </Text>
-            {match.phase === 'roll' && mine() && realDice ? (
-              <View style={styles.picks}>
-                {[0, 1].map((i) => (
-                  <View key={i} style={styles.pickRow} accessibilityRole="radiogroup" accessibilityLabel={i ? 'Second die' : 'First die'}>
-                    {Array.from({ length: match.sides || Core.DIFFICULTY_SIDES[match.difficulty] || 6 }, (_, k) => k + 1).map((n) => (
-                      <Pressable
-                        key={n}
-                        testID={`pick-${i}-${n}`}
-                        accessibilityRole="radio"
-                        accessibilityState={{ selected: picked[i] === n }}
-                        onPress={() => setPicked(i ? [picked[0], n] : [n, picked[1]])}
-                        style={[styles.pick, { backgroundColor: picked[i] === n ? t.accentSoft : t.surface, borderColor: picked[i] === n ? t.accent : t.line }]}
-                      >
-                        <Text style={[styles.pickText, { color: t.ink }]}>{n}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                ))}
-                <Button testID="use-dice" title="Use these dice ›" onPress={useRealDice} disabled={!picked[0] || !picked[1]} />
-              </View>
-            ) : null}
-            {match.phase === 'roll' && mine() && !realDice && cfg.autoRoll !== 'auto' ? <Button testID="roll" title="Roll the dice" onPress={humanRoll} disabled={busy} style={styles.wide} /> : null}
+            {match.phase === 'roll' && mine() && cfg.autoRoll !== 'auto' ? <Button testID="roll" title="Roll the dice" onPress={humanRoll} disabled={busy} style={styles.wide} /> : null}
             {rolled ? <Button testID="draw-it" title="Draw it ›" onPress={toBoard} style={styles.wide} /> : null}
           </View>
         ) : view === 'board' ? (
           <BoardScreen over={Boolean(over)}>
             <Board
               match={match}
-              width={side((over ? 300 : steps.length ? 214 : 150) + (goOn ? 64 : 0) + (placeMode === 'click' && match.phase === 'place' ? 64 : 0))}
+              width={side((over ? 300 : steps.length ? 214 : 150) + (goOn ? 64 : 0))}
               drag={drag}
               preview={preview}
               hide={hide}
@@ -828,13 +757,8 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
               canDraw={match.phase === 'place' && mine() && placeMode === 'draw'}
               onDrag={onDrag}
               onDraw={onDraw}
-              canTap={match.phase === 'place' && mine() && placeMode === 'click'}
-              onTap={onTap}
               tapped={tapped}
             />
-            {match.phase === 'place' && mine() && placeMode === 'click' && match.dice && match.dice[0] !== match.dice[1] && !Match.mustUseCorner(match) ? (
-              <Button testID="rotate" kind="secondary" title="↻ Turn it" onPress={rotate} style={styles.wide} />
-            ) : null}
             {over ? null : (
               <View style={styles.diceRow} accessibilityLabel={dice[0] ? `Rolled ${dice[0]} and ${dice[1]}` : undefined}>
                 <Die value={dice[0]} size={52} />
@@ -1109,10 +1033,6 @@ const styles = StyleSheet.create({
   step: { fontSize: 16, lineHeight: 22 },
   stepBig: { fontSize: 22, fontWeight: '800' },
   timer: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  picks: { alignSelf: 'stretch', gap: 10 },
-  pickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
-  pick: { width: 44, height: 44, borderRadius: 10, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  pickText: { fontSize: 18, fontWeight: '800' },
   timerText: { fontSize: 18, fontWeight: '800', minWidth: 70 },
   timerBar: { flex: 1, height: 10, borderRadius: 5, overflow: 'hidden' },
   answerScreen: { flex: 1, justifyContent: 'center', gap: 14, paddingHorizontal: 16, paddingBottom: 16 },
