@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-17
+
 ### Added
 - Practice's Journey: Practice goes one times table at a time, from ×1 to ×12, with a little review of the tables before. A round with 4 out of 5 right first try moves you up and unlocks the next table; Free practice (pick your own tables) opens at Practice Level 2. In the web game and the phone app ([ADR-0011](https://github.com/DeepSpaceCartel/blockout/blob/main/docs/decisions/0011-practice-journey.md)).
 
@@ -123,7 +125,8 @@ The first release since 0.2.0 (0.3.0 wasn't released on its own): accounts and h
 - The first playable Blockout: roll two dice, draw the rectangle, answer the multiplication, against the CPU.
 
 <!-- No release tags yet: the links point at the release commits (tag them v0.1.0 and v0.2.0 to switch to compare/v0.1.0...v0.2.0). -->
-[Unreleased]: https://github.com/DeepSpaceCartel/blockout/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/DeepSpaceCartel/blockout/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/DeepSpaceCartel/blockout/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/DeepSpaceCartel/blockout/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/DeepSpaceCartel/blockout/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/DeepSpaceCartel/blockout/compare/v0.4.0...v0.4.1

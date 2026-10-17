@@ -1,6 +1,6 @@
 {
   "name": "blockout",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "type": "module",
   "description": "Blockout: multiplication (and more) as area. A Turborepo of plain JavaScript apps and packages.",

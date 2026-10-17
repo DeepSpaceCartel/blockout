@@ -1,6 +1,6 @@
 {
   "name": "@blockout/server",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "type": "module",
   "description": "The Blockout server: serves the built games, runs classrooms (whole class, pairs, tournaments) and accounts (MongoDB).",
