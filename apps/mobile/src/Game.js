@@ -13,7 +13,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Match from '@blockout/engine/match';
+import * as Core from '@blockout/engine';
 import * as Progress from '@blockout/progress';
+import * as Settings from '@blockout/progress/settings';
 import Board, { RectPicture } from './Board';
 import { dragRect, drawnMessage } from './boardMath';
 import * as Rewards from './rewards';
@@ -25,7 +27,8 @@ import { Button, Die, Keypad } from './ui';
 // loads) makes every wait 20 times shorter, and BlockoutMobile.match is the game
 const testing = Platform.OS === 'web' && typeof window !== 'undefined';
 const pace = testing && window.BLOCKOUT_FAST ? 0.05 : 1;
-const CPU_STEP_MS = 1000 * pace; // the web game's "normal" CPU speed
+const AUTO_ROLL_MS = 700 * pace; // before an auto roll, so "Your turn" can be read first
+const INSTANT_CPU_MS = 600 * pace; // an instant CPU turn: just long enough to see it
 const COUNT_STEP_MS = 850 * pace; // between skip-counting steps when helping
 const PASS_MS = 1600 * pace;
 const SCORED_MS = 1400 * pace;
@@ -40,13 +43,16 @@ const article = (n) => (/^(8|11|18)$/.test(String(n)) || /^8\d$/.test(String(n))
 // place); onSave() after every change to it; toast(title, text) for bonuses;
 // onEarned(achievements) for their banners and stickers; onExit() back to the
 // menu; onAgain() a new game.
-export default function Game({ setup, progress, onSave, toast, onEarned, onExit, onAgain }) {
+// settings: the Settings (read once: they don't change mid-game, as on the web).
+export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, progress, onSave, toast, onEarned, onExit, onAgain }) {
   const t = useTheme();
   const [, setTick] = useState(0);
   const redraw = () => setTick((n) => n + 1);
   const alive = useRef(true);
   const m = useRef(null);
-  if (!m.current) m.current = Match.createMatch({ ...setup, answerBonus: Progress.answerBonus });
+  const cfg = useRef(settings).current;
+  const CPU_STEP_MS = (Settings.CPU_STEP_MS[cfg.cpuSpeed] || 1000) * pace;
+  if (!m.current) m.current = Match.createMatch({ ...setup, firstInCorner: cfg.firstInCorner === true || cfg.firstInCorner === 'true', fitMode: cfg.fitRolls, answerBonus: Progress.answerBonus });
   const match = m.current;
   if (testing) window.BlockoutMobile = { match, Match };
 
@@ -66,6 +72,8 @@ export default function Game({ setup, progress, onSave, toast, onEarned, onExit,
   const [busy, setBusy] = useState(false);
   const [over, setOver] = useState(null); // { results }
   const [helpDone, setHelpDone] = useState(false); // counted: "I know it! ›"
+  const [goOn, setGoOn] = useState(null); // after a CPU turn: the "My turn ›" button's label
+  const goOnPressed = useRef(null);
   const helpStarted = useRef(0);
   const answerStart = useRef(0);
   const pausedMs = useRef(0);
@@ -102,6 +110,14 @@ export default function Game({ setup, progress, onSave, toast, onEarned, onExit,
     if (match.phase === 'cpu') return runCpu();
     const p = Match.currentPlayer(match);
     const first = Match.mustUseCorner(match) ? ' Your first rectangle goes in the top-left corner.' : '';
+    if (cfg.autoRoll === 'auto') {
+      // Auto roll: the dice roll by themselves, after a moment to read whose turn it is
+      setMsg(match.mode === 'multi' ? `${p.name}: rolling the dice…${first}` : `Rolling the dice…${first}`);
+      redraw();
+      const turn = turnId.current;
+      wait(AUTO_ROLL_MS).then(() => turn === turnId.current && humanRoll());
+      return;
+    }
     setMsg(match.mode === 'multi' ? `${p.name}, roll the dice!${first}` : `Roll the dice!${first}`);
     redraw();
   }
@@ -252,7 +268,30 @@ export default function Game({ setup, progress, onSave, toast, onEarned, onExit,
 
   // ---- the CPU's turn: roll, then on the board: draw it growing, explain the counting
 
+  // After a CPU turn: on by itself, or (Settings › After a CPU turn) a button
+  // to press, unless the game is over anyway
+  async function afterCpu(delay) {
+    if (cfg.cpuEnd !== 'button' || Match.isOver(match)) return wait(delay);
+    const next = match.players[(match.current + 1) % match.players.length];
+    setGoOn(match.mode === 'single' ? 'My turn ›' : next.cpu ? `${next.name} ›` : `${next.name}'s turn ›`);
+    await new Promise((resolve) => (goOnPressed.current = resolve));
+    setGoOn(null);
+  }
+
+  // Instant CPU turns: roll, place and score straight away, no explanation
+  async function runInstantCpu() {
+    const p = Match.currentPlayer(match);
+    const { dice: [a, b], rect } = Match.cpuTurn(match);
+    setDice([a, b]);
+    setView('board');
+    setMsg(rect ? `${p.name} rolled ${a} and ${b}: ${a} × ${b} = ${rect.area}.` : `${p.name} rolled ${a} and ${b}: no room, so it passes.`);
+    redraw();
+    await wait(INSTANT_CPU_MS);
+    return nextTurn();
+  }
+
   async function runCpu() {
+    if (cfg.cpuSteps === 'instant') return runInstantCpu();
     const p = Match.currentPlayer(match);
     setMsg(`${p.name} is rolling…`);
     redraw();
@@ -264,7 +303,7 @@ export default function Game({ setup, progress, onSave, toast, onEarned, onExit,
     if (!rect) {
       setMsg(`No room for a ${a} × ${b} anywhere. ${p.name} passes.`);
       redraw();
-      await wait(PASS_MS);
+      await afterCpu(PASS_MS);
       return nextTurn();
     }
     setMsg(`${p.name} rolled ${a} and ${b}.`);
@@ -308,7 +347,7 @@ export default function Game({ setup, progress, onSave, toast, onEarned, onExit,
     lines.push(`${a} × ${b} = ${rect.area}`);
     setSteps([...lines]);
     redraw();
-    await wait(CPU_STEP_MS * 1.5);
+    await afterCpu(CPU_STEP_MS * 1.5);
     return nextTurn();
   }
 
@@ -351,7 +390,7 @@ export default function Game({ setup, progress, onSave, toast, onEarned, onExit,
 
   return (
     <View style={[styles.fill, { backgroundColor: t.bg }]}>
-      <Header match={match} who={who} over={over} onExit={leave} />
+      <Header match={match} who={who} over={over} onExit={leave} showProgress={cfg.showProgress === true || cfg.showProgress === 'true'} />
       <View style={styles.fill} onLayout={(e) => setArea(e.nativeEvent.layout)}>
         {!area ? null : view === 'roll' ? (
           <View style={styles.rollScreen}>
@@ -363,14 +402,14 @@ export default function Game({ setup, progress, onSave, toast, onEarned, onExit,
             <Text testID="turn-msg" style={[styles.rollMsg, { color: t.ink }]}>
               {msg || ' '}
             </Text>
-            {match.phase === 'roll' && mine() ? <Button testID="roll" title="Roll the dice" onPress={humanRoll} disabled={busy} style={styles.wide} /> : null}
+            {match.phase === 'roll' && mine() && cfg.autoRoll !== 'auto' ? <Button testID="roll" title="Roll the dice" onPress={humanRoll} disabled={busy} style={styles.wide} /> : null}
             {rolled ? <Button testID="draw-it" title="Draw it ›" onPress={toBoard} style={styles.wide} /> : null}
           </View>
         ) : view === 'board' ? (
           <View style={styles.boardScreen}>
             <Board
               match={match}
-              width={side(over ? 300 : steps.length ? 214 : 150)}
+              width={side((over ? 300 : steps.length ? 214 : 150) + (goOn ? 64 : 0))}
               drag={drag}
               preview={preview}
               hide={hide}
@@ -386,6 +425,7 @@ export default function Game({ setup, progress, onSave, toast, onEarned, onExit,
                 <Die value={dice[1]} size={52} />
               </View>
             )}
+            {goOn ? <Button testID="go-on" title={goOn} onPress={() => goOnPressed.current && goOnPressed.current()} style={styles.wide} /> : null}
             {over ? (
               <Results over={over} match={match} who={who} onAgain={onAgain} onExit={onExit} />
             ) : steps.length ? (
@@ -435,10 +475,13 @@ function HelpScreen({ area, rect, color, counting, text, done, onBack }) {
   );
 }
 
-// Scores, and ✕ back to the menu
-function Header({ match, who, over, onExit }) {
+// Scores, and ✕ back to the menu; with Settings › Board progress, how full the board is
+function Header({ match, who, over, onExit, showProgress }) {
   const t = useTheme();
+  const total = match.size * match.size;
+  const filled = total - Core.emptyCount(match.board);
   return (
+    <View>
     <View style={styles.header}>
       <Pressable onPress={onExit} accessibilityRole="button" accessibilityLabel="Main menu" hitSlop={10} style={[styles.close, { borderColor: t.line, backgroundColor: t.surface }]}>
         <Text style={[styles.closeText, { color: t.ink }]}>✕</Text>
@@ -452,6 +495,17 @@ function Header({ match, who, over, onExit }) {
           <Text style={[styles.scorePts, { color: t.ink }]}>{p.score}</Text>
         </View>
       ))}
+    </View>
+    {showProgress ? (
+      <View style={styles.progress} accessibilityLabel={`Board: ${filled} of ${total} filled`}>
+        <Text testID="board-progress" style={[styles.progressText, { color: t.muted }]}>
+          Board: {filled} of {total} filled
+        </Text>
+        <View style={[styles.progressBar, { backgroundColor: t.soft }]}>
+          <View style={{ width: `${(filled / total) * 100}%`, height: '100%', backgroundColor: PLAYER_COLORS[match.current % PLAYER_COLORS.length], borderRadius: 4 }} />
+        </View>
+      </View>
+    ) : null}
     </View>
   );
 }
@@ -516,6 +570,9 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
   close: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   closeText: { fontSize: 18, fontWeight: '800' },
+  progress: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingBottom: 6 },
+  progressText: { fontSize: 13, fontWeight: '600' },
+  progressBar: { flex: 1, height: 8, borderRadius: 4, overflow: 'hidden' },
   score: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 12, borderWidth: 3 },
   swatch: { width: 12, height: 12, borderRadius: 6 },
   scoreName: { flex: 1, fontSize: 15, fontWeight: '600' },

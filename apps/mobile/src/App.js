@@ -7,6 +7,7 @@ import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-
 import * as Progress from '@blockout/progress';
 import * as Shop from '@blockout/progress/shop';
 import * as Views from '@blockout/progress/views';
+import * as Settings from '@blockout/progress/settings';
 import * as Account from './account';
 import Game from './Game';
 import Home from './Home';
@@ -14,9 +15,11 @@ import { BOARDS, DIFFICULTIES, boardOpen, difficultyOpen, modeOpen } from './rew
 import { ShopScreen, UnlockSheet } from './Shop';
 import { AchievementsScreen, StickersScreen } from './Collection';
 import StatsScreen from './StatsScreen';
-import { useTheme } from './theme';
+import SettingsScreen from './SettingsScreen';
+import { ThemeSetting, useTheme } from './theme';
 
 const CHOICE_KEY = 'blockout.mobile.choice';
+const SETTINGS_KEY = 'blockout.settings'; // (on this phone only, like the web game's)
 const DEFAULT_CHOICE = { mode: 'single', difficulty: 'easy', size: 6 };
 
 // The game to start from the menu's choice (falling back to what's unlocked)
@@ -29,19 +32,23 @@ function setupFor(choice, progress) {
 }
 
 export default function App() {
+  const [theme, setTheme] = useState('auto'); // (Settings › Theme, for every screen)
   return (
     <SafeAreaProvider>
-      <Main />
+      <ThemeSetting.Provider value={theme}>
+        <Main onTheme={setTheme} />
+      </ThemeSetting.Provider>
     </SafeAreaProvider>
   );
 }
 
-function Main() {
+function Main({ onTheme }) {
   const t = useTheme();
   const [ready, setReady] = useState(false);
   const [user, setUser] = useState(null);
   const [progress, setProgress] = useState(null);
   const [choice, setChoice] = useState(DEFAULT_CHOICE);
+  const [settings, setSettings] = useState(Settings.DEFAULT_SETTINGS);
   const [game, setGame] = useState(null); // { key, setup }
   const [screen, setScreen] = useState('menu'); // 'menu' | 'shop' | 'stats' | 'achievements' | 'stickers' (a game is on top)
   const [offer, setOffer] = useState(null); // the unlock sheet: Shop.unlockOffer's answer
@@ -69,6 +76,13 @@ function Main() {
       try {
         setChoice({ ...DEFAULT_CHOICE, ...JSON.parse(await AsyncStorage.getItem(CHOICE_KEY)) });
       } catch (_) {}
+      let saved = {};
+      try {
+        saved = JSON.parse(await AsyncStorage.getItem(SETTINGS_KEY)) || {};
+      } catch (_) {}
+      const s = Settings.enforce(saved, save); // (anything not unlocked back to its default)
+      setSettings(s);
+      onTheme(s.theme);
       setReady(true);
     })();
   }, []);
@@ -82,6 +96,13 @@ function Main() {
     const next = { ...choice, ...part };
     setChoice(next);
     AsyncStorage.setItem(CHOICE_KEY, JSON.stringify(next));
+  };
+
+  const setSetting = (key, value) => {
+    const next = { ...settings, [key]: value };
+    setSettings(next);
+    AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+    if (key === 'theme') onTheme(value);
   };
 
   // New achievements: a banner each, and the sticker each big one drops (as on the web)
@@ -107,6 +128,7 @@ function Main() {
     if (DIFFICULTIES.some((d) => d.id === on.difficulty)) part.difficulty = on.difficulty;
     if (BOARDS.includes(on.size)) part.size = on.size;
     if (Object.keys(part).length) choose(part);
+    if (on.setting) setSetting(on.setting[0], on.setting[1] === 'true' ? true : on.setting[1]);
   }
 
   async function signIn() {
@@ -116,7 +138,9 @@ function Main() {
       const who = await Account.signIn();
       if (who) {
         setUser(who);
-        setProgress(await Account.syncProgress());
+        const synced = await Account.syncProgress();
+        setProgress(synced);
+        setSettings((s) => Settings.enforce(s, synced)); // (this save's unlocks)
       }
     } catch (e) {
       setAccountError(e.message || 'Signing in didn’t work.');
@@ -128,7 +152,9 @@ function Main() {
   async function signOut() {
     await Account.signOut();
     setUser(null);
-    setProgress(await Account.loadProgress()); // back to this phone's guest save
+    const guest = await Account.loadProgress(); // back to this phone's guest save
+    setProgress(guest);
+    setSettings((s) => Settings.enforce(s, guest)); // (its unlocks)
   }
 
   if (!ready) {
@@ -145,11 +171,13 @@ function Main() {
     <SafeAreaView style={[styles.fill, { backgroundColor: t.bg }]}>
       <StatusBar style="auto" />
       {game ? (
-        <Game key={game.key} setup={game.setup} progress={progress} onSave={save} toast={toasts.show} onEarned={celebrate} onExit={() => setGame(null)} onAgain={play} />
+        <Game key={game.key} setup={game.setup} settings={settings} progress={progress} onSave={save} toast={toasts.show} onEarned={celebrate} onExit={() => setGame(null)} onAgain={play} />
       ) : screen === 'shop' ? (
         <ShopScreen progress={progress} onAsk={ask} onClose={() => setScreen('menu')} />
       ) : screen === 'stats' ? (
-        <StatsScreen progress={progress} onClose={() => setScreen('menu')} />
+        <StatsScreen progress={progress} settings={settings} onClose={() => setScreen('menu')} />
+      ) : screen === 'settings' ? (
+        <SettingsScreen progress={progress} settings={settings} onSet={setSetting} onLocked={ask} onClose={() => setScreen('menu')} />
       ) : screen === 'achievements' ? (
         <AchievementsScreen progress={progress} onClose={() => setScreen('menu')} />
       ) : screen === 'stickers' ? (
@@ -182,6 +210,7 @@ function Main() {
           onShop={() => setScreen('shop')}
           onAchievements={() => setScreen('achievements')}
           onStats={() => setScreen('stats')}
+          onSettings={() => setScreen('settings')}
           onStickers={() => setScreen('stickers')}
         />
       )}

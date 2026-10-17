@@ -12,7 +12,7 @@ const MODES = [
 ];
 
 // onLocked(itemId): a locked choice was tapped (offer it); onShop(): open the Shop
-export default function Home({ progress, user, choice, onChoose, onPlay, onSignIn, onSignOut, signingIn, accountError, onLocked, onShop, onAchievements, onStats, onStickers }) {
+export default function Home({ progress, user, choice, onChoose, onPlay, onSignIn, onSignOut, signingIn, accountError, onLocked, onShop, onAchievements, onStats, onStickers, onSettings }) {
   const t = useTheme();
   const newUnlocks = Shop.affordableCount(progress);
   const stickerNews = Shop.newStickers(progress) + Shop.spareStickers(progress);
@@ -33,6 +33,9 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onSignI
                   <Text style={styles.badgeText}>{newUnlocks}</Text>
                 </View>
               ) : null}
+            </Pressable>
+            <Pressable testID="settings" accessibilityRole="button" accessibilityLabel="Settings" onPress={onSettings} hitSlop={6} style={({ pressed }) => [styles.gear, { backgroundColor: t.soft, borderColor: t.line, transform: [{ scale: pressed ? 0.94 : 1 }] }]}>
+              <Text style={styles.gearText}>⚙️</Text>
             </Pressable>
           </View>
         </View>
@@ -172,7 +175,9 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   page: { flexGrow: 1, padding: 16, gap: 16 },
   top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { fontSize: 32, fontWeight: '900' },
+  title: { fontSize: 28, fontWeight: '900' },
+  gear: { width: 38, height: 38, borderRadius: 19, borderWidth: StyleSheet.hairlineWidth * 2, alignItems: 'center', justifyContent: 'center' },
+  gearText: { fontSize: 18 },
   topRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   wallet: { fontSize: 17, fontWeight: '800', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999, overflow: 'hidden' },
   shopBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 7, paddingHorizontal: 12, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth * 2 },

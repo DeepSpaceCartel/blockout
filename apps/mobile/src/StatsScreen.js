@@ -3,6 +3,7 @@
 // to practice, and the recent games.
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import * as Settings from '@blockout/progress/settings';
 import * as Stats from '@blockout/progress/stats';
 import * as Views from '@blockout/progress/views';
 import { loadHistory } from './history';
@@ -12,7 +13,7 @@ import { ScreenHeader } from './ui';
 // The fact statuses' colours (the web grid's)
 const STATUS = { mastered: '#2a9d5c', learning: '#f2c94c', practice: '#d64533', unseen: null };
 
-export default function StatsScreen({ progress, onClose }) {
+export default function StatsScreen({ progress, settings = Settings.DEFAULT_SETTINGS, onClose }) {
   const t = useTheme();
   const [history, setHistory] = useState(null);
   useEffect(() => {
@@ -75,7 +76,7 @@ export default function StatsScreen({ progress, onClose }) {
               ))}
             </View>
             {report.players.map((p) => (
-              <PlayerTable key={p.name} progress={progress} player={p} />
+              <PlayerTable key={p.name} progress={progress} player={p} showTime={Settings.showsTime(settings)} />
             ))}
           </View>
         ) : null}
@@ -98,10 +99,10 @@ export default function StatsScreen({ progress, onClose }) {
 }
 
 // One player's grid, then the facts they miss most
-function PlayerTable({ progress, player }) {
+function PlayerTable({ progress, player, showTime }) {
   const t = useTheme();
   const facts = Stats.playerFacts(progress, player.name);
-  const grid = Stats.factGrid(facts, { unlocked: Views.tableSize(progress) });
+  const grid = Stats.factGrid(facts, { unlocked: Views.tableSize(progress), showTime });
   const practice = Stats.factsToPractice(facts);
   return (
     <View style={styles.player}>

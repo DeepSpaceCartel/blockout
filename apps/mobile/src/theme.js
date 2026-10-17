@@ -1,4 +1,5 @@
 // The web game's colours (packages/ui/src/css/tokens.css), light and dark.
+import { createContext, useContext } from 'react';
 import { useColorScheme } from 'react-native';
 
 const light = {
@@ -58,6 +59,11 @@ const dark = {
 // Players' colours: the Wardrobe's Classic set
 export const PLAYER_COLORS = ['#e4572e', '#2e86de', '#2a9d5c', '#8e5bd6'];
 
+// The Theme setting: 'auto' follows the device, 'light' or 'dark' forces one
+export const ThemeSetting = createContext('auto');
+
 export function useTheme() {
-  return useColorScheme() === 'dark' ? dark : light;
+  const device = useColorScheme();
+  const setting = useContext(ThemeSetting);
+  return (setting === 'auto' ? device : setting) === 'dark' ? dark : light;
 }

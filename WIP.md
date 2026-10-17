@@ -27,7 +27,7 @@ The full production-readiness plan (approved 2026-10-15) is at the end of this f
 
 The owner chose: phases 1–6 and 8 (not the other games), and **extract shared rules into pure packages, then both the web game and the app use them**. One phase at a time, each step tested in the app's web build (390×844 and 375×667) and on the owner's iPhone through Expo Go.
 
-1. **Progress:** Shop ← `@blockout/progress/shop` (done: the web shop uses it; the app's Shop screen next), then achievements and stickers, stats, daily check-in, settings.
+1. **Progress: done (2026-10-17).** Shop, achievements and stickers (with sticker drops), stats (the phone's own history), the daily check-in and settings, each shared through `@blockout/progress/{shop,views,stats,settings}` and used by both clients. The app's Settings list only what its game honours; real dice, tap-to-place and the answer timer come in phase 2.
 2. **The rest of the game:** Tricky, Master, Legend, Expert levels and answer timers. Move the web game's turns (`play.js`) onto `@blockout/engine/match` here (class and pair modes need forced dice and no game end).
 3. **Practice** (`practice.js` → a pure session module in `@blockout/progress`).
 4. **Wardrobe.**
