@@ -24,7 +24,7 @@ Every password the chart needs inside the cluster (MongoDB, Valkey, Postgres, Ke
 **From 1Password (recommended):** `deploy/blockout/.env.1password` names each secret by its 1Password reference (`op://<vault>/<item>/<field>`), so it holds no secrets and is in git. `op run` fills the environment from it, and `install.sh` hands the values to Helm on its standard input (never its command line, where `ps` would show them):
 
 ```sh
-op run --env-file=deploy/blockout/.env.1password -- deploy/blockout/install.sh 0.10.0
+op run --env-file=deploy/blockout/.env.1password -- deploy/blockout/install.sh 0.11.0
 ```
 
 | Variable | Value |
@@ -54,7 +54,7 @@ imageCredentials:
 ```
 
 ```sh
-deploy/blockout/install.sh 0.10.0 -f secrets.yaml
+deploy/blockout/install.sh 0.11.0 -f secrets.yaml
 ```
 
 ## Deploy, update, roll back
@@ -62,14 +62,14 @@ deploy/blockout/install.sh 0.10.0 -f secrets.yaml
 From a checkout (the chart as it is in the checkout, `values-workspace.yaml` by default), with the secrets from either of the above:
 
 ```sh
-op run --env-file=deploy/blockout/.env.1password -- deploy/blockout/install.sh 0.10.0
+op run --env-file=deploy/blockout/.env.1password -- deploy/blockout/install.sh 0.11.0
 VALUES=values-production.yaml deploy/blockout/install.sh 1.0.0 -f secrets.yaml
 ```
 
 Or the released chart, with no checkout:
 
 ```sh
-helm upgrade --install blockout oci://ghcr.io/deepspacecartel/charts/blockout --version 0.10.0 \
+helm upgrade --install blockout oci://ghcr.io/deepspacecartel/charts/blockout --version 0.11.0 \
   -n blockout --create-namespace -f values-workspace.yaml -f secrets.yaml --atomic --wait --timeout 15m
 ```
 
