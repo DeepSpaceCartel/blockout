@@ -326,7 +326,7 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
 
   return (
     <View style={[styles.fill, { backgroundColor: t.bg }]}>
-      <Header match={match} who={who} over={over} dice={view === 'roll' ? null : match.dice || dice} onExit={onExit} />
+      <Header match={match} who={who} over={over} onExit={onExit} />
       <View style={styles.fill} onLayout={(e) => setArea(e.nativeEvent.layout)}>
         {!area ? null : view === 'roll' ? (
           <View style={styles.rollScreen}>
@@ -345,7 +345,7 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
           <View style={styles.boardScreen}>
             <Board
               match={match}
-              width={side(over ? 300 : steps.length ? 150 : 90)}
+              width={side(over ? 300 : steps.length ? 214 : 150)}
               drag={drag}
               preview={preview}
               hide={hide}
@@ -354,6 +354,13 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
               onDrag={onDrag}
               onDraw={onDraw}
             />
+            {over ? null : (
+              <View style={styles.diceRow} accessibilityLabel={dice[0] ? `Rolled ${dice[0]} and ${dice[1]}` : undefined}>
+                <Die value={dice[0]} size={52} />
+                <Text style={[styles.times, { color: t.muted }]}>×</Text>
+                <Die value={dice[1]} size={52} />
+              </View>
+            )}
             {over ? (
               <Results over={over} match={match} who={who} onAgain={onAgain} onExit={onExit} />
             ) : steps.length ? (
@@ -403,8 +410,8 @@ function HelpScreen({ area, rect, color, counting, text, done, onBack }) {
   );
 }
 
-// Scores, the roll once it's in, and ✕ back to the menu
-function Header({ match, who, over, dice, onExit }) {
+// Scores, and ✕ back to the menu
+function Header({ match, who, over, onExit }) {
   const t = useTheme();
   return (
     <View style={styles.header}>
@@ -420,13 +427,6 @@ function Header({ match, who, over, dice, onExit }) {
           <Text style={[styles.scorePts, { color: t.ink }]}>{p.score}</Text>
         </View>
       ))}
-      {dice && dice[0] && !over ? (
-        <View style={[styles.rollChip, { backgroundColor: t.ink }]}>
-          <Text style={[styles.rollChipText, { color: t.bg }]}>
-            {dice[0]} × {dice[1]}
-          </Text>
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -494,8 +494,8 @@ const styles = StyleSheet.create({
   swatch: { width: 12, height: 12, borderRadius: 6 },
   scoreName: { flex: 1, fontSize: 15, fontWeight: '600' },
   scorePts: { fontSize: 18, fontWeight: '800' },
-  rollChip: { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 10 },
-  rollChipText: { fontSize: 16, fontWeight: '800' },
+  diceRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  times: { fontSize: 24, fontWeight: '800' },
   rollScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 28, padding: 24 },
   bigDice: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   bigTimes: { fontSize: 40, fontWeight: '800' },
