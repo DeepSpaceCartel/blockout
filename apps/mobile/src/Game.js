@@ -91,6 +91,7 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
 
   function startTurn() {
     turnId.current++;
+    helpPlan.current = null;
     setView('roll');
     setDice([null, null]);
     setRolled(false);
@@ -203,13 +204,21 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
     }
   }
 
-  async function helpCount(intro = null) {
+  // The first time a turn: the help counts (fact stats, achievements). After
+  // that, "Count again" replays the same counting (again: the plan kept here).
+  const helpPlan = useRef(null);
+  async function helpCount(intro = null, again = false) {
     if (match.phase !== 'answer') return;
     const rect = match.pending.rect;
-    const h = Match.help(match);
+    let h = helpPlan.current;
+    if (!again) {
+      h = Match.help(match);
+      if (!h) return;
+      helpPlan.current = h;
+      award(Rewards.onHelp(progress, match, rect));
+      onSave();
+    }
     if (!h) return;
-    award(Rewards.onHelp(progress, match, rect));
-    onSave();
     helpStarted.current = Date.now();
     setHelpDone(false);
     setCounting(null);
@@ -222,7 +231,7 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
     }
     const plan = h.count;
     const units = plan.steps === 1 ? plan.unit : `${plan.unit}s`;
-    setFeedback({ kind: 'help', text: intro || `${plan.steps} ${units} of ${plan.group}. Let's count by ${plan.group}s!` });
+    setFeedback({ kind: 'help', text: intro || `${plan.steps} ${units} of ${plan.group}. Let's count${again ? ' again' : ''}!` });
     await wait(COUNT_STEP_MS);
     for (let i = 1; i <= plan.steps; i++) {
       setFeedback({ kind: 'help', text: `${plan.steps} ${units} of ${plan.group}: ${plan.totals.slice(0, i).join(', ')}` });
@@ -385,9 +394,9 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
             entry={entry}
             feedback={feedback}
             busy={busy}
-            canHelp={Boolean(match.pending && !match.pending.helped && !match.expert)}
+            help={!match.pending || match.expert ? null : match.pending.helped ? 'again' : 'first'}
             onKey={onKey}
-            onHelp={() => helpCount()}
+            onHelp={() => helpCount(null, Boolean(match.pending && match.pending.helped))}
           />
         )}
       </View>
@@ -432,7 +441,8 @@ function Header({ match, who, over, onExit }) {
 }
 
 // The question and the keypad
-function AnswerScreen({ rect, entry, feedback, busy, canHelp, onKey, onHelp }) {
+// help: 'first' ("Help me count"), 'again' ("Count again") or null (Expert)
+function AnswerScreen({ rect, entry, feedback, busy, help, onKey, onHelp }) {
   const t = useTheme();
   if (!rect) return null;
   return (
@@ -449,7 +459,7 @@ function AnswerScreen({ rect, entry, feedback, busy, canHelp, onKey, onHelp }) {
         {feedback ? feedback.text : 'How many squares did you just draw?'}
       </Text>
       <Keypad onKey={onKey} disabled={busy} />
-      {canHelp ? <Button kind="secondary" title="Help me count" onPress={onHelp} disabled={busy} /> : null}
+      {help ? <Button testID="help" kind="secondary" title={help === 'again' ? 'Count again' : 'Help me count'} onPress={onHelp} disabled={busy} /> : null}
     </View>
   );
 }
