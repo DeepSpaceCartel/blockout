@@ -9,6 +9,7 @@ import * as Auth from '@blockout/auth';
 import * as Game from './game/api.js';
 import * as Progress from '@blockout/progress';
 import * as Homework from '@blockout/progress/homework';
+import * as Grownups from '@blockout/progress/grownups';
 
 let el, account, homework, classes, kids;
 
@@ -16,15 +17,10 @@ const { make, toast } = Game;
 
 const $ = (id) => document.getElementById(id);
 
-const ROLE = {
-  student: { emoji: '🎒', label: 'Student' },
-  teacher: { emoji: '🍎', label: 'Teacher' },
-  parent: { emoji: '👪', label: 'Parent' },
-};
+const { ROLE, FORMAT_NAMES, STATUS_ORDER, ago, activityText, dayString, niceTime, shortDay } = Grownups;
 
 const DIFFICULTY_NAMES = Progress.DIFFICULTY_NAMES;
 
-const FORMAT_NAMES = { knockout: 'Knockout', double: 'Double elimination', roundrobin: 'Round robin', swiss: 'Swiss', koth: 'King of the hill' };
 
 const LIVE_POLL_MS = 20 * 1000;
 
@@ -50,7 +46,6 @@ function input(attrs = {}) {
 }
 
 // "Tue, Oct 29"
-const shortDay = (t) => new Date(t).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 const codeLink = (code) => `${location.origin}${location.pathname}#code=${code}`;
 
 // A one-time code to hand over: big, with when it stops working, a QR code of
@@ -162,22 +157,9 @@ const showError = (p, err) => {
   p.hidden = false;
 };
 
-const dayString = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 const { niceDay } = Homework;
 
-const niceTime = (t) => new Date(t).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-
-function ago(t) {
-  if (!t) return 'not yet';
-  const mins = Math.round((Date.now() - t) / 60000);
-  if (mins < 2) return 'just now';
-  if (mins < 60) return `${mins} min ago`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours} h ago`;
-  const days = Math.round(hours / 24);
-  return days === 1 ? 'yesterday' : `${days} days ago`;
-}
 
 // Our own dialogs, built like the game's: .overlay > .dialog with a bottom
 // .dialog-actions panel. Escape or the backdrop closes them.
@@ -445,12 +427,7 @@ function askTeacherSignIn() {
   openSignIn({ role: 'teacher', note: '🍎 Teachers: sign in to host a class. Students join with the code (no sign-in needed).' });
 }
 
-const STATUS_ORDER = [
-  ['mastered', 'Mastered'],
-  ['learning', 'Learning'],
-  ['practice', 'Needs practice'],
-  ['unseen', 'Not seen yet'],
-];
+
 
 // A thin bar: mastered / learning / needs practice / not seen, out of 144
 function masteryBar(summary) {
@@ -462,13 +439,6 @@ function masteryBar(summary) {
     bar.append(seg);
   }
   return bar;
-}
-
-function activityText(e) {
-  const diff = e.difficulty ? `${DIFFICULTY_NAMES[e.difficulty] || e.difficulty} ` : '';
-  if (e.kind === 'practice') return `📝 ${diff}practice, ${e.count} questions${e.expert ? ' (Expert)' : ''}`;
-  if (e.kind === 'class') return e.type === 'tournament' ? `🏆 Class tournament game${e.won ? ' (won)' : ''}` : e.type === 'pairs' ? `🤝 Class pairs game${e.won ? ' (won)' : ''}` : `🏫 Class game${e.rank ? ` (${e.rank}${['st', 'nd', 'rd'][e.rank - 1] || 'th'})` : ''}`;
-  return `🎲 ${diff}${e.size}×${e.size} ${e.mode === 'multi' ? 'game at home' : e.won ? 'game, beat the CPU' : 'game vs the CPU'}`;
 }
 
 // onPlay(goal): the student's list, where each open homework starts its game
@@ -548,16 +518,13 @@ function studentDetail(s, { onAddHomework, onRemoveHomework, mine }) {
 function homeworkForm(onSubmit, options, who) {
   const form = make('form', 'acct-hw-form');
   form.append(make('h4', null, 'Add homework'));
-  const kinds = [];
-  if (options.practice && options.tables.length) kinds.push(['master', 'Master a times table']);
-  if (options.practice) kinds.push(['practice', 'Finish practice rounds']);
-  kinds.push(['win', 'Beat the CPU on a board'], ['games', 'Play games']);
-  const type = select(kinds);
-  const table = select(options.tables.map((n) => [n, `×${n}`]), options.tables.includes(7) ? 7 : options.tables[options.tables.length - 1]);
-  const rounds = select([1, 2, 3, 4, 5, 6, 8, 10].map((n) => [n, String(n)]), 3);
-  const games = select([1, 2, 3, 4, 5, 6, 8, 10].map((n) => [n, String(n)]), 3);
-  const size = select(options.boards.map((n) => [n, `${n}×${n}`]), options.boards.includes(8) ? 8 : options.boards[options.boards.length - 1]);
-  const difficulty = select([['any', 'Any difficulty'], ...options.difficulties.map((d) => [d, DIFFICULTY_NAMES[d]])], 'any');
+  const c = Grownups.homeworkChoices(options);
+  const type = select(c.kinds);
+  const table = select(c.tables.map((n) => [n, `×${n}`]), c.start.table);
+  const rounds = select(Grownups.HOMEWORK_COUNTS.map((n) => [n, String(n)]), c.start.rounds);
+  const games = select(Grownups.HOMEWORK_COUNTS.map((n) => [n, String(n)]), c.start.games);
+  const size = select(c.boards.map((n) => [n, `${n}×${n}`]), c.start.size);
+  const difficulty = select(c.difficulties, c.start.difficulty);
   const week = new Date(Date.now() + 7 * 86400000);
   const due = input({ type: 'date', value: dayString(week), min: dayString(new Date()) });
   const f = {
@@ -570,36 +537,24 @@ function homeworkForm(onSubmit, options, who) {
   const grid = make('div', 'acct-grid');
   grid.append(field('Homework', type), f.table, f.rounds, f.games, f.size, f.difficulty, field('Due', due));
   const show = () => {
-    const t = type.value;
-    f.table.hidden = t !== 'master';
-    f.rounds.hidden = t !== 'practice';
-    f.games.hidden = t !== 'games';
-    f.size.hidden = t !== 'win';
-    f.difficulty.hidden = t !== 'practice' && t !== 'win';
+    const uses = Grownups.homeworkFields(type.value);
+    for (const k of Object.keys(f)) f[k].hidden = !uses[k];
   };
   type.addEventListener('change', show);
   show();
   const error = errorLine();
   const go = button('Set homework', 'btn btn-small btn-primary');
   go.type = 'submit';
-  const note = make('p', 'setting-help', `Only what ${who} has unlocked, so it can be played straight away. More kinds of homework show up as they unlock practice, times tables, difficulties and boards.`);
+  const note = make('p', 'setting-help', Grownups.homeworkNote(who));
   form.append(grid, note, error, go);
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     error.hidden = true;
-    const t = type.value;
-    const goal =
-      t === 'master'
-        ? { type: t, table: Number(table.value) }
-        : t === 'practice'
-          ? { type: t, rounds: Number(rounds.value), difficulty: difficulty.value }
-          : t === 'win'
-            ? { type: t, size: Number(size.value), difficulty: difficulty.value }
-            : { type: t, games: Number(games.value) };
+    const goal = Grownups.goalFrom({ type: type.value, table: table.value, rounds: rounds.value, games: games.value, size: size.value, difficulty: difficulty.value });
     go.disabled = true;
     try {
       await onSubmit({ goal, due: due.value || null });
-      toast('📚 Homework set', Progress.describeGoal(goal));
+      toast(...Grownups.homeworkSet(goal));
     } catch (err) {
       showError(error, err);
     } finally {
@@ -772,8 +727,7 @@ async function teacherInvites() {
       const { invites } = await Auth.api('GET', '/api/me/teacher-invites');
       for (const i of invites) {
         const row = make('div', 'acct-item');
-        const state = i.usedAt ? `used by ${i.usedBy}` : i.expired ? 'expired' : `waiting, until ${shortDay(i.expiresAt)}`;
-        row.append(make('span', null, `🍎 Code from ${shortDay(i.createdAt)}`), make('span', 'acct-small', state));
+        row.append(make('span', null, `🍎 Code from ${shortDay(i.createdAt)}`), make('span', 'acct-small', Grownups.inviteState(i)));
         if (!i.usedAt) {
           row.append(
             button('Remove', 'btn btn-small', async () => {
@@ -847,8 +801,7 @@ async function renderClass(slot) {
       nameCell.append(button(s.name, 'acct-link', () => openStudent(s.id, classes, renderClasses)));
       const tt = make('td');
       tt.append(masteryBar(s.summary), make('span', 'acct-small', `${s.summary.mastered} of ${s.summary.total} mastered`));
-      const hw = s.homework.total ? `${s.homework.done} of ${s.homework.total}${s.homework.late ? ` · ${s.homework.late} late` : ''}` : '—';
-      tr.append(nameCell, tt, make('td', null, s.summary.needsPractice.length ? s.summary.needsPractice.slice(0, 4).join(', ') + (s.summary.needsPractice.length > 4 ? '…' : '') : '—'), make('td', null, ago(s.lastPlayed)), make('td', null, hw), make('td'));
+      tr.append(nameCell, tt, make('td', null, Grownups.needsPracticeShort(s.summary.needsPractice)), make('td', null, ago(s.lastPlayed)), make('td', null, Grownups.homeworkCount(s.homework)), make('td'));
       tr.lastChild.append(button('Grown-ups', 'btn btn-small', () => openGrownUps(s, classes, renderClasses)));
       const remove = button('×', 'acct-remove', async () => {
         if (!confirm(`Take ${s.name} out of ${c.name}?`)) return;
@@ -872,7 +825,7 @@ async function renderClass(slot) {
   if (!d.assignments.length) hw.append(make('p', 'setting-help', 'No homework set.'));
   for (const a of d.assignments) {
     const row = make('div', 'acct-item');
-    row.append(make('strong', null, a.label), make('span', 'acct-small', `${a.due ? `due ${niceDay(a.due)} · ` : ''}${a.done} of ${a.of} done`));
+    row.append(make('strong', null, a.label), make('span', 'acct-small', Grownups.classHomeworkLine(a, niceDay)));
     row.append(
       button('Remove', 'btn btn-small', async () => {
         if (!confirm(`Remove “${a.label}” for the whole class?`)) return;
@@ -911,13 +864,13 @@ async function renderSchedules() {
     return;
   }
   box.replaceChildren(make('h3', 'stats-heading', 'Tournaments'));
-  const mine = list.filter((s) => s.scope === 'school' || s.classId === currentClass);
+  const mine = Grownups.schedulesFor(list, currentClass);
   if (!mine.length) box.append(make('p', 'setting-help', 'Plan a tournament and its lobby opens by itself at that time.'));
   for (const s of mine) {
     const row = make('div', `acct-item${s.open ? ' live' : ''}`);
     row.append(
       make('strong', null, s.title),
-      make('span', 'acct-small', `${niceTime(s.startsAt)} · ${FORMAT_NAMES[s.settings.format]} · ${s.settings.size}×${s.settings.size} · ${s.scope === 'school' ? 'whole school' : s.className}`)
+      make('span', 'acct-small', Grownups.scheduleLine(s))
     );
     if (s.open) {
       row.append(
@@ -949,8 +902,8 @@ function scheduleForm() {
   const title = input({ type: 'text', maxlength: '60', placeholder: 'e.g. Friday Cup' });
   const when = input({ type: 'datetime-local', value: local(soon) });
   const format = select(Object.entries(FORMAT_NAMES), 'knockout');
-  const size = select([6, 8, 10, 12].map((n) => [n, `${n}×${n}`]), 8);
-  const difficulty = select(['easy', 'medium', 'hard'].map((d) => [d, DIFFICULTY_NAMES[d]]), 'easy');
+  const size = select(Grownups.SCHEDULE_SIZES.map((n) => [n, `${n}×${n}`]), 8);
+  const difficulty = select(Grownups.SCHEDULE_DIFFICULTIES.map((d) => [d, DIFFICULTY_NAMES[d]]), 'easy');
   const scope = select([
     ['class', 'This class'],
     ['school', 'Whole school'],
@@ -997,7 +950,7 @@ async function openStudent(id, d, back) {
   const me = Auth.user();
   d.body.append(
     studentDetail(s, {
-      mine: (h) => h.fromName === me.name && h.from === (me.role === 'teacher' ? 'teacher' : 'parent') && (me.role === 'parent' || !h.classId),
+      mine: (h) => Grownups.canRemove(h, me),
       onAddHomework: async ({ goal, due }) => {
         await Auth.api('POST', '/api/homework', { studentId: s.id, goal, due });
         openStudent(id, d, back);
@@ -1044,8 +997,7 @@ async function renderKids() {
   const cards = make('div', 'acct-kids');
   for (const c of list) {
     const card = button('', 'acct-kid', () => openStudent(c.id, kids, renderKids));
-    const hw = c.homework.total ? `📚 ${c.homework.done} of ${c.homework.total} homework done${c.homework.late ? ` · ${c.homework.late} late` : ''}` : '📚 No homework';
-    card.append(make('strong', null, `🎒 ${c.name}`), masteryBar(c.summary), make('span', 'acct-small', `${c.summary.mastered} of ${c.summary.total} facts mastered · played ${ago(c.lastPlayed)}`), make('span', 'acct-small', hw));
+    card.append(make('strong', null, `🎒 ${c.name}`), masteryBar(c.summary), make('span', 'acct-small', `${c.summary.mastered} of ${c.summary.total} facts mastered · played ${ago(c.lastPlayed)}`), make('span', 'acct-small', Grownups.kidHomework(c.homework)));
     cards.append(card);
   }
   kids.body.append(cards);

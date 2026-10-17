@@ -15,7 +15,9 @@
     "./practice": "./src/practice.js",
     "./wardrobe": "./src/wardrobe.js",
     "./homework": "./src/homework.js",
-    "./classroom": "./src/classroom.js"
+    "./classroom": "./src/classroom.js",
+    "./grownups": "./src/grownups.js",
+    "./hosting": "./src/hosting.js"
   },
   "dependencies": {
     "@blockout/engine": "*"

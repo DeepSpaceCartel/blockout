@@ -6,6 +6,7 @@ import '@blockout/ui/css/tokens.css';
 import '@blockout/ui/css/base.css';
 import './admin.css';
 import * as Auth from '@blockout/auth';
+import * as Grownups from '@blockout/progress/grownups';
 
 const $ = (id) => document.getElementById(id);
 const ROLES = { student: '🎒 Student', teacher: '🍎 Teacher', parent: '👪 Parent' };
@@ -132,7 +133,7 @@ async function loadCodes() {
     invites.map((i) => [
       day(i.createdAt),
       i.by,
-      i.usedBy ? `${i.usedBy} (${day(i.usedAt)})` : i.expired ? 'expired' : 'not yet',
+      Grownups.adminCodeState(i, day),
       day(i.expiresAt),
       i.usedAt
         ? ''

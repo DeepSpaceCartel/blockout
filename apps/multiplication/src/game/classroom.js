@@ -7,6 +7,7 @@ import * as Core from '@blockout/engine';
 import * as Progress from '@blockout/progress';
 import * as Stats from '@blockout/progress/stats';
 import * as Live from '@blockout/progress/classroom';
+import * as Hosting from '@blockout/progress/hosting';
 import { AUTO_ROLL_MS, el } from './base.js';
 import { celebrate, celebrateWin, grantStickers, progress, saveProgress, toast } from './wallet.js';
 import { settings } from './settings.js';
@@ -18,7 +19,7 @@ import { drawQr } from './invites.js';
 import { dragRect, humanPreview, setDetailsOpen, toMenu } from './input.js';
 import { render, renderDie, resizeBoard, setMsg } from './render.js';
 
-let HOST_SETTINGS;
+const HOST_SETTINGS = Hosting.HOST_SETTINGS; // the lobby's settings ([value, label, detail]; `only`: some game types)
 
 // Your Wardrobe look, sent when you join so classmates see your avatar and title
 const myLook = () => ({ avatar: settings.cosmetics.avatar, title: settings.cosmetics.title });
@@ -597,18 +598,14 @@ function setSeg(group, value) {
 }
 
 // Game type: the whole class on one leaderboard, or head to head in pairs.
-const HOST_TYPE_HELP = {
-  class: 'Everyone plays the same rolls on their own board, and the whole class shares one leaderboard.',
-  pairs: 'Students are matched in twos and play head to head on a shared board, taking turns. With an odd number, the odd one out plays you or the CPU.',
-  tournament: 'Short head-to-head games in a knockout, round robin, Swiss or king-of-the-hill tournament, with the bracket on your screen. Choose the format in the lobby.',
-};
+const HOST_TYPE_HELP = Hosting.HOST_TYPE_HELP;
 
 function renderHostType() {
   const type = segValue(el.hostType);
   for (const b of el.hostType.querySelectorAll('button')) b.setAttribute('aria-checked', String(b.dataset.value === type));
   el.hostTypeHelp.textContent = HOST_TYPE_HELP[type];
   el.hostRounds.closest('.field').hidden = type !== 'class'; // pairs and tournament games run by turns
-  if (type === 'tournament' && segValue(el.hostSize) === '12') setSeg(el.hostSize, 8); // many short games: a small board
+  setSeg(el.hostSize, Hosting.setupSize(type, Number(segValue(el.hostSize)))); // (a tournament is many short games: a small board)
 }
 
 // Creating a class. Everything here (and more) can be changed in the lobby too.
@@ -704,7 +701,7 @@ async function copyWithFeedback(btn, text) {
   }, 1600);
 }
 
-const joinMessage = (code) => `Join our Blockout class! Tap this link: ${joinUrl(code).full} (class code ${code})`;
+const joinMessage = (code) => Hosting.joinMessage(joinUrl(code).full, code);
 
 function renderHost(view) {
   const first = !hostView;
@@ -726,38 +723,34 @@ function renderHost(view) {
     const pairs = view.type === 'pairs';
     renderHostSettings(view);
     el.hostPairs.hidden = !pairs;
-    const n = view.players.length;
-    el.hostStartBtn.disabled = !n;
-    el.hostStartBtn.textContent = n ? `Start game (${n} ${n === 1 ? 'player' : 'players'})` : 'Waiting for players to join…';
-    if (view.type === 'tournament') {
-      el.hostStartBtn.disabled = n < 2;
-      el.hostStartBtn.textContent = n >= 2 ? `Start the tournament (${n} players)` : 'A tournament needs at least 2 players…';
-    }
+    const start = Hosting.startButton(view);
+    el.hostStartBtn.disabled = start.disabled;
+    el.hostStartBtn.textContent = start.text;
     if (pairs) renderHostPairsLobby(view);
   } else if (view.state === 'playing' && view.type === 'tournament') {
-    const t = view.tournament;
     renderHostMatches(view, el.hostMatches);
-    renderTournament(t, el.hostTournament);
-    const kothPlayed = t.hills.reduce((n, h) => n + h.played, 0);
-    const kothTotal = t.hills.reduce((n, h) => n + h.limit, 0);
-    el.hostRound.textContent = t.format === 'koth' ? `King of the hill · ${kothPlayed} of ${kothTotal} games` : `${TOURNAMENT_NAMES[t.format]} · ${t.label}`;
-    el.hostNextBtn.replaceChildren(icon('chevron-right'), t.format === 'koth' ? ' Next games' : ' Next round');
-    el.hostNextBtn.disabled = !t.roundReady;
+    renderTournament(view.tournament, el.hostTournament);
+    el.hostRound.textContent = Hosting.roundLabel(view);
+    const next = Hosting.nextButton(view);
+    if (next) {
+      el.hostNextBtn.replaceChildren(icon('chevron-right'), ` ${next.text}`);
+      el.hostNextBtn.disabled = next.disabled;
+    }
     el.hostAuto.checked = view.autoNext;
   } else if (view.state === 'playing' && view.type === 'pairs') {
     renderHostMatches(view, el.hostMatches);
-    const done = view.matches.filter((m) => m.over).length;
-    el.hostRound.textContent = `Pairs · ${done} of ${view.matches.length} ${view.matches.length === 1 ? 'game' : 'games'} finished`;
+    el.hostRound.textContent = Hosting.roundLabel(view);
   } else if (view.state === 'playing') {
     const [a, b] = view.roll;
     const sides = Core.DIFFICULTY_SIDES[s.difficulty];
-    el.hostRound.textContent = `Roll ${view.round} of ${s.rounds}`;
+    el.hostRound.textContent = Hosting.roundLabel(view);
     renderDie(el.hostDieA, a, sides);
     renderDie(el.hostDieB, b, sides);
     el.hostRollText.textContent = `Draw a ${a} by ${b} rectangle`;
     el.hostDoneFill.style.width = `${view.here ? (view.done / view.here) * 100 : 0}%`;
     el.hostDoneText.textContent = `${view.done} of ${view.here} done`;
-    el.hostNextBtn.replaceChildren(icon(view.round >= s.rounds ? 'flag' : 'dices'), view.round >= s.rounds ? ' Finish game' : ' Next roll');
+    const next = Hosting.nextButton(view);
+    el.hostNextBtn.replaceChildren(icon(next.finish ? 'flag' : 'dices'), ` ${next.text}`);
     el.hostAuto.checked = view.autoNext;
     renderHostBoards(view);
   } else {
@@ -767,8 +760,8 @@ function renderHost(view) {
   const pairsPlaying = view.type !== 'class';
   const tourney = view.type === 'tournament';
   for (const node of [el.hostDice, el.hostRollText, el.hostProgress]) node.hidden = pairsPlaying;
-  el.hostNextBtn.hidden = el.hostAutoLabel.hidden = view.type === 'pairs' || (tourney && view.tournament && view.tournament.format === 'koth');
-  el.hostAutoLabel.lastChild.textContent = tourney ? ' Start the next round by itself' : ' Roll again by itself when everyone’s done';
+  el.hostNextBtn.hidden = el.hostAutoLabel.hidden = !Hosting.nextButton(view);
+  el.hostAutoLabel.lastChild.textContent = ` ${Hosting.autoLabel(view)}`;
   el.hostMatches.hidden = !pairsPlaying;
   el.hostBoards.hidden = view.type !== 'class' || view.state !== 'playing';
   el.hostTournament.hidden = !tourney || view.state !== 'playing';
@@ -780,7 +773,7 @@ function renderHost(view) {
 }
 
 // "Make it quick": everything that saves time
-const QUICK_SETTINGS = { placeMode: 'auto', answerTime: 20, autoRoll: true, fitRolls: 'always', cpuSpeed: 'fast', matchTurns: 12 };
+const QUICK_SETTINGS = Hosting.QUICK_SETTINGS;
 
 function renderHostSettings(view) {
   const grid = el.hostSettingsGrid;
@@ -802,14 +795,13 @@ function renderHostSettings(view) {
     }
   }
   HOST_SETTINGS.forEach((def, i) => {
-    grid.children[i].hidden = (def.only && !def.only.includes(view.type)) || (def.when && !def.when(view.settings));
+    grid.children[i].hidden = !Hosting.settingShown(def, view);
   });
   for (const seg of grid.querySelectorAll('.segmented')) {
     const current = JSON.stringify(view.settings[seg.dataset.key]);
     for (const b of seg.querySelectorAll('button')) b.classList.toggle('selected', b.dataset.value === current);
   }
-  const quick = Object.entries(QUICK_SETTINGS).every(([k, v]) => view.settings[k] === v || (k === 'cpuSpeed' && view.type !== 'pairs') || (['autoRoll', 'fitRolls', 'cpuSpeed', 'matchTurns'].includes(k) && view.type === 'class'));
-  el.hostQuick.disabled = quick;
+  el.hostQuick.disabled = Hosting.isQuick(view);
 }
 
 // ---- teacher: tournaments on the projector
@@ -862,44 +854,46 @@ function renderTournament(t, box) {
   }
 }
 
-function renderTournamentPodium(t) {
+function renderPodium(view) {
   el.hostPodium.innerHTML = '';
-  const medals = ['🥇', '🥈', '🥉'];
-  for (const x of t.standings.filter((s) => s.place <= 3).slice(0, 4)) {
-    const li = make('li', `podium-${x.place}`);
-    li.append(make('span', 'podium-medal', medals[x.place - 1]), lookName(x, 'podium-name'), make('span', 'podium-score', `${x.wins}–${x.losses}`));
+  for (const x of Hosting.podium(view)) {
+    const li = make('li', `podium-${x.place || x.rank}`);
+    li.append(make('span', 'podium-medal', x.medal), lookName(x, 'podium-name'), make('span', 'podium-score', x.score));
     el.hostPodium.append(li);
   }
 }
 
-function renderTournamentRoster(view) {
-  const t = view.tournament;
-  el.hostRosterTitle.textContent = t.over ? 'Final standings' : 'Standings';
+// The roster (Hosting.roster): standings in a tournament, else who's joined or the leaderboard
+function renderRosterRows(view) {
+  const r = Hosting.roster(view);
+  el.hostRosterTitle.textContent = r.title;
   el.hostRoster.innerHTML = '';
-  el.hostRoster.classList.add('ranked');
-  const byId = new Map(view.players.map((p) => [p.id, p]));
-  const playingNow = new Set(view.matches.filter((m) => !m.over).flatMap((m) => m.players.map((p) => p.id)));
-  for (const x of t.standings) {
-    const p = byId.get(x.id);
-    const li = make('li', (p && !p.connected ? 'offline ' : '') + (x.out ? 'knocked-out' : ''));
-    li.append(make('span', 'host-rank', ordinal(x.place)), lookName(x, 'host-name'), make('span', 'host-score', `${x.wins}–${x.losses}`));
-    li.append(make('span', 'host-status', !p ? '👋' : t.over ? (x.place === 1 ? '🏆' : '') : !p.connected ? '📴' : playingNow.has(x.id) ? '🎲' : x.out ? '' : '⏳'));
-    el.hostRoster.append(li);
-  }
-  for (const p of view.waiting || []) {
-    const li = make('li', 'waiting');
-    li.append(lookName(p, 'host-name'), make('span', 'host-waiting', '⏳ next tournament'));
+  el.hostRoster.classList.toggle('ranked', r.ranked);
+  if (!r.rows.length) el.hostRoster.append(make('li', 'host-empty', 'Nobody yet. Names show up here as students join.'));
+  for (const p of r.rows) {
+    if (p.waiting) {
+      const li = make('li', 'waiting' + (p.offline ? ' offline' : ''));
+      li.append(lookName(p, 'host-name'), make('span', 'host-waiting', p.waiting));
+      li.title = 'Joined after this game started';
+      el.hostRoster.append(li);
+      continue;
+    }
+    const li = make('li', (p.offline ? 'offline ' : '') + (p.out ? 'knocked-out' : ''));
+    if (p.rank) li.append(make('span', 'host-rank', p.rank));
+    li.append(lookName(p, 'host-name'));
+    if (p.removable) {
+      const remove = make('button', 'host-remove', '×');
+      remove.type = 'button';
+      remove.title = `Remove ${p.name}`;
+      remove.setAttribute('aria-label', `Remove ${p.name}`);
+      remove.addEventListener('click', () => confirm(`Remove ${p.name} from the class?`) && hostAction('remove', { id: p.id }));
+      li.append(remove);
+    } else li.append(make('span', 'host-score', p.score), make('span', 'host-status', p.status));
     el.hostRoster.append(li);
   }
 }
 
 // ---- teacher: pairs
-
-const MATCHING_HELP = {
-  shuffle: 'New pairs are drawn when the game starts. Nobody gets last game’s partner if that can be helped.',
-  keep: 'Same pairs as last game. Anyone new is paired up at the end.',
-  arrange: 'Tap two names to swap them between pairs.',
-};
 
 let swapPick = null; // arranging pairs: the first name tapped
 
@@ -916,9 +910,7 @@ function renderHostPairsLobby(view) {
   setSeg(el.hostMatching, view.pairOptions.matching);
   setSeg(el.hostOdd, view.pairOptions.odd);
   const n = view.players.length;
-  const odd = view.odd;
-  const who = { screen: 'you, here on this screen', device: 'you, on your other device', cpu: 'the CPU' }[view.pairOptions.odd];
-  el.hostPairsHelp.textContent = `${MATCHING_HELP[view.pairOptions.matching]} ${n ? `${n} ${n === 1 ? 'student' : 'students'}: ` : ''}${odd.needed ? `the odd one out plays ${who}.` : n ? 'everyone has a partner.' : ''}`;
+  el.hostPairsHelp.textContent = Hosting.pairsHelp(view);
   // Pairs preview (shuffle mode draws new ones at the start)
   el.hostPairList.hidden = view.pairOptions.matching === 'shuffle' || !n;
   el.hostPairList.innerHTML = '';
@@ -959,13 +951,6 @@ function renderHostPairsLobby(view) {
     el.hostTeacherStatus.textContent = joined ? '✓ Your other device has joined.' : 'Not joined yet.';
     el.hostTeacherStatus.classList.toggle('ok', Boolean(joined));
   }
-  if (odd.needed && !odd.ready) {
-    el.hostStartBtn.disabled = true;
-    el.hostStartBtn.textContent = 'Waiting for your other device to join…';
-  } else if (n) {
-    const games = Math.ceil(n / 2);
-    el.hostStartBtn.textContent = `Start ${games} ${games === 1 ? 'game' : 'games'} (${n} ${n === 1 ? 'student' : 'students'})`;
-  }
 }
 
 // One card per pair: both names and scores, whose turn it is, and how it ended.
@@ -973,15 +958,13 @@ function renderHostMatches(view, list) {
   list.innerHTML = '';
   for (const m of view.matches) {
     const li = make('li', 'host-match' + (m.over ? ' over' : ''));
-    m.players.forEach((p, i) => {
-      const row = make('div', 'match-row' + (m.over && m.winner === p.id ? ' winner' : ''));
-      const turn = !m.over && m.current === i;
-      row.append(make('span', 'match-turn', turn ? '🎲' : m.over && m.winner === p.id ? '🏆' : ''), lookName(p, 'match-name'), make('span', 'match-score', String(p.score)));
+    const card = Hosting.matchCard(m);
+    for (const p of card.rows) {
+      const row = make('div', 'match-row' + (p.winner ? ' winner' : ''));
+      row.append(make('span', 'match-turn', p.mark), lookName(p, 'match-name'), make('span', 'match-score', String(p.score)));
       li.append(row);
-    });
-    const left = m.left && m.players.find((p) => p.id === m.left);
-    const status = m.over ? (left ? `${left.name} left` : m.winner ? 'Finished' : 'Tie!') : `Board ${Math.round(m.filled * 100)}% full`;
-    li.append(make('div', 'match-status', status));
+    }
+    li.append(make('div', 'match-status', card.status));
     list.append(li);
   }
 }
@@ -1024,40 +1007,7 @@ function updateMyGameButton() {
 }
 
 function renderHostRoster(view) {
-  if (view.type === 'tournament' && view.tournament) return renderTournamentRoster(view);
-  const n = view.players.length;
-  el.hostRosterTitle.textContent = view.state === 'lobby' ? `${n} joined` : view.state === 'playing' ? 'Leaderboard' : 'Final scores';
-  el.hostRoster.innerHTML = '';
-  el.hostRoster.classList.toggle('ranked', view.state !== 'lobby');
-  if (!n) el.hostRoster.append(make('li', 'host-empty', 'Nobody yet. Names show up here as students join.'));
-  for (const p of view.players) {
-    const li = make('li', p.connected ? '' : 'offline');
-    if (view.state !== 'lobby') li.append(make('span', 'host-rank', ordinal(p.rank)));
-    li.append(lookName(p, 'host-name'));
-    if (view.state === 'lobby') {
-      const remove = make('button', 'host-remove', '×');
-      remove.type = 'button';
-      remove.title = `Remove ${p.name}`;
-      remove.setAttribute('aria-label', `Remove ${p.name}`);
-      remove.addEventListener('click', () => confirm(`Remove ${p.name} from the class?`) && hostAction('remove', { id: p.id }));
-      li.append(remove);
-    } else {
-      li.append(make('span', 'host-score', `${p.score}`));
-      const match = view.type === 'pairs' && view.matches.find((m) => m.players.some((x) => x.id === p.id));
-      const pairStatus = match ? (match.over ? '🏁' : match.players[match.current].id === p.id ? '🎲' : '') : '';
-      const status = !p.connected ? '📴' : view.state !== 'playing' ? '' : view.type === 'pairs' ? pairStatus : p.done ? '✓' : '…';
-      li.append(make('span', 'host-status', status));
-      li.title = !p.connected ? 'Not connected' : view.type === 'pairs' ? '' : p.done ? 'Done with this roll' : 'Still working';
-    }
-    el.hostRoster.append(li);
-  }
-  // Joined after the game started: they play the next one
-  for (const p of view.waiting || []) {
-    const li = make('li', 'waiting' + (p.connected ? '' : ' offline'));
-    li.append(lookName(p, 'host-name'), make('span', 'host-waiting', '⏳ next game'));
-    li.title = 'Joined after this game started';
-    el.hostRoster.append(li);
-  }
+  renderRosterRows(view);
 }
 
 // Whole class: every student's board, updating as they place their rectangles
@@ -1078,17 +1028,11 @@ function renderHostResults(view) {
   if (view.type === 'pairs') renderHostMatches(view, el.hostMatchResults);
   if (view.type === 'tournament' && view.tournament) {
     renderTournament(view.tournament, el.hostTournamentFinal);
-    renderTournamentPodium(view.tournament);
+    renderPodium(view);
     renderHostReport(view);
     return;
   }
-  el.hostPodium.innerHTML = '';
-  const medals = ['🥇', '🥈', '🥉'];
-  for (const p of view.players.filter((x) => x.rank <= 3).slice(0, 5)) {
-    const li = make('li', `podium-${p.rank}`);
-    li.append(make('span', 'podium-medal', medals[p.rank - 1]), lookName(p, 'podium-name'), make('span', 'podium-score', `${p.score} pts`));
-    el.hostPodium.append(li);
-  }
+  renderPodium(view);
   renderHostReport(view);
 }
 
@@ -1100,11 +1044,7 @@ function renderHostReport(view) {
     t.append(make('span', 'tile-value', value), make('span', 'tile-label', label));
     return t;
   };
-  el.hostReport.append(
-    tile(r.asked ? `${Math.round((r.firstTry / r.asked) * 100)}%` : '—', 'right first time'),
-    tile(r.avgMs ? `${(r.avgMs / 1000).toFixed(1)} s` : '—', 'average answer'),
-    tile(String(r.asked), 'facts answered')
-  );
+  el.hostReport.append(...Hosting.reportTiles(r).map(([value, label]) => tile(value, label)));
   el.hostHardest.innerHTML = '';
   if (!r.hardest.length) el.hostHardest.append(make('li', 'host-empty', 'Nothing missed. What a class! 🌟'));
   for (const f of r.hardest) {
@@ -1206,33 +1146,6 @@ export function run() {
 
   // ---- teacher: game settings in the lobby, for the whole class and free of shop locks
 
-  // [value, label, detail]; `only` limits a setting to one game type
-  HOST_SETTINGS = [
-    { key: 'size', label: 'Board size', options: [6, 8, 10, 12, 16, 20, 24].map((n) => [n, `${n}×${n}`]) },
-    { key: 'difficulty', label: 'Difficulty', options: [['easy', 'Easy', '6-sided dice'], ['medium', 'Medium', '8-sided dice'], ['hard', 'Hard', '12-sided dice']] },
-    {
-      key: 'format',
-      label: 'Tournament format',
-      only: ['tournament'],
-      wide: true,
-      options: [
-        ['knockout', 'Knockout', 'lose once and you’re out'],
-        ['double', 'Double knockout', 'out after 2 losses'],
-        ['roundrobin', 'Round robin', 'everyone plays everyone'],
-        ['swiss', 'Swiss', 'set rounds, no knockouts'],
-        ['koth', 'King of the hill', 'winner stays on'],
-      ],
-    },
-    { key: 'swissRounds', label: 'Swiss rounds', only: ['tournament'], when: (s) => s.format === 'swiss', options: [2, 3, 4, 5].map((n) => [n, String(n)]) },
-    { key: 'kothMatches', label: 'Games per hill', only: ['tournament'], when: (s) => s.format === 'koth', options: [6, 10, 15].map((n) => [n, String(n)]) },
-    { key: 'matchTurns', label: 'Game length', only: ['pairs', 'tournament'], options: [[0, 'Full board'], [12, '6 turns each'], [8, '4 turns each']] },
-    { key: 'rounds', label: 'Rolls in a game', only: ['class'], options: [[10, '10'], [15, '15'], [20, '20']] },
-    { key: 'placeMode', label: 'Placing rectangles', options: [['choice', 'Their choice'], ['draw', 'Draw'], ['click', 'Click'], ['auto', 'Auto', 'fastest']] },
-    { key: 'answerTime', label: 'Time to answer', options: [[0, 'No timer'], [30, '30 s'], [20, '20 s'], [10, '10 s']] },
-    { key: 'autoRoll', label: 'Rolling', only: ['pairs', 'tournament'], options: [[false, 'Tap to roll'], [true, 'Auto roll']] },
-    { key: 'fitRolls', label: 'Only rolls that fit', only: ['pairs', 'tournament'], options: [['end', 'Near the end'], ['always', 'Always'], ['never', 'Never']] },
-    { key: 'cpuSpeed', label: 'CPU speed', only: ['pairs'], options: [['slow', 'Slow'], ['normal', 'Normal'], ['fast', 'Fast']] },
-  ];
 
   el.hostSettingsGrid.addEventListener('click', (e) => {
     const b = e.target.closest('.segmented button');
