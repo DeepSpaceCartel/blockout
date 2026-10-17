@@ -1,9 +1,10 @@
 // Input: part of the multiplication game (split from the old js/game.js).
 
 import * as Core from '@blockout/engine';
+import * as Match from '@blockout/engine/match';
 import { el } from './base.js';
 import { icon } from './wardrobe.js';
-import { cancelContinue, clearLastDie, continueResolve, currentDims, currentPlayer, game, gameId, helpCount, humanRoll, pickDie, placeInstructions, placeRect, pressContinue, setGame, setGameId, startAnswer, startGame, stopTimer, typeDie, typeKey, useRealDice } from './play.js';
+import { cancelContinue, clearLastDie, continueResolve, currentPlayer, game, gameId, helpCount, humanRoll, pickDie, placeInstructions, placeRect, pressContinue, setGame, setGameId, startAnswer, startGame, stopTimer, typeDie, typeKey, useRealDice } from './play.js';
 import { classSession, leaveClass, showHostView } from './classroom.js';
 import { render, renderDie, setMsg } from './render.js';
 
@@ -50,22 +51,11 @@ function cellFromEvent(e, clamp = false) {
   return { c, r };
 }
 
-// Top-left corner of the rectangle being previewed, centred on the pointer
-// and clamped inside the board.
-function previewOrigin(hover, w, h) {
-  if (Core.mustUseCorner(game.board)) return { x: 0, y: 0 };
-  const clamp = (v, max) => Math.max(0, Math.min(v, max));
-  return {
-    x: clamp(hover.c - Math.floor((w - 1) / 2), game.size - w),
-    y: clamp(hover.r - Math.floor((h - 1) / 2), game.size - h),
-  };
-}
-
+// The rectangle being previewed, centred on the pointer and kept on the board
+// (the rule is shared with the phone app: Match.previewAt)
 function humanPreview() {
   if (!game || game.phase !== 'place' || game.placeMode !== 'click' || !game.hover) return null;
-  const [w, h] = currentDims();
-  const { x, y } = previewOrigin(game.hover, w, h);
-  return { x, y, w, h, valid: Core.isValidPlacement(game.board, x, y, w, h) };
+  return Match.previewAt(game, game.hover, game.rotated);
 }
 
 // ---- draw mode: drag out the rectangle corner to corner

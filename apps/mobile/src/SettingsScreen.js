@@ -6,8 +6,8 @@ import * as Settings from '@blockout/progress/settings';
 import { useTheme } from './theme';
 import { ScreenHeader } from './ui';
 
-// (real dice, tap-to-place and the answer timer come with the rest of the game)
-const IN_THE_APP = ['theme', 'firstInCorner', 'autoRoll', 'fitRolls', 'cpuSpeed', 'cpuSteps', 'cpuEnd', 'showProgress', 'timesMastered', 'timesLearning', 'timesPractice'];
+// (all of them; the order and words are the web game's)
+const IN_THE_APP = ['theme', 'firstInCorner', 'diceMode', 'autoRoll', 'fitRolls', 'placeMode', 'cpuSpeed', 'cpuSteps', 'cpuEnd', 'answerTime', 'showProgress', 'timesMastered', 'timesLearning', 'timesPractice'];
 
 // onSet(key, value): pick a choice; onLocked(itemId): a locked one was tapped
 export default function SettingsScreen({ progress, settings, onSet, onLocked, onClose }) {

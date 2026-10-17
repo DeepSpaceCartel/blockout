@@ -37,30 +37,32 @@ function Outline({ x, y, w, h, cell, color }) {
 
 // drag: { c0, r0, c1, r1, verdict } while drawing (verdict: match.judge's); preview: the CPU's rectangle so
 // far (hide: the placed one it grows into); counting: { rect, byRows, shown };
-// onDraw(rect) when a drag ends.
-export default function Board({ match, width, drag, preview, hide, counting, canDraw, onDrag, onDraw }) {
+// onDraw(rect) when a drag ends. Tap to place instead: canTap, onTap({ c, r })
+// for the square tapped, and tapped (the rectangle shown there, with valid).
+export default function Board({ match, width, drag, preview, hide, counting, canDraw, onDrag, onDraw, canTap = false, onTap, tapped = null }) {
   const t = useTheme();
   const { size, board } = match;
   const { cell, side } = boardLayout(width, size);
   const start = useRef(null);
-  const live = useRef({ canDraw, onDrag, onDraw, cell, size });
-  live.current = { canDraw, onDrag, onDraw, cell, size };
+  const live = useRef({ canDraw, onDrag, onDraw, cell, size, canTap, onTap });
+  live.current = { canDraw, onDrag, onDraw, cell, size, canTap, onTap };
 
   const responder = useMemo(
     () =>
       PanResponder.create({
-        onStartShouldSetPanResponder: () => live.current.canDraw,
+        onStartShouldSetPanResponder: () => live.current.canDraw || live.current.canTap,
         onMoveShouldSetPanResponder: () => live.current.canDraw,
         onPanResponderTerminationRequest: () => false, // (don't let a scroll steal the drag)
         onPanResponderGrant: (e) => {
           const { cell: px, size: n } = live.current;
           const { c, r } = cellAt(e.nativeEvent.locationX, e.nativeEvent.locationY, px, n);
           start.current = { c0: c, r0: r, x0: e.nativeEvent.locationX, y0: e.nativeEvent.locationY };
+          if (live.current.canTap) return; // (a tap: answered on release)
           live.current.onDrag({ c0: c, r0: r, c1: c, r1: r });
         },
         onPanResponderMove: (_, g) => {
           const s = start.current;
-          if (!s) return;
+          if (!s || live.current.canTap) return;
           const { cell: px, size: n } = live.current;
           const { c, r } = cellAt(s.x0 + g.dx, s.y0 + g.dy, px, n);
           live.current.onDrag({ c0: s.c0, r0: s.r0, c1: c, r1: r });
@@ -69,6 +71,7 @@ export default function Board({ match, width, drag, preview, hide, counting, can
           const s = start.current;
           start.current = null;
           if (!s) return;
+          if (live.current.canTap) return live.current.onTap({ c: s.c0, r: s.r0 });
           const { cell: px, size: n } = live.current;
           const { c, r } = cellAt(s.x0 + g.dx, s.y0 + g.dy, px, n);
           live.current.onDraw(dragRect({ c0: s.c0, r0: s.r0, c1: c, r1: r }));
@@ -113,6 +116,7 @@ export default function Board({ match, width, drag, preview, hide, counting, can
         })}
         {counting ? <CountingOverlay counting={counting} cell={cell} t={t} /> : null}
         {preview ? box(preview, 'cpu', { fill: PLAYER_COLORS[match.current % PLAYER_COLORS.length], fillOpacity: 0.35, stroke: t.boardEdge, strokeWidth: 2, strokeDasharray: '6 4' }) : null}
+        {tapped ? <Drawing rect={tapped} verdict={{ ok: tapped.valid, fits: tapped.valid, rightSize: true, corner: true }} color={PLAYER_COLORS[match.current % PLAYER_COLORS.length]} cell={cell} side={side} t={t} /> : null}
         {drawing ? <Drawing rect={drawing} verdict={drag.verdict} color={PLAYER_COLORS[match.current % PLAYER_COLORS.length]} cell={cell} side={side} t={t} /> : null}
         <Rect x={1} y={1} width={side - 2} height={side - 2} fill="none" stroke={t.boardEdge} strokeWidth={2} />
       </Svg>

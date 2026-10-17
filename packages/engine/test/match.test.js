@@ -145,3 +145,27 @@ test('two players on one screen take turns; a CPU first starts with its turn', (
 test('a match notes when it started (for the history)', () => {
   assert.equal(Match.createMatch({ players: [{ name: 'Ann' }], now: () => 1234 }).startedAt, 1234);
 });
+
+test('tap to place: centred on the tap, kept on the board, the corner first', () => {
+  const m = solo({ firstInCorner: true });
+  Match.roll(m, [2, 3]);
+  assert.deepEqual(Match.previewAt(m, { c: 4, r: 4 }), { x: 0, y: 0, w: 2, h: 3, valid: true }, 'the first one goes in the corner');
+  Match.place(m, { x: 0, y: 0, w: 2, h: 3 });
+  Match.answer(m, 6);
+  Match.endTurn(m); // (the CPU's turn)
+  Match.cpuTurn(m);
+  Match.endTurn(m);
+  Match.roll(m, [3, 1]);
+  const p = Match.previewAt(m, { c: 5, r: 2 });
+  assert.equal(p.x, 3, 'kept on the board');
+  assert.deepEqual([p.w, p.h], [3, 1]);
+  assert.deepEqual([Match.previewAt(m, { c: 5, r: 2 }, true).w, Match.previewAt(m, { c: 5, r: 2 }, true).h], [1, 3], 'rotated');
+});
+
+test('auto placing picks a spot that fits, and the starting way round is one that fits', () => {
+  const m = solo();
+  Match.roll(m, [2, 3]);
+  const spot = Match.autoSpot(m);
+  assert.ok(Match.judge(m, spot).ok);
+  assert.equal(Match.startRotated(m), false);
+});

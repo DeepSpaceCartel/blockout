@@ -90,6 +90,23 @@ function putDown(m, { x, y, w, h }) {
   return rect;
 }
 
+// Tap to place: the rolled rectangle (rotated: the other way round) centred on
+// the square tapped ({ c, r }), kept on the board, or in the corner when it's
+// the first one. Returns { x, y, w, h, valid }.
+function previewAt(m, { c, r }, rotated = false) {
+  const [a, b] = m.dice;
+  const [w, h] = rotated ? [b, a] : [a, b];
+  const clamp = (v, max) => Math.max(0, Math.min(v, max));
+  const at = mustUseCorner(m) ? { x: 0, y: 0 } : { x: clamp(c - Math.floor((w - 1) / 2), m.size - w), y: clamp(r - Math.floor((h - 1) / 2), m.size - h) };
+  return { ...at, w, h, valid: Core.isValidPlacement(m.board, at.x, at.y, w, h) };
+}
+
+// Which way round to start a preview: the rolled way, unless only the other one fits
+const startRotated = (m) => !Core.validPlacements(m.board, ...m.dice).some((o) => o.w === m.dice[0] && o.h === m.dice[1]);
+
+// Auto placing: where the CPU would put it (snug against the others)
+const autoSpot = (m) => Core.chooseComputerMove(m.board, ...m.dice, m.rng);
+
 // The human's rectangle goes on the board; its points wait for the answer.
 function place(m, rect) {
   expect(m, 'place');
@@ -269,4 +286,4 @@ function results(m) {
   };
 }
 
-export { PHASES, createMatch, currentPlayer, mustUseCorner, roll, judge, place, answer, answerDecided, help, countPlan, legendSplit, timeout, pass, cpuTurn, isOver, endTurn, results };
+export { PHASES, createMatch, currentPlayer, mustUseCorner, roll, judge, previewAt, startRotated, autoSpot, place, answer, answerDecided, help, countPlan, legendSplit, timeout, pass, cpuTurn, isOver, endTurn, results };
