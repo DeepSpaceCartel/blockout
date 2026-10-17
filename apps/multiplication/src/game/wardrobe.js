@@ -4,6 +4,7 @@ import * as Core from '@blockout/engine';
 import * as Cosmetics from '@blockout/progress/cosmetics';
 import * as Progress from '@blockout/progress';
 import * as Views from '@blockout/progress/views';
+import * as Settings from '@blockout/progress/settings';
 import { BOARD_UNLOCK, DEFAULT_NAMES, DEFAULT_SETTINGS, el, setup } from './base.js';
 import { formatPoints, progress, saveProgress, toast, updateMenuBadges } from './wallet.js';
 import { saveSettings, settings } from './settings.js';
@@ -206,18 +207,9 @@ function closeStickers() {
 }
 
 // Shop item that unlocks a setting's choice; null when it's free (the default).
-function unlockFor(key, value) {
-  if (key === 'theme' || String(value) === String(DEFAULT_SETTINGS[key])) return null;
-  if (key === 'difficulty') return `difficulty.${value}`;
-  if (key === 'cpuSteps') return 'cpuInstant';
-  if (key === 'answerTime') return `answerTime${value}`; // each length is its own unlock
-  if (key === 'placeMode') return value === 'auto' ? 'placeAuto' : 'placeMode'; // Click, then Auto
-  return key;
-}
+const unlockFor = Settings.unlockFor;
 
-function isAllowed(key, value) {
-  return Progress.isUnlocked(progress, unlockFor(key, value));
-}
+const isAllowed = (key, value) => Settings.allowed(progress, key, value);
 
 // Anything saved before it was locked (or not yet bought) falls back to the default.
 function enforceLocks() {

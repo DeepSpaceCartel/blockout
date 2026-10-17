@@ -1,5 +1,6 @@
 // Shared constants, elements and helpers: part of the multiplication game (split from the old js/game.js).
 
+import * as Settings from '@blockout/progress/settings';
 import * as Auth from '@blockout/auth';
 import * as Invite from '../invite.js';
 
@@ -20,30 +21,13 @@ const PIPS = {
 
 // How long each computer action takes (ms): every explanation step,
 // every square it draws and every number it counts.
-const CPU_STEP_MS = { slow: 2000, normal: 1000, fast: 500 };
+const CPU_STEP_MS = Settings.CPU_STEP_MS;
 
 const COUNT_STEP = 850; // ms between skip-counting steps when helping a human
 
 const SETTINGS_KEY = 'blockout.settings';
 
-const DEFAULT_SETTINGS = {
-  firstInCorner: false,
-  cpuSpeed: 'normal',
-  placeMode: 'draw',
-  diceMode: 'virtual',
-  cpuEnd: 'auto', // 'auto': next turn starts by itself; 'button': wait for "My turn"
-  showProgress: false, // "Board: X of Y filled" meter in the header
-  answerTime: '0', // seconds to answer the multiplication; '0' = no timer
-  difficulty: 'easy', // easy d6, medium d8, hard d12
-  cpuSteps: 'show', // 'show': CPU explains step by step; 'instant': CPU plays straight away
-  autoRoll: 'manual', // 'manual': press Roll dice; 'auto': the dice roll by themselves
-  fitRolls: 'end', // "no room": only roll what fits 'end' (near the end), 'always' or 'never'
-  // Times-table grid cells: 'icon' (✓ ~ !) or 'time' (best time), per status
-  timesMastered: 'icon',
-  timesLearning: 'icon',
-  timesPractice: 'icon',
-  theme: 'auto', // 'auto' follows the device; 'light' or 'dark' forces one (free, not in the shop)
-};
+const DEFAULT_SETTINGS = Settings.DEFAULT_SETTINGS; // (shared with the phone app: @blockout/progress/settings)
 
 // Board sizes other than the small one are bought in the shop.
 // Only the smallest board is free; every other size is bought in the shop.

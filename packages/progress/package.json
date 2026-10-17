@@ -9,7 +9,8 @@
     "./cosmetics": "./src/cosmetics.js",
     "./shop": "./src/shop.js",
     "./views": "./src/views.js",
-    "./stats": "./src/stats.js"
+    "./stats": "./src/stats.js",
+    "./settings": "./src/settings.js"
   },
   "dependencies": {
     "@blockout/engine": "*"
