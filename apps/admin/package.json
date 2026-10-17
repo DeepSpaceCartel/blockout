@@ -1,6 +1,6 @@
 {
   "name": "@blockout/admin",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "description": "Blockout admin page (/admin/): accounts and roles, teacher codes, schools. For accounts with the Keycloak realm role admin.",

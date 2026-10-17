@@ -17,9 +17,27 @@ A server can stop at any time: its classes carry on at another one. Nothing is c
 2. **A Google OAuth client** with `https://<keycloak>/realms/blockout/broker/google/endpoint` among its redirect URIs ([Switch sign-in to Keycloak](set-up-keycloak.md#a-google-oauth-client)). Its id is in `files/realm-blockout.json`; keep its secret at hand.
 3. **A released image:** tagging `v…` publishes `ghcr.io/deepspacecartel/blockout` ([CI](../project/ci.md#releases)). The package is internal to the DeepSpaceCartel organization, so the cluster pulls it with a token that can read packages (`imageCredentials`).
 
-## The secrets file
+## Secrets
 
-What only you have goes in a values file that stays out of git (`secrets*.yaml` is ignored), or in a password manager:
+Every password the chart needs inside the cluster (MongoDB, Valkey, Postgres, Keycloak's admin) is made by the chart on the first install and kept in its Secrets, also through `helm uninstall`. What only you have comes from the environment, or from a values file.
+
+**From 1Password (recommended):** `deploy/blockout/.env.1password` names each secret by its 1Password reference (`op://<vault>/<item>/<field>`), so it holds no secrets and is in git. `op run` fills the environment from it, and `install.sh` hands the values to Helm on its standard input (never its command line, where `ps` would show them):
+
+```sh
+op run --env-file=deploy/blockout/.env.1password -- deploy/blockout/install.sh 0.5.0
+```
+
+| Variable | Value |
+|---|---|
+| `BLOCKOUT_GOOGLE_CLIENT_SECRET` | `keycloak.google.clientSecret` (required) |
+| `BLOCKOUT_GHCR_USER`, `BLOCKOUT_GHCR_TOKEN` | `imageCredentials`: a token that can read packages |
+| `BLOCKOUT_SMTP_HOST`, `_PORT`, `_FROM`, `_USER`, `_PASSWORD` | `keycloak.smtp` (optional) |
+| `RCLONE_CONFIG_*` | `backup.rclone`; any of them turns backups on |
+| `BLOCKOUT_OPENAI_API_KEY` | `openai.apiKey` (optional) |
+
+Point the references at your own vault and items. The same variables work from anywhere else (a CI secret store, `export`).
+
+**Or a values file** that stays out of git (`secrets*.yaml` is ignored):
 
 ```yaml
 # secrets.yaml
@@ -35,14 +53,16 @@ imageCredentials:
 #   smtp: { … }       (mail, see Switch sign-in to Keycloak)
 ```
 
-Every other password (MongoDB, Valkey, Postgres, Keycloak's admin) is made by the chart on the first install and kept in its Secrets, also through `helm uninstall`.
+```sh
+deploy/blockout/install.sh 0.5.0 -f secrets.yaml
+```
 
 ## Deploy, update, roll back
 
-From a checkout (the chart as it is in the checkout, `values-workspace.yaml` by default):
+From a checkout (the chart as it is in the checkout, `values-workspace.yaml` by default), with the secrets from either of the above:
 
 ```sh
-deploy/blockout/install.sh 0.4.1 -f secrets.yaml
+op run --env-file=deploy/blockout/.env.1password -- deploy/blockout/install.sh 0.5.0
 VALUES=values-production.yaml deploy/blockout/install.sh 1.0.0 -f secrets.yaml
 ```
 

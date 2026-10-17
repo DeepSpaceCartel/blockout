@@ -4,13 +4,22 @@
 # until every part is ready; a failed update is rolled back by itself. The same
 # as installing the released chart (docs/guides/deploy.md), with a local one.
 #
-#   deploy/blockout/install.sh 0.4.1 -f secrets.yaml           # a released image
-#   IMAGE=registry.example.org/blockout:test deploy/blockout/install.sh -f secrets.yaml
-#   VALUES=values-production.yaml deploy/blockout/install.sh 1.0.0 -f secrets.yaml
+#   op run --env-file=deploy/blockout/.env.1password -- deploy/blockout/install.sh 0.5.0
+#   deploy/blockout/install.sh 0.5.0 -f secrets.yaml           # or the secrets in a file
+#   IMAGE=registry.example.org/blockout:test deploy/blockout/install.sh
+#   VALUES=values-production.yaml deploy/blockout/install.sh 1.0.0
 #
-# secrets.yaml holds what only you have: keycloak.google.clientSecret,
-# imageCredentials, and backup.rclone (see values.yaml). Keep it out of git.
-# Any other helm options can follow. Needs helm with access to the cluster.
+# What only you have comes from the environment (op run fills it from
+# 1Password; .env.1password holds only references), or from a values file kept
+# out of git (secrets.yaml, see values.yaml):
+#   BLOCKOUT_GOOGLE_CLIENT_SECRET               keycloak.google.clientSecret (required)
+#   BLOCKOUT_GHCR_USER, BLOCKOUT_GHCR_TOKEN     imageCredentials (a token that can read packages)
+#   BLOCKOUT_SMTP_HOST, _PORT, _FROM, _USER, _PASSWORD    keycloak.smtp (optional)
+#   RCLONE_CONFIG_*                             backup.rclone; any of them turns backups on
+#   BLOCKOUT_OPENAI_API_KEY                     openai.apiKey (optional)
+# They reach helm on its standard input, never on its command line (where ps
+# would show them). Any other helm options can follow. Needs helm and jq with
+# access to the cluster.
 set -euo pipefail
 
 NS="${NAMESPACE:-blockout}"
@@ -27,7 +36,22 @@ else
   exit 1
 fi
 
+# The secrets from the environment, as values (unset ones are left out)
+secrets() {
+  jq -n '{
+    keycloak: {
+      google: { clientSecret: env.BLOCKOUT_GOOGLE_CLIENT_SECRET },
+      smtp: { host: env.BLOCKOUT_SMTP_HOST, port: env.BLOCKOUT_SMTP_PORT, from: env.BLOCKOUT_SMTP_FROM,
+              user: env.BLOCKOUT_SMTP_USER, password: env.BLOCKOUT_SMTP_PASSWORD }
+    },
+    imageCredentials: { username: env.BLOCKOUT_GHCR_USER, password: env.BLOCKOUT_GHCR_TOKEN },
+    openai: { apiKey: env.BLOCKOUT_OPENAI_API_KEY },
+    backup: ([env | to_entries[] | select(.key | startswith("RCLONE_CONFIG_"))]
+             | if length > 0 then { enabled: true, rclone: from_entries } else null end)
+  } | walk(if type == "object" then with_entries(select(.value != null and .value != "" and .value != {})) else . end)'
+}
+
 helm repo add codecentric https://codecentric.github.io/helm-charts --force-update >/dev/null
 helm dependency build . >/dev/null
-helm upgrade --install blockout . -n "$NS" --create-namespace -f "$VALUES" "${image_args[@]}" "$@" \
+secrets | helm upgrade --install blockout . -n "$NS" --create-namespace -f "$VALUES" -f - "${image_args[@]}" "$@" \
   --atomic --wait --timeout 15m

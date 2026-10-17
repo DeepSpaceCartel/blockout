@@ -7,8 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-17
+
 ### Changed
-- One Helm chart installs everything a deployment needs: the servers, MongoDB, Valkey, Keycloak with its Postgres, nightly backups and a monthly restore check. Passwords are made by the chart and kept; the Google client secret, image credentials, mail and backup storage are values. `deploy/data` and `deploy/keycloak` are gone ([ADR-0009](docs/decisions/0009-one-chart.md)).
+- One Helm chart installs everything a deployment needs: the servers, MongoDB, Valkey, Keycloak with its Postgres, nightly backups and a monthly restore check. Passwords are made by the chart and kept; the Google client secret, image credentials, mail and backup storage are values. `deploy/data` and `deploy/keycloak` are gone ([ADR-0009](https://github.com/DeepSpaceCartel/blockout/blob/main/docs/decisions/0009-one-chart.md)).
+- The secrets only a person has can come from the environment, for example from 1Password with `op run --env-file=deploy/blockout/.env.1password -- deploy/blockout/install.sh <version>`. They reach Helm on its standard input, never its command line.
 - Development signs in with the workspace's Keycloak at `https://id.deepspacecartel.com`, and `npm run services` forwards the chart's development release (`values-dev.yaml`).
 
 ## [0.4.1] - 2026-10-16
@@ -89,7 +92,8 @@ The first release since 0.2.0 (0.3.0 wasn't released on its own): accounts and h
 - The first playable Blockout: roll two dice, draw the rectangle, answer the multiplication, against the CPU.
 
 <!-- No release tags yet: the links point at the release commits (tag them v0.1.0 and v0.2.0 to switch to compare/v0.1.0...v0.2.0). -->
-[Unreleased]: https://github.com/DeepSpaceCartel/blockout/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/DeepSpaceCartel/blockout/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/DeepSpaceCartel/blockout/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/DeepSpaceCartel/blockout/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/DeepSpaceCartel/blockout/compare/4921120...v0.4.0
 [0.2.0]: https://github.com/DeepSpaceCartel/blockout/compare/382b38c...4921120
