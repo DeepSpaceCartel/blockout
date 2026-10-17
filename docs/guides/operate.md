@@ -16,7 +16,7 @@ What to do when something happens, for whoever looks after Blockout in the clust
 ## Deploy, and go back
 
 ```sh
-deploy/blockout/install.sh 0.9.0 -f secrets.yaml    # waits for every part; rolls back by itself if they don't get ready
+deploy/blockout/install.sh 0.9.1 -f secrets.yaml    # waits for every part; rolls back by itself if they don't get ready
 helm -n blockout history blockout
 helm -n blockout rollback blockout <revision>       # back to an earlier one by hand
 ```

@@ -1,6 +1,6 @@
 {
   "name": "@blockout/classroom",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": true,
   "description": "Client for the classroom server: requests, live updates (SSE with long-poll fallback, or long polling only) and the class session. client.js for the browser, core.js for anywhere.",
   "type": "module",
