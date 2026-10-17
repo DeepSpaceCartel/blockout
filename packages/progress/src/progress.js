@@ -345,15 +345,16 @@ const SHOP = [
   { id: 'difficulty.master', group: 'Difficulty', name: 'Master: the dice go after your weakest facts', price: 0, journey: levelGranting('difficulty.master') },
   { id: 'difficulty.legend', group: 'Difficulty', name: 'Legend: two-digit × one-digit (like 14 × 7) mixed with Tricky facts', price: 0, journey: levelGranting('difficulty.legend') },
   // Placing rectangles: Click first, then Auto (drawing is free)
-  { id: 'placeAuto', group: 'Settings', name: 'Placing: auto (placed for you)', price: 60 },
-  { id: 'autoRoll', group: 'Settings', name: 'Auto roll', price: 40 },
+  // (the speed-ups come with the Journey once the mechanics are learned: levels.js)
+  { id: 'placeAuto', group: 'Settings', name: 'Placing: auto (placed for you)', price: 0, journey: levelGranting('placeAuto') },
+  { id: 'autoRoll', group: 'Settings', name: 'Auto roll', price: 0, journey: levelGranting('autoRoll') },
   // (Home multiplayer; single player has its own timers under Expert)
   { id: 'answerTime30', group: 'Settings', name: 'Home multiplayer answer timer: 30 seconds', price: 30, perk: `Answer quickly for a timer bonus of up to +${TIMER_BONUS_MAX[30]} each.` },
   { id: 'answerTime10', group: 'Settings', name: 'Home multiplayer answer timer: 10 seconds', price: 50, requires: 'answerTime30', perk: `Answer quickly for a timer bonus of up to +${TIMER_BONUS_MAX[10]} each.` },
   { id: 'answerTime5', group: 'Settings', name: 'Home multiplayer answer timer: 5 seconds', price: 80, requires: 'answerTime10', perk: `Answer quickly for a timer bonus of up to +${TIMER_BONUS_MAX[5]} each.` },
-  { id: 'cpuSpeed', group: 'Settings', name: 'Slow & fast CPU explanations', price: 40 },
-  { id: 'cpuEnd', group: 'Settings', name: 'Press a button after CPU turns', price: 40 },
-  { id: 'cpuInstant', group: 'Settings', name: 'Instant CPU turns', price: 80 },
+  { id: 'cpuSpeed', group: 'Settings', name: 'Slow & fast CPU explanations', price: 0, journey: levelGranting('cpuSpeed') },
+  { id: 'cpuEnd', group: 'Settings', name: 'Press a button after CPU turns', price: 0, journey: levelGranting('cpuEnd') },
+  { id: 'cpuInstant', group: 'Settings', name: 'Instant CPU turns', price: 0, journey: levelGranting('cpuInstant') },
   { id: 'showProgress', group: 'Settings', name: 'Board progress bar', price: 30 },
   // perk: what the unlock gives you, shown when you buy it
   ...GAME_CHAINS,
@@ -471,7 +472,8 @@ function grantJourney(state) {
 function startLevel(state) {
   const played = (state.counters.games || 0) > 0 || Object.keys(state.facts).length > 0;
   let level = played ? levelOfStep(6) : 1;
-  for (const id of state.unlocks) level = Math.max(level, levelGranting(id) || 0);
+  // (boards and difficulties only: a speed-up bought in the Shop isn't a level reached)
+  for (const id of state.unlocks) if (/^(board|difficulty\.)/.test(id)) level = Math.max(level, levelGranting(id) || 0);
   for (const [size, wins] of Object.entries(state.boardWins)) if (wins > 0 && Number(size) <= 12) level = Math.max(level, levelOfStep(Number(size) + 1));
   return Math.min(level, DONE);
 }
@@ -492,7 +494,7 @@ function levelResult({ won, answered = 0, firstTry = 0, helped = 0 }, stage = 1)
 function recordLevelGame(state, level, game) {
   const from = journeyLevel(state);
   const result = levelResult(game, (LEVELS[level - 1] || { stage: 1 }).stage);
-  const out = { ...result, current: level === from && from < DONE, advanced: false, from, to: from, grants: [], reward: 0, earned: [] };
+  const out = { ...result, current: level === from && from < DONE, advanced: false, from, to: from, grants: [], switches: [], reward: 0, earned: [] };
   if (!out.current || !result.passed) return out;
   const before = new Set(state.unlocks);
   state.journey = { ...state.journey, level: from + 1 };
@@ -501,6 +503,7 @@ function recordLevelGame(state, level, game) {
   out.to = from + 1;
   out.grants = state.unlocks.filter((id) => !before.has(id));
   out.reward = levelUpReward(LEVELS[from - 1].step);
+  out.switches = out.to < DONE ? LEVELS[out.to - 1].switches : []; // (settings to turn on: the client does)
   addPoints(state, out.reward);
   out.earned = awardAchievements(state, { event: 'level', level: out.to });
   return out;

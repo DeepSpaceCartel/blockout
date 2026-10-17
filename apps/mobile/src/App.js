@@ -381,7 +381,7 @@ function Main({ onTheme }) {
       ) : game && game.practice ? (
         <PracticeScreen key={game.key} options={game.practice} progress={progress} settings={settings} onSave={save} toast={toasts.show} onEarned={celebrate} earned={toasts.held} onHold={toasts.hold} onExit={() => setGame(null)} onAgain={() => play()} />
       ) : game ? (
-        <Game key={game.key} setup={game.setup} settings={settings} progress={progress} onSave={save} toast={toasts.show} onEarned={celebrate} earned={toasts.held} onHold={toasts.hold} onExit={() => setGame(null)} onAgain={() => play()} />
+        <Game key={game.key} setup={game.setup} settings={settings} progress={progress} onSave={save} onTurnOn={(switches) => switches.forEach(([key, value]) => setSetting(key, value))} toast={toasts.show} onEarned={celebrate} earned={toasts.held} onHold={toasts.hold} onExit={() => setGame(null)} onAgain={() => play()} />
       ) : screen === 'shop' ? (
         <ShopScreen progress={progress} onAsk={ask} onClose={() => setScreen('menu')} />
       ) : screen === 'account' && user ? (

@@ -72,7 +72,9 @@ test('reaching a board unlocks its board and difficulty, and Free play on 6×6',
   assert.equal(Journey.freePlayOpen(s), true);
   assert.ok(r.earned.some((a) => a.id === 'journey_6'));
   s.journey.level = levelOfStep(7) - 1;
-  assert.deepEqual(Journey.recordLevelGame(s, levelOfStep(7) - 1, won).grants, ['difficulty.medium']);
+  const seven = Journey.recordLevelGame(s, levelOfStep(7) - 1, won);
+  assert.deepEqual(seven.grants, ['difficulty.medium', 'cpuInstant', 'cpuEnd']);
+  assert.deepEqual(seven.switches, [['cpuSteps', 'instant']], 'Instant CPU turns: on');
   s.journey.level = 36;
   const done = Journey.recordLevelGame(s, 36, won);
   assert.equal(done.to, Journey.DONE);
@@ -167,4 +169,19 @@ test('older saves: Practice starts on the first round of the highest table owned
   const v2 = { practiceV2: true, practiceJourneyV1: true, practiceJourneyV2: true };
   assert.equal(lvl({ ...v2, practiceJourney: { level: 17 } }), practiceLevelOfTable(6) + 1, '×6, round 2');
   assert.equal(lvl({ ...v2, practiceJourney: { level: 37 } }), Journey.PRACTICE_DONE);
+});
+
+test('the speed-ups come with the Journey once the mechanics are learned, and switch on', () => {
+  const at = (id) => Progress.shopItem(id).journey;
+  assert.deepEqual(['cpuSpeed', 'autoRoll', 'placeAuto', 'cpuInstant', 'cpuEnd'].map(at), [4, 7, 10, 13, 13], '4×4, 5×5, 6×6, 7×7 (first stages)');
+  const s = Progress.createProgress();
+  s.journey.level = 3;
+  const r = Journey.recordLevelGame(s, 3, won);
+  assert.deepEqual([r.grants, r.switches], [['cpuSpeed'], [['cpuSpeed', 'fast']]]);
+  assert.deepEqual(Journey.switchToast(r.switches), ['⚡ Fast CPU explanations is on!', 'You know how it works now: more time for the math. Change it in Settings.']);
+  assert.deepEqual(Journey.recordLevelGame(s, 4, won).switches, [], 'only on reaching the board');
+  assert.equal(Journey.switchToast([]), null);
+  // bought before: kept; an old save isn't moved up the Journey by them
+  assert.ok(Progress.isUnlocked(Progress.normalize({ unlocks: ['autoRoll'] }), 'autoRoll'));
+  assert.equal(Journey.journeyLevel(Progress.normalize({ unlocks: ['autoRoll', 'cpuInstant'] })), 1);
 });

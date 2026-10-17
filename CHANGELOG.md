@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- The speed-ups come with the Journey and switch on by themselves once the mechanics are learned: fast CPU explanations on 4×4, auto roll on 5×5, auto placing on 6×6, instant CPU turns on 7×7 (which also unlocks "Press a button after CPU turns"). They're no longer bought, and they can be switched back in Settings. Whoever bought them keeps them; players already past those boards get them, with their settings left as they are.
+
 ## [0.11.0] - 2026-10-17
 
 ### Changed

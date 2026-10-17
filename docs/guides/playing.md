@@ -37,7 +37,7 @@ Each difficulty unlocks when the Journey reaches it: Medium at Level 7, Hard at 
 
 ## Points, shop and Wardrobe
 
-Right answers earn points: more for first-try answers, streaks, quick answers on a timer, and finishing bigger boards. Points buy things in the **Shop**: Expert and its timers, longer practice rounds, multiplayer, and settings like auto roll. (Boards, difficulties and times tables come from the Journeys.) Unlocks come as a skill tree: only the next step shows its price.
+Right answers earn points: more for first-try answers, streaks, quick answers on a timer, and finishing bigger boards. Points buy things in the **Shop**: Expert and its timers, multiplayer, and a few settings like the board progress bar. (Boards, difficulties, times tables, practice rounds and the speed-ups, like auto roll and auto placing, come from the Journeys.) Unlocks come as a skill tree: only the next step shows its price.
 
 ![The shop: unlocks grouped by kind, with the wallet at the bottom](../assets/screenshots/shop.png)
 

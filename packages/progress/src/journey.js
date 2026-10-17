@@ -145,3 +145,15 @@ export function practiceResultMessage(r) {
   if (!r.current) return null;
   return { title: 'So close!', text: `Get ${fiveOf()} right first try to move up.` };
 }
+
+// ---- the speed-ups the Journey turns on (levels.js SWITCHES)
+
+const SWITCH_NAMES = { cpuSpeed: 'Fast CPU explanations', autoRoll: 'Auto roll', placeMode: 'Auto placing', cpuSteps: 'Instant CPU turns' };
+
+// What to say when a level up turns settings on (recordLevelGame's switches):
+// [title, text] or null
+export function switchToast(switches = []) {
+  if (!switches.length) return null;
+  const names = switches.map(([key]) => SWITCH_NAMES[key] || key);
+  return [`⚡ ${names.join(' and ')} ${names.length > 1 ? 'are' : 'is'} on!`, 'You know how it works now: more time for the math. Change it in Settings.'];
+}

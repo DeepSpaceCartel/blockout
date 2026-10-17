@@ -35,11 +35,14 @@ How it plays out:
 
 ## What a board unlocks
 
-Reaching a board's first stage unlocks the board and difficulty it uses:
+Reaching a board's first stage unlocks the board and difficulty it uses. On the first boards it also unlocks and switches on the speed-ups. A child first learns the mechanics: rolling, drawing, watching the CPU explain. Later the game gets out of the way, so the time goes on the math. The player can switch each one back in Settings.
 
 | Board | Unlocks |
 |---|---|
-| 7×7 | Medium |
+| 4×4 | Fast CPU explanations (switched on) |
+| 5×5 | Auto roll (switched on) |
+| 6×6 | Auto placing (switched on) |
+| 7×7 | Medium; Instant CPU turns (switched on); "Press a button after CPU turns" |
 | 8×8 | 8×8 |
 | 9×9 | Hard |
 | 10×10 | 10×10 |
@@ -92,7 +95,7 @@ That makes 60 levels: ×1 is Levels 1–5, ×6 is 26–30, ×12 is 56–60.
 Points buy what changes *how* you play, not *what* you play next:
 - Multiplayer
 - Single player's Expert and its timers (for the difficulty the level uses)
-- Settings such as auto roll, and the Wardrobe's looks
+- A few settings (the board progress bar, the times-table grid's best times, Home multiplayer's answer timers), and the Wardrobe's looks
 
 ## Older saves
 

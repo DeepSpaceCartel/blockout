@@ -224,9 +224,10 @@ function icon(name) {
 function setLockBadge(btn, itemId) {
   const locked = !Progress.isUnlocked(progress, itemId);
   const hidden = locked && Progress.isHidden(progress, itemId);
-  // boards, difficulties and tables the Journeys haven't reached yet aren't shown at all
+  // boards, difficulties and tables the Journeys haven't reached yet aren't shown
+  // on the menu at all (settings show their lock: tapping it says where it comes)
   const item = itemId && Progress.shopItem(itemId);
-  if (item && (item.journey || item.practiceJourney)) btn.hidden = locked;
+  if (item && (item.journey || item.practiceJourney) && btn.closest('#setup-form')) btn.hidden = locked;
   btn.classList.toggle('locked', locked);
   btn.classList.toggle('skeleton', hidden);
   btn.dataset.unlock = locked ? itemId : '';

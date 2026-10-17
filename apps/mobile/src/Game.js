@@ -62,7 +62,8 @@ const article = (n) => (/^(8|11|18)$/.test(String(n)) || /^8\d$/.test(String(n))
 // when its results are up }; onExit then leaves the class.
 // earned: what it's earned so far (held back from popping up while playing:
 // onHold(true) while it's on screen), listed on its results screen
-export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, progress, onSave, toast, onEarned, earned = [], onHold = () => {}, onExit, onAgain, live = null }) {
+// onTurnOn(switches): settings a Journey level up turns on ([[key, value], …])
+export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, progress, onSave, onTurnOn = () => {}, toast, onEarned, earned = [], onHold = () => {}, onExit, onAgain, live = null }) {
   const t = useTheme();
   const PLAYER_COLORS = usePlayerColors(); // (the Wardrobe's colours)
   const [, setTick] = useState(0);
@@ -704,6 +705,12 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
     if (Rewards.countsForStats(match)) recordGame(setup.journeyLevel ? { ...match, level: setup.journeyLevel } : match, results); // (two players on one phone: just for fun)
     if (rewards.boardBonus) toast(`🏁 Finished ${article(match.size)} ${match.size}×${match.size} game!`, `+${rewards.boardBonus} bonus points`);
     award(rewards.earned);
+    // the speed-ups a new Journey board brings: on (Settings turns them back)
+    const switches = (rewards.journey && rewards.journey.switches) || [];
+    if (switches.length) {
+      onTurnOn(switches);
+      toast(...Journey.switchToast(switches));
+    }
     const daily = match.mode === 'single' && Daily.complete(progress, { kind: 'game', size: match.size, difficulty: match.difficulty, won: results.humanWon, level: setup.journeyLevel }); // (today's practice?)
     if (daily) {
       toast(...daily.toast);

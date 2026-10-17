@@ -9,7 +9,7 @@ import * as Journey from '@blockout/progress/journey';
 import * as Wardrobe from '@blockout/progress/wardrobe';
 import { AUTO_PLACE_MS, AUTO_ROLL_MS, COUNT_STEP, PASS_DELAY, TRY_AGAIN, el, seededRandom, setup } from './base.js';
 import { BONUS_TOASTS, capitalize, celebrate, celebrateWin, grantStickers, progress, queueAchievements, saveProgress, toast } from './wallet.js';
-import { cpuStep, settings } from './settings.js';
+import { cpuStep, saveSettings, settings } from './settings.js';
 import { GAME_EXPERT_BONUS, applySettingsForTurn, icon, look, syncBoardLocks, syncSettingsUI } from './wardrobe.js';
 import { recordGame } from './stats.js';
 import { refreshNudges } from './shop.js';
@@ -800,6 +800,12 @@ function renderLevelResult(humanWon) {
   }
   if (r.advanced) {
     el.againBtn.textContent = r.to >= Journey.DONE ? 'Play again' : `Level ${r.to} ›`;
+    // the speed-ups this board brings: on (Settings turns them back)
+    for (const [key, value] of r.switches) settings[key] = value;
+    if (r.switches.length) {
+      saveSettings();
+      toast(...Journey.switchToast(r.switches));
+    }
     syncSettingsUI();
     syncBoardLocks();
     renderJourney();

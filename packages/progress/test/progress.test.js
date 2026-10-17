@@ -376,11 +376,10 @@ test('practice lengths are reached separately for each difficulty, on its first 
   assert.match(P.shopItem('practice20.hard').name, /\(Hard\)/);
 });
 
-test('placing rectangles: Auto is its own unlock (Click to place is gone)', () => {
+test('placing rectangles: Auto comes with the Journey (Click to place is gone)', () => {
   const s = P.createProgress();
   s.wallet = 500;
-  assert.equal(P.isHidden(s, 'placeAuto'), false);
-  assert.equal(P.buy(s, 'placeAuto').ok, true);
+  assert.deepEqual(P.buy(s, 'placeAuto'), { ok: false, reason: 'journey', level: P.shopItem('placeAuto').journey });
   assert.equal(P.shopItem('placeMode'), null);
 });
 

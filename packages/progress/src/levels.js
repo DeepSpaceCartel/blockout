@@ -22,10 +22,14 @@ const STAGES_FROM = 4;
 // The steps of the game's Journey: n×n with an n-sided die (1–12), then the
 // challenges. grants: the Shop ids (boards, difficulties) reaching a step
 // unlocks for Free play and everything keyed on them (Expert per difficulty,
-// homework, practice).
-const GRANTS = { 7: ['difficulty.medium'], 8: ['board8'], 9: ['difficulty.hard'], 10: ['board10'], 12: ['board12'] };
+// homework, practice), and the speed-ups: once the mechanics are learned
+// (rolling, drawing, watching the CPU), the game gets out of the way so the
+// player mostly answers. switches: the settings reaching the step turns on
+// (the player can turn them back in Settings).
+const GRANTS = { 4: ['cpuSpeed'], 5: ['autoRoll'], 6: ['placeAuto'], 7: ['difficulty.medium', 'cpuInstant', 'cpuEnd'], 8: ['board8'], 9: ['difficulty.hard'], 10: ['board10'], 12: ['board12'] };
+const SWITCHES = { 4: [['cpuSpeed', 'fast']], 5: [['autoRoll', 'auto']], 6: [['placeMode', 'auto']], 7: [['cpuSteps', 'instant']] };
 const STEPS = [
-  ...Array.from({ length: 12 }, (_, i) => ({ step: i + 1, size: i + 1, sides: i + 1, difficulty: tierFor(i + 1), stages: i + 1 >= STAGES_FROM ? STAGES : 1, grants: GRANTS[i + 1] || [] })),
+  ...Array.from({ length: 12 }, (_, i) => ({ step: i + 1, size: i + 1, sides: i + 1, difficulty: tierFor(i + 1), stages: i + 1 >= STAGES_FROM ? STAGES : 1, grants: GRANTS[i + 1] || [], switches: SWITCHES[i + 1] || [] })),
   { step: 13, size: 16, sides: 12, difficulty: 'hard', stages: 1, grants: ['board16'] },
   { step: 14, size: 12, difficulty: 'tricky', stages: 1, grants: ['difficulty.tricky'] },
   { step: 15, size: 20, sides: 12, difficulty: 'hard', stages: 1, grants: ['board20'] },
@@ -36,7 +40,7 @@ const STEPS = [
 // Every level: a step's stage. A step's grants come with its first stage.
 const LEVELS = [];
 for (const s of STEPS) {
-  for (let stage = 1; stage <= s.stages; stage++) LEVELS.push({ ...s, level: LEVELS.length + 1, stage, grants: stage === 1 ? s.grants : [] });
+  for (let stage = 1; stage <= s.stages; stage++) LEVELS.push({ ...s, level: LEVELS.length + 1, stage, grants: stage === 1 ? s.grants : [], switches: (stage === 1 && s.switches) || [] });
 }
 // Past the last level: the Journey is done (and Custom boards open)
 const DONE = LEVELS.length + 1;
