@@ -13,7 +13,8 @@
     "./settings": "./src/settings.js",
     "./setup": "./src/setup.js",
     "./practice": "./src/practice.js",
-    "./wardrobe": "./src/wardrobe.js"
+    "./wardrobe": "./src/wardrobe.js",
+    "./homework": "./src/homework.js"
   },
   "dependencies": {
     "@blockout/engine": "*"

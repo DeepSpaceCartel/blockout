@@ -8,6 +8,7 @@
 import * as Auth from '@blockout/auth';
 import * as Game from './game/api.js';
 import * as Progress from '@blockout/progress';
+import * as Homework from '@blockout/progress/homework';
 
 let el, account, homework, classes, kids;
 
@@ -163,7 +164,7 @@ const showError = (p, err) => {
 
 const dayString = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-const niceDay = (s) => new Date(`${s}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+const { niceDay } = Homework;
 
 const niceTime = (t) => new Date(t).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
@@ -475,23 +476,23 @@ function homeworkList(items, { onRemove = null, mine = () => false, onPlay = nul
   const list = make('div', 'acct-list');
   if (!items.length) list.append(make('p', 'setting-help', 'No homework.'));
   for (const h of items) {
+    const words = Homework.homeworkRow(h);
     const row = make('div', `acct-hw ${h.status}`);
     const top = make('div', 'acct-hw-top');
-    top.append(make('strong', null, h.label || Progress.describeGoal(h.goal)));
-    const state = h.status === 'done' ? '✅ Done' : h.status === 'late' ? `⏰ Was due ${niceDay(h.due)}` : h.due ? `Due ${niceDay(h.due)}` : 'Any time';
-    top.append(make('span', 'acct-hw-state', state));
+    top.append(make('strong', null, words.label));
+    top.append(make('span', 'acct-hw-state', words.state));
     row.append(top);
     const bar = make('div', 'practice-bar');
     const fill = make('span');
     fill.style.width = `${(h.have / h.need) * 100}%`;
     bar.append(fill);
     const meta = make('div', 'acct-hw-meta');
-    meta.append(make('span', null, `${h.have} of ${h.need}`), make('span', null, h.from === 'parent' ? `from ${h.fromName || 'a grown-up'} 👪` : `from ${h.fromName || 'your teacher'} 🍎`));
+    meta.append(make('span', null, `${h.have} of ${h.need}`), make('span', null, words.from));
     if (onRemove && mine(h)) meta.append(button('Remove', 'btn btn-small', () => onRemove(h)));
-    if (onPlay && h.status !== 'done') {
+    if (onPlay && words.playable) {
       row.classList.add('playable');
       const play = button('Play ›', 'btn btn-small btn-primary', () => onPlay(h.goal));
-      play.setAttribute('aria-label', `Play: ${h.label || Progress.describeGoal(h.goal)}`);
+      play.setAttribute('aria-label', `Play: ${words.label}`);
       meta.append(play);
     }
     row.append(bar, meta);
@@ -614,42 +615,30 @@ async function openHomework() {
   homework.open();
   try {
     const { homework: items } = await Auth.api('GET', '/api/me/homework');
-    const open = items.filter((h) => h.status !== 'done');
-    homework.body.append(make('p', 'setting-help', open.length ? 'Play and practice as usual: homework ticks itself off.' : items.length ? 'All done. Great work! 🎉' : 'No homework right now.'));
-    const order = { late: 0, open: 1, done: 2 };
-    homework.body.append(homeworkList([...items].sort((a, b) => order[a.status] - order[b.status]), { onPlay: playHomework }));
+    homework.body.append(make('p', 'setting-help', Homework.homeworkIntro(items)));
+    homework.body.append(homeworkList(Homework.sortHomework(items), { onPlay: playHomework }));
   } catch (err) {
     homework.body.append(make('p', 'setting-help', err.message));
   }
 }
 
-// Tapping a homework: set the menu up for it (mode, difficulty, board, table) and start.
-// Homework only asks for what the student has unlocked, so nothing here should be locked.
+// Tapping a homework: set the menu up for it (Homework.homeworkChoice: mode,
+// difficulty, board, table) and start. Homework only asks for what the
+// student has unlocked, so nothing here should be locked.
 function playHomework(goal) {
   homework.close();
   const tap = (selector) => {
     const b = document.querySelector(selector);
     if (b && !b.dataset.unlock) b.click();
-    return b && !b.dataset.unlock;
   };
-  const setDifficulty = (d) => d && d !== 'any' && tap(`[data-setting="difficulty"] [data-value="${d}"]`);
-  if (goal.type === 'master' || goal.type === 'practice') {
-    tap('[data-mode="practice"]');
-    if (goal.type === 'practice') setDifficulty(goal.difficulty);
-    else {
-      // a difficulty whose practice tables include this one, then just that table
-      const chip = () => document.querySelector(`#practice-tables [data-table="${goal.table}"]`);
-      for (const d of Progress.DIFFICULTIES) {
-        if (chip()) break;
-        setDifficulty(d);
-      }
-      for (const on of document.querySelectorAll('#practice-tables [aria-pressed="true"]')) on.click();
-      tap(`#practice-tables [data-table="${goal.table}"]`);
-    }
-  } else {
-    tap('[data-mode="single"]');
-    setDifficulty(goal.difficulty);
-    if (goal.type === 'win') tap(`#board-size [data-size="${goal.size}"]`);
+  const choice = Homework.homeworkChoice(Game.progress(), goal);
+  tap(`[data-mode="${choice.mode}"]`);
+  if (choice.difficulty) tap(`[data-setting="difficulty"] [data-value="${choice.difficulty}"]`);
+  if (choice.size) tap(`#board-size [data-size="${choice.size}"]`);
+  if (choice.tables) {
+    // just these tables
+    for (const on of document.querySelectorAll('#practice-tables [aria-pressed="true"]')) on.click();
+    for (const n of choice.tables) tap(`#practice-tables [data-table="${n}"]`);
   }
   const start = document.getElementById('start-btn');
   if (!start.disabled) start.click();
@@ -659,7 +648,7 @@ async function refreshHomeworkBadge() {
   if (Auth.role() !== 'student') return;
   try {
     const { homework: items } = await Auth.api('GET', '/api/me/homework');
-    setBadge(el.homeworkBtn, items.filter((h) => h.status !== 'done').length);
+    setBadge(el.homeworkBtn, Homework.openCount(items));
   } catch (_) {
     // offline: no badge
   }
