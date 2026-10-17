@@ -1,7 +1,8 @@
 // The menu, on one screen: points and who's signed in, what to play
 // (mode, difficulty, board, each one row of choices) and Play at the bottom.
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { BOARDS, DIFFICULTIES, boardOpen, difficultyOpen } from './rewards';
+import * as Shop from '@blockout/progress/shop';
+import { BOARDS, DIFFICULTIES, boardOpen, difficultyOpen, itemFor, modeOpen } from './rewards';
 import { useTheme } from './theme';
 import { Button } from './ui';
 
@@ -10,17 +11,29 @@ const MODES = [
   { id: 'multi', label: 'Two players' },
 ];
 
-export default function Home({ progress, user, choice, onChoose, onPlay, onSignIn, onSignOut, signingIn, accountError }) {
+// onLocked(itemId): a locked choice was tapped (offer it); onShop(): open the Shop
+export default function Home({ progress, user, choice, onChoose, onPlay, onSignIn, onSignOut, signingIn, accountError, onLocked, onShop }) {
   const t = useTheme();
+  const newUnlocks = Shop.affordableCount(progress);
   const anyLocked = DIFFICULTIES.some((d) => !difficultyOpen(progress, d.id)) || BOARDS.some((n) => !boardOpen(progress, n));
   return (
     <View style={[styles.fill, { backgroundColor: t.bg }]}>
       <ScrollView contentContainerStyle={styles.page} bounces={false}>
         <View style={styles.top}>
           <Text style={[styles.title, { color: t.ink }]}>Blockout</Text>
-          <Text testID="wallet" style={[styles.wallet, { color: t.goldInk, backgroundColor: t.goldBg }]}>
-            ⭐ {progress.wallet}
-          </Text>
+          <View style={styles.topRight}>
+            <Text testID="wallet" style={[styles.wallet, { color: t.goldInk, backgroundColor: t.goldBg }]}>
+              🪙 {Shop.formatPoints(progress.wallet)}
+            </Text>
+            <Pressable testID="shop" accessibilityRole="button" accessibilityLabel={`Shop${newUnlocks ? `, ${newUnlocks} to unlock` : ''}`} onPress={onShop} style={({ pressed }) => [styles.shopBtn, { backgroundColor: t.soft, borderColor: t.line, transform: [{ scale: pressed ? 0.96 : 1 }] }]}>
+              <Text style={[styles.smallText, { color: t.ink }]}>🛒 Shop</Text>
+              {newUnlocks ? (
+                <View style={[styles.badge, { backgroundColor: t.bad }]}>
+                  <Text style={styles.badgeText}>{newUnlocks}</Text>
+                </View>
+              ) : null}
+            </Pressable>
+          </View>
         </View>
 
         <View style={[styles.account, { backgroundColor: t.paper, borderColor: t.line }]}>
@@ -39,7 +52,7 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onSignI
         {accountError ? <Text style={[styles.error, { color: t.bad }]}>{accountError}</Text> : null}
 
         <Section title="Play">
-          <Segments items={MODES.map((x) => ({ id: x.id, label: x.label, open: true }))} value={choice.mode} onPick={(mode) => onChoose({ mode })} />
+          <Segments items={MODES.map((x) => ({ id: x.id, label: x.label, open: modeOpen(progress, x.id) }))} value={choice.mode} onPick={(mode) => onChoose({ mode })} onLocked={() => onLocked(itemFor.mode())} />
         </Section>
 
         <Section title="Difficulty">
@@ -47,14 +60,15 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onSignI
             items={DIFFICULTIES.map((d) => ({ id: d.id, label: d.name, sub: d.dice.replace(' dice', ''), open: difficultyOpen(progress, d.id) }))}
             value={choice.difficulty}
             onPick={(difficulty) => onChoose({ difficulty })}
+            onLocked={(id) => onLocked(itemFor.difficulty(id))}
           />
         </Section>
 
         <Section title="Board">
-          <Segments items={BOARDS.map((n) => ({ id: n, label: `${n}`, sub: `× ${n}`, open: boardOpen(progress, n) }))} value={choice.size} onPick={(size) => onChoose({ size })} />
+          <Segments items={BOARDS.map((n) => ({ id: n, label: `${n}`, sub: `× ${n}`, open: boardOpen(progress, n) }))} value={choice.size} onPick={(size) => onChoose({ size })} onLocked={(n) => onLocked(itemFor.size(n))} />
         </Section>
 
-        {anyLocked ? <Text style={[styles.note, { color: t.muted }]}>🔒 Unlock more in the Shop at blockout.deepspacecartel.com</Text> : null}
+        {anyLocked ? <Text style={[styles.note, { color: t.muted }]}>🔒 Tap a locked one to see how to unlock it.</Text> : null}
       </ScrollView>
       <View style={styles.bottom}>
         <Button testID="play" title="Play" onPress={onPlay} />
@@ -73,8 +87,8 @@ function Section({ title, children }) {
   );
 }
 
-// One row of equal choices; a locked one shows 🔒 and can't be picked
-function Segments({ items, value, onPick }) {
+// One row of equal choices; a locked one shows 🔒, and tapping it offers it (onLocked)
+function Segments({ items, value, onPick, onLocked }) {
   const t = useTheme();
   return (
     <View style={styles.segments} accessibilityRole="radiogroup">
@@ -86,9 +100,8 @@ function Segments({ items, value, onPick }) {
             testID={`choice-${it.id}`}
             accessibilityRole="radio"
             accessibilityLabel={`${it.label}${it.sub ? ` ${it.sub}` : ''}${it.open ? '' : ', locked'}`}
-            accessibilityState={{ selected: on, disabled: !it.open }}
-            disabled={!it.open}
-            onPress={() => onPick(it.id)}
+            accessibilityState={{ selected: on }}
+            onPress={() => (it.open ? onPick(it.id) : onLocked(it.id))}
             style={({ pressed }) => [
               styles.segment,
               { backgroundColor: on ? t.accentSoft : t.surface, borderColor: on ? t.accent : t.line, opacity: it.open ? 1 : 0.5, transform: [{ scale: pressed ? 0.97 : 1 }] },
@@ -130,7 +143,11 @@ const styles = StyleSheet.create({
   page: { flexGrow: 1, padding: 16, gap: 16 },
   top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { fontSize: 32, fontWeight: '900' },
-  wallet: { fontSize: 18, fontWeight: '800', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999, overflow: 'hidden' },
+  topRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  wallet: { fontSize: 17, fontWeight: '800', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999, overflow: 'hidden' },
+  shopBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 7, paddingHorizontal: 12, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth * 2 },
+  badge: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, alignItems: 'center', justifyContent: 'center' },
+  badgeText: { color: '#fff', fontSize: 12, fontWeight: '800' },
   account: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth * 2 },
   accountText: { flex: 1, fontSize: 15 },
   bold: { fontWeight: '700' },
