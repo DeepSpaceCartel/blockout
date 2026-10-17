@@ -1,7 +1,7 @@
 // What a game puts in the save, as the web game does it (play.js): every
 // answer goes into the player's fact record, achievements are checked, and a
-// finished game adds its points to the wallet. Single-player games count
-// towards stats and achievements; two players on one phone only earn points.
+// finished game adds its points to the wallet. Single-player and class games
+// count towards stats and achievements; two players on one phone only earn points.
 // Each function changes the save and returns the achievements it earned.
 import * as Progress from '@blockout/progress';
 import * as Views from '@blockout/progress/views';
@@ -9,7 +9,8 @@ import * as Setup from '@blockout/progress/setup';
 
 export const STATS_NAME = 'You'; // whose times tables the single player's answers count towards
 
-export const countsForStats = (match) => match.mode === 'single';
+// (and a live class's games, except the teacher's own player's: as on the web)
+export const countsForStats = (match) => ['single', 'class', 'pair'].includes(match.mode) && !match.teacherPlayer;
 
 // The biggest times table this player has unlocked: achievements for
 // "every fact up to…" only count facts in reach (shared with the web game)

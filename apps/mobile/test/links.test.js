@@ -10,6 +10,9 @@ test('codes and classes come from web links and app links', () => {
   assert.equal(parseLink('blockout://auth?code=xyz'), null, 'the sign-in redirect is not a code');
   assert.equal(parseLink('exp://host/--/auth?code=abc'), null);
   assert.equal(parseLink(null), null);
+  assert.deepEqual(parseLink('https://blockout.deepspacecartel.com/#class=qxkp'), { kind: 'class', code: 'QXKP' });
+  assert.deepEqual(parseLink('https://blockout.deepspacecartel.com/#class=QXKP&play=0a1b'), { kind: 'class', code: 'QXKP' });
+  assert.deepEqual(parseLink('blockout://class/QXKP'), { kind: 'class', code: 'QXKP' });
 });
 
 test('a code is shared as the web link, and read in two halves', () => {

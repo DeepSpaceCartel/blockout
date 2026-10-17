@@ -21,7 +21,7 @@ const LEVELS = [
 ];
 
 // onLocked(itemId): a locked choice was tapped (offer it); onShop(): open the Shop
-export default function Home({ progress, user, choice, onChoose, onPlay, onSignIn, onAccount, onHomework, homeworkCount = 0, signingIn, accountError, onLocked, onShop, onWardrobe, onAchievements, onStats, onStickers, onSettings }) {
+export default function Home({ progress, user, choice, onChoose, onPlay, onClass, liveClasses = [], onSignIn, onAccount, onHomework, homeworkCount = 0, signingIn, accountError, onLocked, onShop, onWardrobe, onAchievements, onStats, onStickers, onSettings }) {
   const t = useTheme();
   const newUnlocks = Shop.affordableCount(progress);
   const stickerNews = Shop.newStickers(progress) + Shop.spareStickers(progress);
@@ -189,7 +189,19 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onSignI
         {anyLocked ? <Text style={[styles.note, { color: t.muted }]}>🔒 Tap a locked one to see how to unlock it.</Text> : null}
       </ScrollView>
       <View style={styles.bottom}>
-        <Button testID="play" title={practicing ? 'Practice' : 'Play'} onPress={onPlay} disabled={Boolean(warning) || (practicing && !prPreview)} />
+        {/* a tournament your teacher scheduled, open now */}
+        {liveClasses.map((l) => (
+          <View key={l.code} testID="live-banner" style={[styles.live, { backgroundColor: t.goldBg, borderColor: t.gold }]}>
+            <Text style={[styles.liveText, { color: t.ink }]} numberOfLines={2}>
+              🏆 {l.title} is open!
+            </Text>
+            <SmallButton testID="live-join" title="Join" onPress={() => onClass(l.code)} />
+          </View>
+        ))}
+        <View style={styles.playRow}>
+          <Button testID="class" kind="secondary" title="🏫 Class" onPress={() => onClass('')} style={styles.classBtn} />
+          <Button testID="play" title={practicing ? 'Practice' : 'Play'} onPress={onPlay} disabled={Boolean(warning) || (practicing && !prPreview)} style={styles.flex} />
+        </View>
       </View>
     </View>
   );
@@ -294,6 +306,11 @@ function SmallButton({ title, onPress, disabled, testID, badge = 0 }) {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
+  flex: { flex: 1 },
+  playRow: { flexDirection: 'row', gap: 10 },
+  classBtn: { minWidth: 110 },
+  live: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 12, borderWidth: 2 },
+  liveText: { flex: 1, fontSize: 15, fontWeight: '800' },
   page: { flexGrow: 1, padding: 16, paddingTop: 10, paddingBottom: 8, gap: 10 },
   top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { fontSize: 28, fontWeight: '900' },

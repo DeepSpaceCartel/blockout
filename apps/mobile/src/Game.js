@@ -10,16 +10,24 @@
 //
 // The screen animates between the match's steps; a game left half-way just
 // stops (every wait checks it's still the same game).
+//
+// A live class's game (live) plays the same turns, but the server rolls (the
+// teacher's roll for the whole class, or yours on your turn in pairs), hears
+// each answer, and ends the game. Pairs: your partner's moves show as they
+// make them. The words, the board's catching up and the rewards are shared
+// with the web game (@blockout/progress/classroom).
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Match from '@blockout/engine/match';
 import * as Core from '@blockout/engine';
 import * as Progress from '@blockout/progress';
 import * as Settings from '@blockout/progress/settings';
+import * as Stats from '@blockout/progress/stats';
 import Board, { RectPicture } from './Board';
 import { dragRect, drawnMessage } from './boardMath';
 import * as Rewards from './rewards';
-import { recordGame } from './history';
+import * as Live from '@blockout/progress/classroom';
+import { addToHistory, recordGame } from './history';
 import { useTheme } from './theme';
 import { usePlayerColors } from './looks';
 import { Celebration, Rolling, Streak } from './effects';
@@ -47,7 +55,10 @@ const article = (n) => (/^(8|11|18)$/.test(String(n)) || /^8\d$/.test(String(n))
 // onEarned(achievements) for their banners and stickers; onExit() back to the
 // menu; onAgain() a new game.
 // settings: the Settings (read once: they don't change mid-game, as on the web).
-export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, progress, onSave, toast, onEarned, onExit, onAgain }) {
+// live: a live class's game: { kind: 'class' | 'pair', view (the server's,
+// updated as it changes), session, client, me (pairs: your player), onOver()
+// when its results are up }; onExit then leaves the class.
+export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, progress, onSave, toast, onEarned, onExit, onAgain, live = null }) {
   const t = useTheme();
   const PLAYER_COLORS = usePlayerColors(); // (the Wardrobe's colours)
   const [, setTick] = useState(0);
@@ -61,7 +72,16 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
   const realDice = cfg.diceMode === 'real' && !Core.usesPairDice(setup.difficulty);
   if (!m.current) m.current = Match.createMatch({ ...setup, firstInCorner: cfg.firstInCorner === true || cfg.firstInCorner === 'true', fitMode: cfg.fitRolls, answerBonus: Progress.answerBonus });
   const match = m.current;
-  if (testing) window.BlockoutMobile = { match, Match };
+  if (testing) window.BlockoutMobile = { match, Match, live };
+  // a live game: the round (or pairs turn) it's at, whether this one's answer
+  // went to the server, and what of the server's match is on the board
+  const lc = useRef(null);
+  if (!lc.current) {
+    lc.current = { round: 0, reported: true, doneTurn: 0, synced: 0, passSeen: 0, rollShown: null, note: '' };
+    match.teacherPlayer = Boolean(live && live.session.teacher);
+    if (live && live.kind === 'class' && Live.rejoinClass(match, live.view.you)) toast(`🏫 Back in class ${live.view.code}`, `You have ${live.view.you.score} points.`);
+  }
+  const gen = useRef(0); // a new roll from the teacher stops whatever the last one was still doing
 
   const [area, setArea] = useState(null); // { width, height } below the header
   const [view, setView] = useState('roll'); // 'roll' | 'board' | 'answer' | 'help'
@@ -135,6 +155,7 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
   async function answerTimeout() {
     if (!alive.current || match.phase !== 'answer') return;
     const res = Match.timeout(match);
+    report({ kind: 'timeout' });
     Rewards.onTimeout(progress, match, res);
     onSave();
     setBusy(true);
@@ -148,7 +169,10 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
     return nextTurn();
   }
   // Resolves after ms, or never once the game is left
-  const wait = useCallback((ms) => new Promise((resolve) => setTimeout(() => alive.current && resolve(), ms)), []);
+  const wait = useCallback((ms) => {
+    const g = gen.current;
+    return new Promise((resolve) => setTimeout(() => alive.current && g === gen.current && resolve(), ms));
+  }, []);
 
   const who = (p) => (match.mode === 'single' && !p.cpu ? 'You' : p.name);
   const mine = () => !Match.currentPlayer(match).cpu;
@@ -176,6 +200,7 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
     setFeedback(null);
     setEntry('');
     setOops(false);
+    if (live) return liveTurn();
     if (match.phase === 'cpu') return runCpu();
     const p = Match.currentPlayer(match);
     const first = Match.mustUseCorner(match) ? ' Your first rectangle goes in the top-left corner.' : '';
@@ -199,6 +224,7 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
   }
 
   function nextTurn() {
+    if (live) return startTurn(); // (the server ends these games)
     const results = Match.endTurn(match);
     if (results) return finish(results);
     startTurn();
@@ -206,6 +232,7 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
 
   async function humanRoll() {
     if (match.phase !== 'roll' || busy) return;
+    if (live) return pairRoll(); // (the server rolls for a pairs game)
     setBusy(true);
     setMsg('');
     await rollAnimation();
@@ -224,6 +251,7 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
   async function rolledDice(a, b) {
     setDice([a, b]);
     if (match.phase === 'stuck') {
+      report({ kind: 'pass' }); // (whole class: the server checks it; pairs: it passes for you)
       setMsg(`No room for a ${a} × ${b} anywhere. ${match.mode === 'multi' ? `${Match.currentPlayer(match).name} passes` : 'You pass'}.`);
       redraw();
       await wait(PASS_MS);
@@ -273,6 +301,7 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
     lastTap.current = cell;
     const p = Match.previewAt(match, cell, rotated);
     setTapped(p);
+    showPartner('place', p);
     setOops(!p.valid);
     if (!p.valid) setMsg('It bumps into another rectangle there. Tap another spot!');
     else setMsg('Tap it again to place it here, or tap somewhere else.');
@@ -287,6 +316,7 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
   function onDrag(d) {
     if (!d || match.phase !== 'place') return setDrag(null);
     setDrag({ ...d, verdict: Match.judge(match, dragRect(d)) });
+    showPartner('place', dragRect(d));
   }
 
   function onDraw(rect) {
@@ -305,6 +335,7 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
     pausedMs.current = 0;
     setAnswering(res.rect);
     setView('answer');
+    showPartner('answer', res.rect);
     startClock();
   }
 
@@ -332,6 +363,7 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
       setBusy(true);
       const squares = `+${res.rect.area} ${res.rect.area === 1 ? 'square' : 'squares'}`;
       setFeedback({ text: res.firstTry ? `Correct! ${squares} 🎉` : `You got it! ${squares}`, kind: 'good' });
+      report({ kind: 'placed', rect: { x: res.rect.x, y: res.rect.y, w: res.rect.w, h: res.rect.h }, firstTry: res.firstTry, ms: Math.round(ms) });
       for (const part of res.bonus.parts) toast(`${BONUS_ICONS[part.label.split(' ')[0]] || '⭐'} ${capitalize(part.label)}`, `+${part.points} bonus points`);
       award(Rewards.onAnswer(progress, match, res, ms));
       onSave();
@@ -488,8 +520,8 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
   // ✕ in the middle of a game asks first: the game's points only count once it's finished
   function leave() {
     if (over) return onExit();
-    const title = 'Leave this game?';
-    const text = "The points from this game won't count. (Your answers and achievements are kept.)";
+    const title = live ? 'Leave the class?' : 'Leave this game?';
+    const text = live ? 'You can join again with the class code.' : "The points from this game won't count. (Your answers and achievements are kept.)";
     if (Platform.OS === 'web') {
       if (window.confirm(`${title}\n\n${text}`)) onExit();
       return;
@@ -498,6 +530,216 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
       { text: 'Keep playing', style: 'cancel' },
       { text: 'Leave', style: 'destructive', onPress: onExit },
     ]);
+  }
+
+  // ---- a live class's game
+
+  const opponent = () => match.players[1 - live.me];
+
+  // A turn in a live game: wait for the teacher's roll (whole class), or in
+  // pairs roll on your turn and watch your partner's
+  function liveTurn() {
+    const c = lc.current;
+    if (live.kind === 'class') {
+      match.phase = 'wait';
+      setMsg(c.round ? 'Waiting for the next roll…' : 'Get ready! Waiting for the first roll…');
+      return redraw();
+    }
+    const m = live.view.match;
+    if (m && !m.over && m.current === live.me && m.turn === c.round && m.turn !== c.doneTurn) {
+      c.reported = false;
+      match.phase = 'roll';
+      const auto = live.view.settings.autoRoll;
+      setMsg(`${c.note} ${auto ? 'Your turn! Rolling…' : 'Your turn: roll the dice!'}`.trim());
+      c.note = '';
+      redraw();
+      const turn = turnId.current;
+      if (auto) wait(AUTO_ROLL_MS).then(() => turn === turnId.current && humanRoll());
+      return;
+    }
+    match.phase = 'wait';
+    setView('board'); // (watch your partner's move)
+    setMsg(m && m.current !== live.me ? `${opponent().name}'s turn…` : 'Waiting…');
+    redraw();
+  }
+
+  // Tell the server how this roll went (once per roll)
+  function report(result) {
+    const c = lc.current;
+    if (!live || c.reported) return;
+    c.reported = true;
+    c.doneTurn = c.round;
+    live.client.sendResult(live.session, { round: c.round, ...result }).catch((err) => {
+      if (err.code !== 'stale' && err.code !== 'done') toast('⚠️ Couldn’t send your answer', err.message);
+    });
+  }
+
+  // Pairs: your roll, from the server (it passes for you when nothing fits)
+  async function pairRoll() {
+    const c = lc.current;
+    setBusy(true);
+    setMsg('');
+    match.phase = 'rolling';
+    let res;
+    try {
+      res = await live.client.roll(live.session);
+    } catch (err) {
+      match.phase = 'roll';
+      setBusy(false);
+      if (err.code !== 'turn' && err.code !== 'stale') toast('⚠️ Couldn’t roll', err.message);
+      return redraw();
+    }
+    await rollAnimation();
+    setBusy(false);
+    const [a, b] = res.roll;
+    setDice([a, b]);
+    if (res.passed) {
+      c.reported = true;
+      c.doneTurn = c.round;
+      match.phase = 'wait';
+      return setMsg(`No room for a ${a} × ${b} anywhere. You pass.`);
+    }
+    match.phase = 'roll';
+    Match.roll(match, [a, b]);
+    return rolledDice(a, b);
+  }
+
+  // Pairs: what you're doing on your turn (the rectangle you're dragging or
+  // aiming, then the one you're answering) for your partner to watch: when it
+  // changes, a few times a second at most. Only a preview: misses don't matter.
+  const partnerFeed = useRef({ sent: '', timer: null });
+  function showPartner(phase, rect) {
+    if (!live || live.kind !== 'pair' || match.current !== live.me) return;
+    const f = partnerFeed.current;
+    const key = JSON.stringify({ phase, rect: rect ? { x: rect.x, y: rect.y, w: rect.w, h: rect.h } : null });
+    if (key === f.sent) return;
+    f.sent = key;
+    if (f.timer) return; // (the latest goes out when the timer fires)
+    const send = () => {
+      f.timer = null;
+      if (alive.current) live.client.live(live.session, JSON.parse(f.sent)).catch(() => {});
+    };
+    send();
+    f.timer = setTimeout(send, 120);
+  }
+
+  // Whole class: a new roll from the teacher. If you were still working on the
+  // last one, it's gone.
+  async function classView(view) {
+    const c = lc.current;
+    if (view.state === 'ended') return over ? null : finishClass(view);
+    if (view.state !== 'playing' || view.round <= c.round) {
+      if (!c.round && match.phase === 'roll') startTurn(); // (no roll yet: get ready)
+      return;
+    }
+    if (!['wait', 'over'].includes(match.phase)) {
+      gen.current++; // (stop whatever the last roll was still doing)
+      stopClock();
+      if (!c.reported) {
+        Live.skipUnfinished(match);
+        toast('⏭️ Next roll!', 'Your teacher moved on before you finished that one.');
+      }
+    }
+    c.round = view.round;
+    startTurn();
+    setBusy(false);
+    setTimeLeft(null);
+    setCounting(null);
+    const [a, b] = view.roll;
+    if (view.you.done) {
+      // no room for this roll (the server checks), or you'd answered it already
+      c.reported = true;
+      setDice([a, b]);
+      if (view.you.result === 'pass') setMsg(`No room for a ${a} × ${b} anywhere. You pass this time.`);
+      return;
+    }
+    c.reported = false;
+    await rollAnimation();
+    match.phase = 'roll';
+    Match.roll(match, [a, b]);
+    rolledDice(a, b);
+  }
+
+  // Pairs: bring the board and the turn up to date
+  async function pairView(view) {
+    if (over) return;
+    const c = lc.current;
+    const m = view.match;
+    if (!m) return;
+    const note = Live.syncPair(match, m, live.me, c);
+    if (m.over) return finishPair(view);
+    const myTurn = m.current === live.me;
+    const newTurn = m.turn !== c.round;
+    if (newTurn) c.round = m.turn;
+    if (newTurn && myTurn && ['wait', 'roll'].includes(match.phase)) {
+      c.note = note;
+      return startTurn();
+    }
+    // your partner's move as they make it: dragging, then answering
+    const partner = !myTurn && m.live && m.live.by !== view.you.id ? m.live : null;
+    setPreview(partner && partner.rect ? partner.rect : null);
+    if (!myTurn && match.phase === 'wait') {
+      if (m.roll) {
+        setMsg(Live.partnerLine(opponent().name, m.roll, partner));
+        if (c.rollShown !== m.turn) {
+          c.rollShown = m.turn;
+          await rollAnimation();
+          setDice(m.roll);
+        }
+      } else if (newTurn || note) {
+        setDice([null, null]);
+        setMsg(`${note} ${opponent().name}'s turn…`.trim());
+      }
+    }
+    redraw();
+  }
+
+  useEffect(() => {
+    if (!live) return;
+    if (live.kind === 'class') classView(live.view);
+    else pairView(live.view);
+  }, [live && live.view]);
+
+  function finishLive() {
+    if (live.onOver) live.onOver();
+    gen.current++;
+    stopClock();
+    match.phase = 'over';
+    match.pending = null;
+    setPreview(null);
+    setTimeLeft(null);
+    setView('board');
+  }
+
+  function finishClass(view) {
+    finishLive();
+    const p = match.players[0];
+    Object.assign(p, { score: view.you.score, squares: view.you.squares, bonus: view.you.bonus });
+    if (!match.teacherPlayer) {
+      const { earned, entry } = Live.classRewards(progress, view, p, { startedAt: match.startedAt, statsName: Rewards.STATS_NAME });
+      award(earned);
+      onSave();
+      addToHistory(entry);
+    }
+    const result = Live.classResult(view);
+    setOver({ live: result, celebrate: result.celebrate });
+  }
+
+  function finishPair(view) {
+    finishLive();
+    if (match.teacherPlayer) {
+      // (the teacher's games don't count)
+    } else if (view.type === 'tournament') {
+      Live.tournamentGamePoints(progress, view, live.me); // (the tournament's own rewards come at the end)
+      onSave();
+    } else {
+      const { earned, entry } = Live.pairRewards(progress, view, live.me, match.players[live.me], { startedAt: match.startedAt, statsName: Rewards.STATS_NAME });
+      award(earned);
+      onSave();
+      addToHistory(entry);
+    }
+    const result = Live.pairResult(view, live.me, Core.emptyCount(match.board));
+    setOver({ live: result, celebrate: result.won });
   }
 
   // ---- the end
@@ -514,7 +756,7 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
   }
 
   useEffect(() => {
-    startTurn(); // (once, for the match this screen was made with)
+    if (!live || live.kind !== 'class') startTurn(); // (once, for the match this screen was made with; a class's waits for its view)
   }, []);
 
   // ---- the screens
@@ -591,7 +833,9 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
               </View>
             )}
             {goOn ? <Button testID="go-on" title={goOn} onPress={() => goOnPressed.current && goOnPressed.current()} style={styles.wide} /> : null}
-            {over ? (
+            {over && over.live ? (
+              <LiveResults over={over} tournament={live.view.tournament ? Live.tournamentLine(live.view.tournament) : null} teacherPlayer={match.teacherPlayer} onLeave={onExit} />
+            ) : over ? (
               <Results over={over} match={match} who={who} onAgain={onAgain} onExit={onExit} />
             ) : steps.length ? (
               <View style={[styles.steps, { backgroundColor: t.surface, borderColor: t.line }]}>
@@ -624,7 +868,7 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
           />
         )}
       </View>
-      {over && over.results.winners.length === 1 && !over.results.winners[0].cpu ? <Celebration /> : null}
+      {over && (over.live ? over.celebrate : over.results.winners.length === 1 && !over.results.winners[0].cpu) ? <Celebration /> : null}
     </View>
   );
 }
@@ -751,6 +995,54 @@ function Results({ over, match, who, onAgain, onExit }) {
       <View style={styles.resultActions}>
         <Button title="Play Again" onPress={onAgain} style={styles.flex} testID="again" />
         <Button kind="secondary" title="Menu" onPress={onExit} style={styles.flex} />
+      </View>
+    </View>
+  );
+}
+
+// A live class's results: the server's (Live.classResult / pairResult). The
+// next game is the teacher's to start, so it's stay, or leave the class.
+// tournament: where you stand now (it changes as the other games finish)
+function LiveResults({ over, tournament, teacherPlayer, onLeave }) {
+  const t = useTheme();
+  const PLAYER_COLORS = usePlayerColors();
+  const r = over.live;
+  const top = Math.max(1, ...r.rows.filter((x) => !x.gap).map((x) => x.score));
+  return (
+    <View testID="results" style={[styles.results, { backgroundColor: t.paper, borderColor: t.line }]}>
+      <Text testID="result-title" style={[styles.resultTitle, { color: t.ink }]}>
+        {r.title}
+      </Text>
+      <Text style={[styles.resultSub, { color: t.muted }]}>{r.sub}</Text>
+      {r.rows.map((p, i) =>
+        p.gap ? (
+          <Text key={i} style={[styles.resultSub, { color: t.muted }]}>
+            ⋯
+          </Text>
+        ) : (
+          <View key={i} style={styles.resultRow}>
+            <View style={styles.resultLine}>
+              <Text style={[styles.resultName, { color: t.ink, fontWeight: p.you ? '900' : '700' }]} numberOfLines={1}>
+                {p.rank ? `${Stats.ordinal(p.rank)} ` : ''}
+                {p.avatar ? `${p.avatar} ` : ''}
+                {p.name}
+              </Text>
+              <Text style={[styles.resultName, { color: t.ink }]}>{p.score} pts</Text>
+            </View>
+            <View style={[styles.bar, { backgroundColor: t.soft }]}>
+              <View style={{ width: `${(p.score / top) * 100}%`, height: '100%', backgroundColor: p.you ? PLAYER_COLORS[p.index || 0] : PLAYER_COLORS[p.index === undefined ? 1 : p.index] + '99', borderRadius: 6 }} />
+            </View>
+          </View>
+        )
+      )}
+      {tournament ? (
+        <Text testID="result-tournament" style={[styles.resultSub, { color: t.ink }]}>
+          {tournament}
+        </Text>
+      ) : null}
+      <Text style={[styles.resultSub, { color: t.muted }]}>{teacherPlayer ? 'Thanks for playing! Teacher games don’t count towards stats.' : 'Stay on this screen: your teacher can start another game.'}</Text>
+      <View style={styles.resultActions}>
+        <Button kind="secondary" title="Leave class" onPress={onLeave} style={styles.flex} testID="leave-class" />
       </View>
     </View>
   );

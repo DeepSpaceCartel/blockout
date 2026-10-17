@@ -59,6 +59,14 @@ export async function loadSession() {
 
 export const user = () => (session ? session.user : null);
 
+// The bearer token for other requests (a live class's), renewed when it's
+// about to run out; null for a guest (or a sign-in that's over)
+export async function freshToken() {
+  if (!session) return null;
+  if (expiresSoon(session.token) && !(await refresh())) return null;
+  return session ? session.token : null;
+}
+
 let configCache = null;
 async function discovery() {
   if (!configCache) {

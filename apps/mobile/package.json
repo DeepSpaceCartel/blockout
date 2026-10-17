@@ -12,6 +12,7 @@
     "lint": "eslint src test index.js"
   },
   "dependencies": {
+    "@blockout/classroom": "*",
     "@blockout/engine": "*",
     "@blockout/progress": "*",
     "@expo/metro-runtime": "~57.0.17",

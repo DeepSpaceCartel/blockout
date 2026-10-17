@@ -24,6 +24,8 @@ import SettingsScreen from './SettingsScreen';
 import WardrobeScreen from './Wardrobe';
 import AccountScreen, { redeemCode } from './AccountScreen';
 import HomeworkScreen from './HomeworkScreen';
+import ClassScreen from './ClassScreen';
+import * as Classroom from './classroom';
 import { parseLink } from './links';
 import { DEFAULT_LOOKS, Looks } from './looks';
 import { ThemeSetting, useTheme } from './theme';
@@ -79,6 +81,8 @@ function Main({ onTheme }) {
   const [screen, setScreen] = useState('menu'); // 'menu' | 'shop' | 'wardrobe' | 'stats' | 'achievements' | 'stickers' | 'settings' (a game is on top)
   const [wardrobeNew, setWardrobeNew] = useState([]); // (the looks new when the Wardrobe opened)
   const [homeworkCount, setHomeworkCount] = useState(0); // (a student's homework still to do)
+  const [inClass, setInClass] = useState(null); // a live class: { code } to join, or { resume } (a session from last time)
+  const [liveClasses, setLiveClasses] = useState([]); // (a student's scheduled tournaments, open now)
   const pendingLink = useRef(null); // (a code's link that came before signing in)
   const live = useRef({}); // (the latest user, for link events)
   live.current.user = user;
@@ -117,6 +121,8 @@ function Main({ onTheme }) {
       const s = Settings.enforce(saved, save); // (anything not unlocked back to its default)
       setSettings(s);
       onTheme(s.theme);
+      const resume = await Classroom.loadSession(); // (the app was closed in the middle of a class)
+      if (resume) setInClass({ resume });
       setReady(true);
     })();
   }, []);
@@ -128,6 +134,18 @@ function Main({ onTheme }) {
       .then(({ homework }) => setHomeworkCount(Homework.openCount(homework)))
       .catch(() => {}); // (offline: no badge)
   }, [ready, user, game, screen]);
+
+  // A student's tournaments open now (scheduled by their teacher), while on the menu
+  useEffect(() => {
+    if (!ready || !user || user.role !== 'student' || game || inClass || screen !== 'menu') return setLiveClasses([]);
+    const look = () =>
+      Account.api('GET', '/api/me/live')
+        .then(({ live }) => setLiveClasses(live))
+        .catch(() => {}); // (offline)
+    look();
+    const every = setInterval(look, 20 * 1000);
+    return () => clearInterval(every);
+  }, [ready, user, game, inClass, screen]);
 
   // Links into the app: a one-time code, or a class to join (links.js)
   useEffect(() => {
@@ -142,6 +160,7 @@ function Main({ onTheme }) {
   function followLink(link) {
     if (!link) return;
     const who = live.current.user;
+    if (link.kind === 'class') return setInClass({ code: link.code }); // (no account needed)
     if (link.kind === 'code') {
       if (!who) {
         pendingLink.current = link;
@@ -299,7 +318,20 @@ function Main({ onTheme }) {
     <Looks.Provider value={looks}>
     <SafeAreaView style={[styles.fill, { backgroundColor: t.bg }]}>
       <StatusBar style="auto" />
-      {game && game.practice ? (
+      {inClass ? (
+        <ClassScreen
+          key={inClass.code || 'class'}
+          user={user}
+          resume={inClass.resume || null}
+          code={inClass.code || ''}
+          progress={progress}
+          settings={settings}
+          onSave={save}
+          toast={toasts.show}
+          onEarned={celebrate}
+          onExit={() => setInClass(null)}
+        />
+      ) : game && game.practice ? (
         <PracticeScreen key={game.key} options={game.practice} progress={progress} settings={settings} onSave={save} toast={toasts.show} onEarned={celebrate} onExit={() => setGame(null)} onAgain={() => play()} />
       ) : game ? (
         <Game key={game.key} setup={game.setup} settings={settings} progress={progress} onSave={save} toast={toasts.show} onEarned={celebrate} onExit={() => setGame(null)} onAgain={() => play()} />
@@ -339,6 +371,8 @@ function Main({ onTheme }) {
           choice={choice}
           onChoose={choose}
           onPlay={() => play()}
+          onClass={(code) => setInClass({ code })}
+          liveClasses={liveClasses}
           onSignIn={signIn}
           onAccount={() => setScreen('account')}
           onHomework={() => setScreen('homework')}
