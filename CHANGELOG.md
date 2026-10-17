@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-10-17
+
 ### Changed
 - Better rolls: no 1 × N (like 1 × 1 or 1 × 7) while a roll without a 1 fits, and no repeats of a rectangle already rolled that game while a new one fits (3 × 4 and 4 × 3 count as the same). The dice roll again, in every game from single player to live classes. A 1 × N or a repeat still comes when it's all that fits, like the last 1-wide gaps. Real dice rolled at the table are left as they are. Games are about a fifth shorter: fewer tiny rectangles.
 
@@ -147,7 +149,8 @@ The first release since 0.2.0 (0.3.0 wasn't released on its own): accounts and h
 - The first playable Blockout: roll two dice, draw the rectangle, answer the multiplication, against the CPU.
 
 <!-- No release tags yet: the links point at the release commits (tag them v0.1.0 and v0.2.0 to switch to compare/v0.1.0...v0.2.0). -->
-[Unreleased]: https://github.com/DeepSpaceCartel/blockout/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/DeepSpaceCartel/blockout/compare/v0.9.2...HEAD
+[0.9.2]: https://github.com/DeepSpaceCartel/blockout/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/DeepSpaceCartel/blockout/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/DeepSpaceCartel/blockout/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/DeepSpaceCartel/blockout/compare/v0.7.0...v0.8.0

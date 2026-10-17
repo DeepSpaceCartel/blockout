@@ -1,6 +1,6 @@
 {
   "name": "@blockout/demos",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "private": true,
   "type": "module",
   "description": "Blockout demos: classic game mechanics (Tetris, Space Invaders, 2048, Bingo…) turned into quick math games to try.",
