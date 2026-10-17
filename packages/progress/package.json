@@ -10,7 +10,8 @@
     "./shop": "./src/shop.js",
     "./views": "./src/views.js",
     "./stats": "./src/stats.js",
-    "./settings": "./src/settings.js"
+    "./settings": "./src/settings.js",
+    "./setup": "./src/setup.js"
   },
   "dependencies": {
     "@blockout/engine": "*"

@@ -3,6 +3,7 @@
 import * as Core from '@blockout/engine';
 import * as Progress from '@blockout/progress';
 import * as Shop from '@blockout/progress/shop';
+import * as Setup from '@blockout/progress/setup';
 import { COUNT_STEP, TRY_AGAIN, el } from './base.js';
 import { BONUS_TOASTS, capitalize, celebrate, progress, saveProgress, toast } from './wallet.js';
 import { settings } from './settings.js';
@@ -77,17 +78,7 @@ function playerFacts(name) {
 // record. Like practice, but mastered facts are rarer still: whoever reaches
 // Master has mastered most of the table, and with practice's weights only
 // about a third of the rolls would be weak facts (this makes it ~70%).
-const MASTER_WEIGHTS = { ...Progress.PRACTICE_WEIGHTS, mastered: 0.1 };
-
-function weakFactWeight(player) {
-  const facts = playerFacts(player ? player.name : 'You');
-  return (a, b) => {
-    const status = Progress.factStatus(facts[Progress.factKey(a, b)]);
-    let weight = MASTER_WEIGHTS[status];
-    if ((a === 1 || b === 1) && status !== 'practice') weight /= 2;
-    return weight;
-  };
-}
+const weakFactWeight = (player) => Setup.masterWeight(progress, player ? player.name : 'You');
 
 // Practice table size follows Difficulty: Easy 6, Medium 8, Hard 12 (and
 // Tricky, Master and Legend, whose facts are within 12 or one teen × 2–9).

@@ -1,10 +1,10 @@
 // Wardrobe (cosmetics): part of the multiplication game (split from the old js/game.js).
 
-import * as Core from '@blockout/engine';
 import * as Cosmetics from '@blockout/progress/cosmetics';
 import * as Progress from '@blockout/progress';
 import * as Views from '@blockout/progress/views';
 import * as Settings from '@blockout/progress/settings';
+import * as Setup from '@blockout/progress/setup';
 import { BOARD_UNLOCK, DEFAULT_NAMES, DEFAULT_SETTINGS, el, setup } from './base.js';
 import { formatPoints, progress, saveProgress, toast, updateMenuBadges } from './wallet.js';
 import { saveSettings, settings } from './settings.js';
@@ -377,12 +377,9 @@ function syncBoardLocks() {
 }
 
 // ---- single player: Level (Learn / Expert) and Expert's timer, per difficulty, like Practice
-const GAME_EXPERT_BONUS = 2;
+const GAME_EXPERT_BONUS = Setup.GAME_EXPERT_BONUS;
 
-const GAME_LEVEL_HELP = {
-  learn: 'Learn: “Help me count” is there whenever you need it.',
-  expert: 'Expert: no help counting, and bonus points are doubled!',
-};
+const GAME_LEVEL_HELP = Setup.GAME_LEVEL_HELP;
 
 function renderGameLevel() {
   if (!el.gameLevel) return;
@@ -401,21 +398,18 @@ function renderGameLevel() {
     btn.classList.toggle('selected', Number(btn.dataset.secs) === setup.timer);
     setLockBadge(btn, timerId(btn.dataset.secs));
   }
-  const top = (secs) => Progress.TIMER_BONUS_MAX[secs] * GAME_EXPERT_BONUS;
-  el.gameTimerHelp.textContent = setup.timer
-    ? `⏱️ Answer fast for a timer bonus of up to +${top(setup.timer)} a question: the quicker, the more. If time runs out, the rectangle comes off and scores nothing.`
-    : `⏱️ A timer earns a bonus for quick answers: up to +${top(30)} a question with 30 s, +${top(10)} with 10 s, +${top(5)} with 5 s.`;
+  el.gameTimerHelp.textContent = Setup.timerHelp(setup.timer);
 }
 
 // Under the board sizes: the finishing bonus for the chosen size
 function renderBoardHint() {
   if (!el.boardSizeHelp) return;
   // Legend rolls a teen (11–19), so it needs a board it fits on
-  const fits = Core.fitsDifficulty(settings.difficulty, setup.size);
-  if (setup.mode !== 'practice') el.startBtn.disabled = !fits;
-  el.boardSizeHelp.classList.toggle('warn', !fits);
-  if (!fits) {
-    el.boardSizeHelp.textContent = `⚠️ ${Progress.DIFFICULTY_NAMES[settings.difficulty]} rolls numbers like 14 × 7, so it needs a board of 12×12 or bigger.`;
+  const warning = Setup.boardWarning(settings.difficulty, setup.size);
+  if (setup.mode !== 'practice') el.startBtn.disabled = Boolean(warning);
+  el.boardSizeHelp.classList.toggle('warn', Boolean(warning));
+  if (warning) {
+    el.boardSizeHelp.textContent = warning;
     return;
   }
   const bonus = Progress.boardFinishBonus(setup.size);
