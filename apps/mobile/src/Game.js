@@ -487,7 +487,7 @@ function Results({ over, match, who, onAgain, onExit }) {
       ))}
       {match.mode === 'multi' ? <Text style={[styles.resultSub, { color: t.muted }]}>Two-player games are just for fun: they don’t count towards stats or achievements.</Text> : null}
       <View style={styles.resultActions}>
-        <Button title="Play again" onPress={onAgain} style={styles.flex} testID="again" />
+        <Button title="Play Again" onPress={onAgain} style={styles.flex} testID="again" />
         <Button kind="secondary" title="Menu" onPress={onExit} style={styles.flex} />
       </View>
     </View>

@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Progress from '@blockout/progress';
 import * as Account from './account';
 import Game from './Game';
@@ -126,21 +126,23 @@ function Main() {
 // Bonuses and achievements show one at a time, sliding in at the top
 function useToasts() {
   const t = useTheme();
+  // (positioned absolutely, so it has to step below the notch and status bar itself)
+  const insets = useSafeAreaInsets();
   const queue = useRef([]);
   const active = useRef(false); // (a ref: show() is called from other screens' renders)
   const [current, setCurrent] = useState(null);
-  const y = useRef(new Animated.Value(-120)).current;
+  const y = useRef(new Animated.Value(-200)).current;
 
   const next = () => {
     const item = queue.current.shift();
     active.current = Boolean(item);
     setCurrent(item || null);
     if (!item) return;
-    y.setValue(-120);
+    y.setValue(-(insets.top + 160));
     Animated.sequence([
       Animated.spring(y, { toValue: 0, useNativeDriver: true }),
       Animated.delay(1800),
-      Animated.timing(y, { toValue: -120, duration: 250, useNativeDriver: true }),
+      Animated.timing(y, { toValue: -(insets.top + 160), duration: 250, useNativeDriver: true }),
     ]).start(next);
   };
 
@@ -151,7 +153,7 @@ function useToasts() {
 
   const View_ = () =>
     current ? (
-      <Animated.View pointerEvents="none" style={[styles.toast, { backgroundColor: t.goldBg, borderColor: t.gold, transform: [{ translateY: y }] }]}>
+      <Animated.View pointerEvents="none" style={[styles.toast, { top: insets.top + 8, backgroundColor: t.goldBg, borderColor: t.gold, transform: [{ translateY: y }] }]}>
         <Text style={[styles.toastTitle, { color: t.ink }]}>{current.title}</Text>
         <Text style={[styles.toastText, { color: t.goldInk }]}>{current.text}</Text>
       </Animated.View>
@@ -163,7 +165,7 @@ function useToasts() {
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  toast: { position: 'absolute', top: 12, left: 16, right: 16, padding: 12, borderRadius: 14, borderWidth: 2 },
+  toast: { position: 'absolute', left: 16, right: 16, padding: 12, borderRadius: 14, borderWidth: 2 },
   toastTitle: { fontSize: 17, fontWeight: '800' },
   toastText: { fontSize: 15, fontWeight: '600' },
 });
