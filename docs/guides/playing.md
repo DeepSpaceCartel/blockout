@@ -6,7 +6,7 @@ Everything here works without an account. Progress is saved in the browser; [sig
 
 ## Single player
 
-Pick **Single player** and tap **Play Level 1**. The [Journey](../concepts/progression.md) picks the board and the dice: Level 1 is a 1×1 board with a 1-sided die, and Level *n* an *n*×*n* board with an *n*-sided die, up to 12×12 and beyond. Beat the CPU with 4 out of 5 answers right first try to move up a level. From Level 6, **Free play** lets you pick any difficulty and board you've reached. Roll, draw the rectangle (drag it out, or click to drop it once *Click to place* is unlocked), and answer. The CPU takes its turn and shows its working.
+Pick **Single player** and tap **Play Level 1**. The [Journey](../concepts/progression.md) picks the board and the dice: it starts on a 1×1 board with a 1-sided die and grows to 12×12 with a 12-sided die, and beyond. Each board has three stages: beat the CPU with 4 out of 5 answers right first try, then do it without “Help me count”, then also claim more than half the board. From the 6×6 board, **Free play** lets you pick any difficulty and board you've reached. Roll, draw the rectangle (drag it out, or click to drop it once *Click to place* is unlocked), and answer. The CPU takes its turn and shows its working.
 
 ![A single-player game: the board, the roll and the scores](../assets/screenshots/single-player.png)
 
@@ -16,7 +16,7 @@ When the board is full, or nobody can place anything, the game ends. The results
 
 ## Practice
 
-**Practice** asks questions without a board, picking the facts that need it most. It's free and goes one times table at a time: **Practice ×1**, then ×2 once a round has 4 out of 5 right first try, and so on up to ×12. From Practice Level 2, **Free practice** lets you pick the tables yourself. **Learn** has help; **Expert** has none, doubles the bonus points and can add a timer. Longer rounds (10 or 20 questions) earn a finishing bonus.
+**Practice** asks questions without a board, picking the facts that need it most. It's free and goes one times table at a time, each in three rounds of 5, 10 and 20 questions: **Practice ×1**, and on to ×2 once all three rounds have 4 out of 5 right first try, up to ×12. From ×2, **Free practice** lets you pick the tables and the length yourself. **Learn** has help; **Expert** has none, doubles the bonus points and can add a timer. Longer rounds earn a finishing bonus.
 
 ![Practice settings: difficulty, level, times tables and number of questions](../assets/screenshots/practice-menu.png)
 

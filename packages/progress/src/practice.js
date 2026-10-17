@@ -105,24 +105,29 @@ export function timerHelp(timer) {
 
 // The questions are picked from the player's weakest facts (in the tables
 // chosen). Returns the round; round.current is the first question.
-// journeyLevel: a Practice Journey round, the ×n table (see journeyQueue).
+// journeyLevel: a Practice Journey round, its table and its length (see journeyQueue).
 export function createRound(state, { name = 'You', difficulty = 'easy', count = 5, tables = [], level = 'learn', timer = 0, journeyLevel = null, rng = Math.random, now = Date.now } = {}) {
   const expert = level === 'expert';
   const facts = playerFacts(state, name);
-  if (journeyLevel) tables = [journeyLevel];
-  const queue = journeyLevel ? journeyQueue(facts, journeyLevel, count, rng) : Progress.pickPracticeFacts(facts, Progress.practiceSet(difficulty), count, rng, tables);
+  const journey = journeyLevel ? Progress.PRACTICE_LEVELS[journeyLevel - 1] : null;
+  if (journey) {
+    tables = [journey.table];
+    count = journey.count;
+  }
+  const queue = journey ? journeyQueue(facts, journey.table, count, rng) : Progress.pickPracticeFacts(facts, Progress.practiceSet(difficulty), count, rng, tables);
   const before = {};
   for (const [a, b] of queue) before[Progress.factKey(a, b)] = Progress.factStatus(facts[Progress.factKey(a, b)]);
-  const round = { name, max: journeyLevel ? 12 : practiceMax(difficulty), journeyLevel, count, tables, expert, timer: expert ? timer : 0, difficulty, startedAt: now(), times: [], queue, index: 0, requeued: new Set(), before, firstTry: 0, answered: 0, streak: 0, bestStreak: 0, points: 0, current: null, done: false };
+  const round = { name, max: journey ? journey.upTo : practiceMax(difficulty), journeyLevel, count, tables, expert, timer: expert ? timer : 0, difficulty, startedAt: now(), times: [], queue, index: 0, requeued: new Set(), before, firstTry: 0, answered: 0, streak: 0, bestStreak: 0, points: 0, current: null, done: false };
   ask(round);
   return round;
 }
 
-// A Practice Journey round on the ×n table: its facts (×1 to ×12, both ways
-// round), and about one question in five reviewing the tables before it.
+// A Practice Journey round on the ×n table: its facts up to the level's dice
+// (n × 1…6 for ×1–×6, …8 for ×7–×8, …12 from ×9; both ways round), and about
+// one question in five reviewing the tables before it, as far.
 export const REVIEW_SHARE = 1 / 5;
 export function journeyQueue(facts, n, count, rng = Math.random) {
-  const all = Progress.practiceSet('hard'); // (1 to 12 each way)
+  const all = Progress.practiceSet(Progress.PRACTICE_LEVELS.find((l) => l.table === n).difficulty);
   const reviews = n > 1 ? Math.round(count * REVIEW_SHARE) : 0;
   const main = Progress.pickPracticeFacts(facts, all, count - reviews, rng, [n]);
   const earlier = Array.from({ length: n - 1 }, (_, i) => i + 1);

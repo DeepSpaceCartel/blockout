@@ -33,8 +33,8 @@ test('shop: buying needs points, prerequisites, and only happens once', () => {
   assert.equal(P.isUnlocked(s, 'multiplayer'), true);
   assert.deepEqual(P.buy(s, 'multiplayer'), { ok: false, reason: 'owned' });
   // boards and difficulties come from the Journey, never the wallet
-  assert.deepEqual(P.buy(s, 'board8'), { ok: false, reason: 'journey', level: 8 });
-  assert.deepEqual(P.buy(s, 'difficulty.hard'), { ok: false, reason: 'journey', level: 9 });
+  assert.deepEqual(P.buy(s, 'board8'), { ok: false, reason: 'journey', level: 22 }); // (8×8's first stage)
+  assert.deepEqual(P.buy(s, 'difficulty.hard'), { ok: false, reason: 'journey', level: 25 }); // (9×9's)
   assert.equal(s.wallet, 850);
   assert.deepEqual(P.buy(s, 'goldenDice'), { ok: false, reason: 'points', missing: 10000 - 850 });
   s.wallet = 10000;
@@ -206,7 +206,7 @@ test('skill trees: only the next step in a chain shows; the rest are hidden', ()
   assert.equal(P.isHidden(s, 'answerTime5'), true);
   // Journey unlocks stay hidden until their level is reached
   assert.equal(P.isHidden(s, 'board8'), true);
-  assert.equal(P.isHidden(P.normalize({ ...s, journey: { level: 8 } }), 'board8'), false);
+  assert.equal(P.isHidden(P.normalize({ ...s, journey: { level: P.shopItem('board8').journey } }), 'board8'), false);
 });
 
 test('Times Table readiness: most facts mastered and none needing practice', () => {
@@ -226,20 +226,19 @@ test('Times Table readiness: most facts mastered and none needing practice', () 
   assert.equal(P.tableReady(s, 6).ok, false);
 });
 
-test('practice: free with ×1; 10 and 20 questions are bought; the tables come with Practice levels', () => {
+test('practice: free with ×1; the tables and longer rounds come with Practice levels', () => {
   const s = P.createProgress();
   s.wallet = 5000;
   assert.ok(P.isUnlocked(s, 'practice') && P.isUnlocked(s, 'table1'));
   assert.equal(P.isUnlocked(s, 'practice10'), false);
-  assert.equal(P.buy(s, 'practice20').reason, 'requires');
-  assert.equal(P.buy(s, 'practice10').ok, true);
-  assert.equal(P.buy(s, 'practice20').ok, true);
-  assert.deepEqual(P.buy(s, 'table2'), { ok: false, reason: 'journey', level: 2, path: 'practice' });
+  assert.deepEqual(P.buy(s, 'practice10'), { ok: false, reason: 'journey', level: 2, path: 'practice' });
+  assert.deepEqual(P.buy(s, 'practice20'), { ok: false, reason: 'journey', level: 3, path: 'practice' });
+  assert.deepEqual(P.buy(s, 'table2'), { ok: false, reason: 'journey', level: 4, path: 'practice' });
   assert.equal(P.isHidden(s, 'table2'), true);
   // players who bought Practice before keep 10, 20 and every table
   const old = P.normalize({ unlocks: ['practice'] });
   for (const id of ['practice10', 'practice20', 'table1', 'table12']) assert.ok(P.isUnlocked(old, id), id);
-  assert.equal(P.practiceLevel(old), 12);
+  assert.equal(P.practiceLevel(old), 34, '×12’s first round');
 });
 
 test('best-score tiers: one game can unlock several at once, each only once', () => {
@@ -380,18 +379,15 @@ test('expert practice timers are unlocked separately for each difficulty', () =>
   assert.equal(P.buy(s, 'practiceTimer5.medium').reason, 'requires');
 });
 
-test('practice lengths are unlocked separately for each difficulty', () => {
-  const s = P.createProgress();
-  s.wallet = 5000;
-  for (const id of ['practice10', 'practice20']) assert.equal(P.buy(s, id).ok, true, id);
+test('practice lengths are reached separately for each difficulty, on its first table', () => {
   assert.equal(P.practiceCountId(5, 'hard'), null); // 5 always comes with Practice mode
   assert.equal(P.practiceCountId(20, 'medium'), 'practice20.medium');
-  assert.equal(P.isUnlocked(s, 'practice10.medium'), false);
-  assert.equal(P.buy(s, 'practice10.medium').reason, 'requires'); // needs Medium first
-  s.unlocks.push('difficulty.medium');
-  assert.equal(P.buy(s, 'practice20.medium').reason, 'requires');
-  assert.equal(P.buy(s, 'practice10.medium').ok, true);
-  assert.equal(P.buy(s, 'practice20.medium').ok, true);
+  // ×1's rounds 2 and 3 for Easy, ×7's for Medium, ×9's for Hard, ×12's after Hard
+  const at = (id) => P.shopItem(id).practiceJourney;
+  assert.deepEqual(['practice10', 'practice20', 'practice10.medium', 'practice20.hard', 'practice20.legend'].map(at), [2, 3, 20, 27, 36]);
+  const s = P.normalize({ ...P.createProgress(), practiceJourney: { level: 20 } });
+  assert.ok(P.isUnlocked(s, 'practice10.medium'));
+  assert.equal(P.isUnlocked(s, 'practice20.medium'), false);
   assert.match(P.shopItem('practice20.hard').name, /\(Hard\)/);
 });
 
@@ -425,7 +421,7 @@ test('single player Expert and its timers are unlocked for each difficulty; old 
 });
 
 test('difficulties after Hard: Journey levels, each with its own unlocks', () => {
-  assert.deepEqual(['tricky', 'master', 'legend'].map((d) => P.shopItem(`difficulty.${d}`).journey), [14, 16, 17]);
+  assert.deepEqual(['tricky', 'master', 'legend'].map((d) => P.shopItem(`difficulty.${d}`).journey), [38, 40, 41]);
   // Master's dice weighting counts only Tricky's facts
   const t = P.createProgress();
   const ready = P.tableReady(t, { faces: [3, 4], share: 0.75 });

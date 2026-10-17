@@ -2,109 +2,143 @@ import test from 'node:test';
 import assert from 'node:assert';
 import * as Progress from '../src/progress.js';
 import * as Journey from '../src/journey.js';
+import { levelOfStep, practiceLevelOfTable } from '../src/levels.js';
 
-test('the ladder: level n is an n×n board with an n-sided die up to 12, then challenges', () => {
-  for (let n = 1; n <= 12; n++) assert.deepEqual(Journey.levelSetup(n), { size: n, difficulty: n <= 6 ? 'easy' : n <= 8 ? 'medium' : 'hard', sides: n });
-  assert.deepEqual(Journey.levelSetup(14), { size: 12, difficulty: 'tricky' });
-  assert.equal(Journey.LEVELS.length + 1, Journey.DONE);
-  // every grant is a Shop item that says which level unlocks it
+const won = { won: true, answered: 5, firstTry: 5, helped: 0, squares: 30, size: 6 };
+
+test('the ladder: n×n with an n-sided die, three stages a board up to 12, then six challenges', () => {
+  assert.equal(Journey.LEVELS.length, 12 * 3 + 6);
+  assert.equal(Journey.DONE, 43);
+  for (let n = 1; n <= 12; n++) {
+    for (let stage = 1; stage <= 3; stage++) {
+      const level = (n - 1) * 3 + stage;
+      assert.deepEqual(Journey.levelSetup(level), { size: n, difficulty: n <= 6 ? 'easy' : n <= 8 ? 'medium' : 'hard', sides: n });
+      assert.equal(Journey.levelInfo(level).stage, stage);
+    }
+  }
+  assert.deepEqual(Journey.levelSetup(38), { size: 12, difficulty: 'tricky' });
+  // a step's grants come with its first stage; each is a Shop item that says so
   for (const l of Journey.LEVELS) for (const id of l.grants) assert.equal(Progress.shopItem(id).journey, l.level, id);
+  assert.ok(Journey.LEVELS.every((l) => l.stage === 1 || !l.grants.length));
   // a level's Expert uses a difficulty it has unlocked by then
   for (const l of Journey.LEVELS) {
     if (l.difficulty !== 'easy') assert.ok(Journey.LEVELS.some((x) => x.level <= l.level && x.grants.includes(`difficulty.${l.difficulty}`)), `level ${l.level}`);
   }
-  assert.equal(Journey.levelLine(1), '1×1 board, 1-sided die');
-  assert.equal(Journey.levelLine(7), '7×7 board, 7-sided dice');
-  assert.equal(Journey.levelLine(14), '12×12 board, Tricky dice');
+  assert.equal(Journey.levelLine(1), '1×1 board, 1-sided die · stage 1 of 3');
+  assert.equal(Journey.levelLine(20), '7×7 board, 7-sided dice · stage 2 of 3');
+  assert.equal(Journey.levelLine(38), '12×12 board, Tricky dice');
+  assert.match(Journey.goalLine(2), /without “Help me count”/);
+  assert.match(Journey.goalLine(3), /more than half the board/);
 });
 
 test('a new player starts on level 1 with no Free play', () => {
   const s = Progress.createProgress();
   assert.equal(Journey.journeyLevel(s), 1);
   assert.equal(Journey.freePlayOpen(s), false);
-  assert.deepEqual(Journey.steps(s).slice(0, 2), [{ level: 1, done: false, current: true }, { level: 2, done: false, current: false }]);
+  const steps = Journey.steps(s);
+  assert.equal(steps.length, 18);
+  assert.deepEqual(steps[0], { level: 1, label: '1', done: false, current: true });
+  assert.deepEqual(steps.slice(13, 17).map((x) => x.label), ['T', '20', 'M', 'L']);
 });
 
-test('moving up: beat the CPU with 80 % right first try, on your own level', () => {
+test('the stages: win with good answers, then without help, then with more than half the board', () => {
   const s = Progress.createProgress();
-  assert.equal(Journey.recordLevelGame(s, 1, { won: false, answered: 1, firstTry: 1 }).missing, 'win');
-  assert.equal(Journey.recordLevelGame(s, 1, { won: true, answered: 5, firstTry: 3 }).missing, 'accuracy');
-  assert.equal(Journey.journeyLevel(s), 1);
-  const r = Journey.recordLevelGame(s, 1, { won: true, answered: 5, firstTry: 4 });
-  assert.deepEqual([r.advanced, r.from, r.to, r.reward], [true, 1, 2, 10]);
-  assert.equal(s.wallet, 10);
-  assert.equal(Journey.journeyLevel(s), 2);
+  s.journey.level = levelOfStep(6); // 6×6, stage 1
+  assert.equal(Journey.recordLevelGame(s, 16, { ...won, won: false }).missing, 'win');
+  assert.equal(Journey.recordLevelGame(s, 16, { ...won, firstTry: 3 }).missing, 'accuracy');
+  const r = Journey.recordLevelGame(s, 16, { ...won, helped: 2 });
+  assert.deepEqual([r.advanced, r.to, r.reward], [true, 17, 60], 'stage 1 allows help; 10 points × the board');
+  assert.equal(Journey.recordLevelGame(s, 17, { ...won, helped: 1 }).missing, 'help');
+  Journey.recordLevelGame(s, 17, won);
+  assert.equal(Journey.recordLevelGame(s, 18, { ...won, squares: 18 }).missing, 'half', 'exactly half isn’t more than half');
+  assert.equal(Journey.recordLevelGame(s, 18, { ...won, squares: 19 }).advanced, true);
+  assert.equal(Journey.journeyLevel(s), levelOfStep(7));
   // replaying a level you've passed doesn't move you
-  const again = Journey.recordLevelGame(s, 1, { won: true, answered: 1, firstTry: 1 });
+  const again = Journey.recordLevelGame(s, 1, won);
   assert.deepEqual([again.advanced, again.current], [false, false]);
   assert.equal(Journey.resultMessage(again), null);
-  assert.match(Journey.resultMessage(r).title, /Level 2 unlocked/);
+  assert.match(Journey.resultMessage(Journey.recordLevelGame(s, 19, { ...won, won: false })).text, /Beat the CPU/);
 });
 
-test('reaching a level unlocks its boards and difficulties, and Free play at 6', () => {
+test('reaching a board unlocks its board and difficulty, and Free play on 6×6', () => {
   const s = Progress.createProgress();
-  s.journey.level = 6;
+  s.journey.level = levelOfStep(6) - 1;
+  assert.equal(Journey.freePlayOpen(s), false);
+  const r = Journey.recordLevelGame(s, levelOfStep(6) - 1, { ...won, size: 5, squares: 20 });
   assert.equal(Journey.freePlayOpen(s), true);
-  const r = Journey.recordLevelGame(s, 6, { won: true, answered: 4, firstTry: 4 });
-  assert.deepEqual(r.grants, ['difficulty.medium']);
-  Journey.recordLevelGame(s, 7, { won: true, answered: 4, firstTry: 4 });
-  assert.ok(Progress.isUnlocked(s, 'board8'));
-  s.journey.level = 18;
-  const done = Journey.recordLevelGame(s, 18, { won: true, answered: 10, firstTry: 10 });
+  assert.ok(r.earned.some((a) => a.id === 'journey_6'));
+  s.journey.level = levelOfStep(7) - 1;
+  assert.deepEqual(Journey.recordLevelGame(s, levelOfStep(7) - 1, won).grants, ['difficulty.medium']);
+  s.journey.level = 42;
+  const done = Journey.recordLevelGame(s, 42, { ...won, size: 24 });
   assert.equal(done.to, Journey.DONE);
   assert.ok(Progress.isUnlocked(s, 'boardCustom'));
   assert.ok(done.earned.some((a) => a.id === 'journey_done'));
-  assert.equal(Journey.recordLevelGame(s, Journey.DONE, { won: true, answered: 1, firstTry: 1 }).current, false);
+  assert.equal(Journey.recordLevelGame(s, Journey.DONE, won).current, false);
+  assert.ok(Journey.steps(s).every((x) => x.done && !x.current));
 });
 
-test('older saves start on the level they had reached, keeping everything', () => {
+test('older saves start on the first stage of the board they had reached, keeping everything', () => {
   const level = (saved) => Journey.journeyLevel(Progress.normalize(saved));
   assert.equal(level({ wallet: 5 }), 1);
-  assert.equal(level({ counters: { games: 2 }, boardsV2: true }), 6);
-  assert.equal(level({ boardsV2: true, unlocks: ['board8'], counters: { games: 2 } }), 8);
-  assert.equal(level({ boardsV2: true, boardWins: { 8: 1 }, counters: { games: 2 } }), 9);
-  assert.equal(level({ boardsV2: true, unlocks: ['board12', 'difficulty.hard'] }), 12);
-  assert.equal(level({ boardsV2: true, unlocks: ['difficulty.legend'] }), 17);
+  assert.equal(level({ counters: { games: 2 }, boardsV2: true }), levelOfStep(6));
+  assert.equal(level({ boardsV2: true, unlocks: ['board8'], counters: { games: 2 } }), levelOfStep(8));
+  assert.equal(level({ boardsV2: true, boardWins: { 8: 1 }, counters: { games: 2 } }), levelOfStep(9));
+  assert.equal(level({ boardsV2: true, unlocks: ['board12', 'difficulty.hard'] }), levelOfStep(12));
+  assert.equal(level({ boardsV2: true, unlocks: ['difficulty.legend'] }), levelOfStep(17));
   // played before 6×6 was free: had 12×12
-  assert.equal(level({ counters: { games: 2 } }), 12);
+  assert.equal(level({ counters: { games: 2 } }), levelOfStep(12));
+  // from 0.6–0.7, a level a board: to that board's first stage
+  assert.equal(level({ boardsV2: true, journeyV1: true, journey: { level: 7 } }), levelOfStep(7));
+  assert.equal(level({ boardsV2: true, journeyV1: true, journey: { level: 14 } }), 38);
+  assert.equal(level({ boardsV2: true, journeyV1: true, journey: { level: 19 } }), Journey.DONE);
   const s = Progress.normalize({ boardsV2: true, unlocks: ['board10'] });
   for (const id of ['difficulty.medium', 'board8', 'difficulty.hard', 'board10']) assert.ok(Progress.isUnlocked(s, id), id);
   // only once: a new save isn't moved up by what it owns
   assert.equal(level({ ...Progress.createProgress(), unlocks: ['board12'] }), 1);
 });
 
-test('merging two saves keeps the higher level', () => {
+test('merging two saves keeps the higher levels', () => {
   const a = Progress.createProgress();
   const b = Progress.createProgress();
-  b.journey.level = 9;
+  b.journey.level = levelOfStep(9);
+  b.practiceJourney.level = practiceLevelOfTable(5);
   const m = Progress.mergeProgress(a, b);
-  assert.equal(Journey.journeyLevel(m), 9);
+  assert.equal(Journey.journeyLevel(m), levelOfStep(9));
   assert.ok(Progress.isUnlocked(m, 'difficulty.hard'));
+  assert.equal(Journey.practiceLevel(m), practiceLevelOfTable(5));
+  assert.ok(Progress.isUnlocked(m, 'table5'));
 });
 
-test('Practice Journey: ×1 to ×12, free practice at 2, a good round moves you up', () => {
+test('Practice Journey: each table in rounds of 5, 10 and 20; Free practice from ×2', () => {
+  assert.equal(Journey.PRACTICE_LEVELS.length, 36);
+  assert.deepEqual([1, 2, 3, 4].map(Journey.practiceSetup), [{ table: 1, count: 5 }, { table: 1, count: 10 }, { table: 1, count: 20 }, { table: 2, count: 5 }]);
   const s = Progress.createProgress();
-  assert.equal(Journey.practiceLevel(s), 1);
   assert.equal(Journey.freePracticeOpen(s), false);
   assert.equal(Journey.onPracticeJourney(s, 'free'), true, 'nothing to pick yet');
   assert.equal(Journey.recordPracticeLevel(s, 1, { count: 5, firstTry: 3 }).missing, 'accuracy');
   const r = Journey.recordPracticeLevel(s, 1, { count: 5, firstTry: 4 });
-  assert.deepEqual([r.advanced, r.to, r.grants, r.reward], [true, 2, ['table2'], 5]);
+  assert.deepEqual([r.advanced, r.to, r.grants, r.reward], [true, 2, ['practice10'], 5]);
+  assert.match(Journey.practiceResultMessage(r).title, /Round 2 of ×1/);
+  Journey.recordPracticeLevel(s, 2, { count: 10, firstTry: 8 });
+  const t = Journey.recordPracticeLevel(s, 3, { count: 20, firstTry: 16 });
+  assert.deepEqual(t.grants, ['table2']);
+  assert.match(Journey.practiceResultMessage(t).title, /×2 unlocked/);
   assert.equal(Journey.freePracticeOpen(s), true);
-  assert.match(Journey.practiceResultMessage(r).title, /×2 unlocked/);
-  assert.equal(Journey.practiceTier(s, 7), 'easy', 'Medium practice waits for the game’s Medium');
+  assert.equal(Journey.practiceTier(s, practiceLevelOfTable(7)), 'easy', 'Medium practice waits for the game’s Medium');
   s.unlocks.push('difficulty.medium');
-  assert.equal(Journey.practiceTier(s, 7), 'medium');
-  assert.equal(Journey.practiceLine(3), 'The ×3 table, with a little review');
+  assert.equal(Journey.practiceTier(s, practiceLevelOfTable(7)), 'medium');
+  assert.equal(Journey.practiceLine(8), 'The ×3 table up to 3 × 6 · round 2 of 3: 10 questions');
+  assert.deepEqual(Journey.practiceSteps(s).slice(0, 2).map((x) => [x.label, x.done, x.current]), [['×1', true, false], ['×2', false, true]]);
   for (const l of Journey.PRACTICE_LEVELS) for (const id of l.grants) assert.equal(Progress.shopItem(id).practiceJourney, l.level, id);
 });
 
-test('older saves: Practice starts on the highest table owned, and is free', () => {
+test('older saves: Practice starts on the first round of the highest table owned, and is free', () => {
   const lvl = (saved) => Journey.practiceLevel(Progress.normalize(saved));
   assert.equal(lvl({ practiceV2: true, unlocks: [] }), 1);
-  assert.equal(lvl({ practiceV2: true, unlocks: ['practice', 'table1', 'table2', 'table3'] }), 3);
+  assert.equal(lvl({ practiceV2: true, unlocks: ['practice', 'table1', 'table2', 'table3', 'practice20'] }), practiceLevelOfTable(3), 'a bought 20 doesn’t move you');
   assert.ok(Progress.isUnlocked(Progress.normalize({ practiceV2: true }), 'practice'));
-  const m = Progress.mergeProgress(Progress.createProgress(), { ...Progress.createProgress(), practiceJourney: { level: 5 } });
-  assert.equal(Journey.practiceLevel(m), 5);
-  assert.ok(Progress.isUnlocked(m, 'table5'));
+  // from 0.7, a level a table: to that table's first round
+  assert.equal(lvl({ practiceV2: true, practiceJourneyV1: true, practiceJourney: { level: 6 } }), practiceLevelOfTable(6));
+  assert.equal(lvl({ practiceV2: true, practiceJourneyV1: true, practiceJourney: { level: 13 } }), Journey.PRACTICE_DONE);
 });

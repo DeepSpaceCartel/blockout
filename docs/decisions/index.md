@@ -15,5 +15,6 @@ Architecture Decision Records: one hard-to-reverse decision per file, numbered, 
 | [0007](0007-live-classes-in-redis.md) | Live classes in Redis for up to 4 hours, one server running each class's timers | accepted |
 | [0008](0008-roles-in-blockout.md) | Blockout keeps each account's role; one-time invites change it, only `admin` comes from Keycloak | accepted |
 | [0009](0009-one-chart.md) | One Helm chart deploys Blockout with its databases and Keycloak | accepted |
-| [0010](0010-journey-progression.md) | Boards and difficulties are Journey levels, not Shop items | accepted |
-| [0011](0011-practice-journey.md) | Practice is free, and its times tables are Practice Journey levels | accepted |
+| [0010](0010-journey-progression.md) | Boards and difficulties are Journey levels, not Shop items | accepted (level shapes superseded by [0012](0012-journey-stages.md)) |
+| [0011](0011-practice-journey.md) | Practice is free, and its times tables are Practice Journey levels | accepted (level shapes superseded by [0012](0012-journey-stages.md)) |
+| [0012](0012-journey-stages.md) | Each Journey level has three stages; Practice's longer rounds are stages too | accepted |

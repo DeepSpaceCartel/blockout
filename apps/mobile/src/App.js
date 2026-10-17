@@ -335,7 +335,7 @@ function Main({ onTheme }) {
       const journeyLevel = Journey.practiceLevel(progress);
       const d = Journey.practiceTier(progress, journeyLevel);
       const pr = Practice.practiceChoice(progress, d, choice.practice || {});
-      return setGame({ key: Date.now(), practice: { difficulty: d, count: pr.count, tables: [], level: pr.level, timer: pr.timer, journeyLevel } });
+      return setGame({ key: Date.now(), practice: { difficulty: d, count: Journey.practiceSetup(journeyLevel).count, tables: [], level: pr.level, timer: pr.timer, journeyLevel } });
     }
     if (choice.mode === 'practice' && modeOpen(progress, 'practice')) {
       const d = difficultyOpen(progress, choice.difficulty) ? choice.difficulty : 'easy';

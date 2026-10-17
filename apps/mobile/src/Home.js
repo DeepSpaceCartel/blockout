@@ -132,14 +132,17 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onClass
                   onLocked={(secs) => onLocked(Practice.timerItem(d, secs))}
                 />
               ) : null}
-              <Segments
-                compact
-                items={Practice.PRACTICE_COUNTS.map((n) => ({ id: n, label: `${n}`, sub: 'questions', open: isOpen(progress, Practice.countItem(d, n)) }))}
-                prefix="q"
-                value={pr.count}
-                onPick={(count) => setPractice({ count })}
-                onLocked={(n) => onLocked(Practice.countItem(d, n))}
-              />
+              {/* (on the Journey the level sets the round's length) */}
+              {practiceLevel ? null : (
+                <Segments
+                  compact
+                  items={Practice.PRACTICE_COUNTS.map((n) => ({ id: n, label: `${n}`, sub: 'questions', open: isOpen(progress, Practice.countItem(d, n)) }))}
+                  prefix="q"
+                  value={pr.count}
+                  onPick={(count) => setPractice({ count })}
+                  onLocked={(n) => onLocked(Practice.countItem(d, n))}
+                />
+              )}
             </>
           ) : choice.mode === 'single' ? (
             <Segments
@@ -229,7 +232,7 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onClass
         ))}
         <View style={styles.playRow}>
           <Button testID="class" kind="secondary" title="🏫 Class" onPress={() => onClass('')} style={styles.classBtn} />
-          <Button testID="play" title={practiceLevel ? `▶ Practice ×${practiceLevel}` : practicing ? 'Practice' : journeyLevel ? `▶ Play Level ${journeyLevel}` : 'Play'} onPress={onPlay} disabled={Boolean(warning) || (practicing && !practiceLevel && !prPreview)} style={styles.flex} />
+          <Button testID="play" title={practiceLevel ? `▶ Practice ×${Journey.practiceSetup(practiceLevel).table}` : practicing ? 'Practice' : journeyLevel ? `▶ Play Level ${journeyLevel}` : 'Play'} onPress={onPlay} disabled={Boolean(warning) || (practicing && !practiceLevel && !prPreview)} style={styles.flex} />
         </View>
       </View>
     </View>
@@ -252,7 +255,7 @@ function JourneyCard({ progress, practice = false }) {
         {practice ? Journey.practiceName(level) : Journey.levelName(level)}
       </Text>
       <Text style={[styles.journeyLine, { color: t.ink }]}>{line}</Text>
-      {done ? null : <Text style={[styles.preview, { color: t.muted, textAlign: 'center' }]}>🏁 {practice ? Journey.practiceGoalLine() : Journey.goalLine()} to move up.</Text>}
+      {done ? null : <Text style={[styles.preview, { color: t.muted, textAlign: 'center' }]}>🏁 {practice ? Journey.practiceGoalLine() : Journey.goalLine(level)} to move up.</Text>}
       <View style={styles.steps} accessibilityLabel={`Level ${level} of ${steps.length}`}>
         {steps.map((s) => (
           <View key={s.level} style={[styles.step, { borderColor: s.done ? t.good : s.current ? t.accent : t.line, backgroundColor: s.done ? t.good : s.current ? t.accentButton : t.surface }]}>

@@ -102,22 +102,26 @@ test('practice: a helped question earns its point but no bonus', () => {
   assert.equal(round.streak, 0);
 });
 
-test('a Practice Journey round: the ×n table with a little review, and a good round moves you up', () => {
+test('a Practice Journey round: the ×n table with a little review, its round’s length, and a good round moves you up', () => {
   const s = Progress.createProgress();
-  s.practiceJourney.level = 7;
-  const r = Practice.createRound(s, { count: 10, journeyLevel: 7, rng: seeded(3) });
+  s.practiceJourney.level = 20; // ×7, round 2: 10 questions
+  const r = Practice.createRound(s, { count: 5, journeyLevel: 20, rng: seeded(3) });
+  assert.equal(r.count, 10, 'the level sets the length');
   assert.deepEqual(r.tables, [7]);
   const sevens = r.queue.filter(([a, b]) => a === 7 || b === 7);
   assert.equal(sevens.length, 8, 'two in ten review the tables before');
-  assert.ok(r.queue.every(([a, b]) => a <= 12 && b <= 12));
+  assert.ok(r.queue.every(([a, b]) => a <= 8 && b <= 8), '×7 goes up to 8, like Medium');
   assert.ok(r.queue[0][0] === 7 || r.queue[0][1] === 7, 'the round starts on the new table');
   while (r.current) {
     Practice.answer(s, r, r.current.area);
     Practice.next(r);
   }
   const end = Practice.finish(s, r);
-  assert.deepEqual([end.journey.advanced, end.journey.to], [true, 8]);
-  assert.ok(Progress.isUnlocked(s, 'table8'));
-  assert.equal(end.record.journeyLevel, 7);
+  assert.deepEqual([end.journey.advanced, end.journey.to], [true, 21]);
+  assert.ok(Progress.isUnlocked(s, 'practice10.medium'));
+  assert.equal(end.record.journeyLevel, 20);
   assert.equal(Practice.journeyQueue({}, 1, 5, seeded()).length, 5, '×1 has nothing to review');
+  // up to 6 on ×1–×6, as Easy practice always was: no 3 × 12 on Level 6
+  for (let i = 0; i < 50; i++) for (const [a, b] of Practice.journeyQueue({}, 6, 10, Math.random)) assert.ok(a <= 6 && b <= 6, `${a} × ${b}`);
+  for (let i = 0; i < 20; i++) assert.ok(Practice.journeyQueue({}, 10, 10, Math.random).every(([a, b]) => a <= 12 && b <= 12));
 });

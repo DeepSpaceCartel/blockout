@@ -23,8 +23,10 @@ test('boards and difficulties are Journey unlocks: not in the Shop, tapping one 
   assert.equal(Shop.availableIds(s).has('board8'), false);
   const offer = Shop.unlockOffer(s, 'board8');
   assert.equal(offer.kind, 'earn');
-  assert.match(offer.message, /Reach Level 8 on your Journey/);
-  assert.match(Shop.unlockOffer(s, 'difficulty.hard').message, /Level 9/);
+  assert.match(offer.message, /Reach the 8×8 board on your Journey/);
+  assert.match(Shop.unlockOffer(s, 'difficulty.hard').message, /the 9×9 board/);
+  assert.match(Shop.unlockOffer(s, 'table3').message, /Reach the ×3 table in Practice/);
+  assert.match(Shop.unlockOffer(s, 'practice10').message, /10-question rounds of ×1 in Practice/);
 });
 
 test('the next step shows its name and price; the one after is blurred', () => {

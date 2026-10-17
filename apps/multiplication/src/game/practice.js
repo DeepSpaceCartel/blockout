@@ -135,8 +135,8 @@ const tableUnlocked = (n) => Practice.tableOpen(progress, n);
 function startPracticeJourney(name) {
   const level = Journey.practiceLevel(progress);
   const d = Journey.practiceTier(progress, level);
-  const c = Practice.practiceChoice(progress, d, { level: practiceLevel, timer: practiceTimerSecs, count: practiceRoundSize });
-  startPractice(name, c.count, [], c.level === 'expert', c.timer, d, level);
+  const c = Practice.practiceChoice(progress, d, { level: practiceLevel, timer: practiceTimerSecs });
+  startPractice(name, Journey.practiceSetup(level).count, [], c.level === 'expert', c.timer, d, level);
 }
 
 // difficulty: whose dice the questions come from (today's practice may pick one)
@@ -351,8 +351,9 @@ function finishPractice() {
   el.pdJourney.hidden = !message;
   el.pdJourney.classList.toggle('up', Boolean(end.journey && end.journey.advanced));
   if (message) el.pdJourney.replaceChildren(make('strong', null, message.title), ' ', message.text);
-  const next = end.journey && end.journey.advanced && !Journey.practiceDone(progress);
-  el.pdAgain.textContent = next ? `×${end.journey.to} ›` : 'Practice again';
+  // moved up: on to the next table (×4 ›) or the next, longer round (10 questions ›)
+  const next = end.journey && end.journey.advanced && !Journey.practiceDone(progress) ? Journey.PRACTICE_LEVELS[end.journey.to - 1] : null;
+  el.pdAgain.textContent = !next ? 'Practice again' : next.stage === 1 ? `×${next.table} ›` : `${next.count} questions ›`;
   if (end.journey && end.journey.advanced) renderJourney();
 
   // Which facts moved, e.g. "3 × 4: Needs practice → Learning"

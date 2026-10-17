@@ -153,6 +153,7 @@ export function run() {
     boardSizeHelp: $('board-size-help'),
     journeyCard: $('journey-card'),
     practiceTablesField: $('practice-tables-field'),
+    practiceCountField: $('practice-count-field'),
     pdJourney: $('pd-journey'),
     playKind: $('play-kind'),
     journeyInfo: $('journey-info'),

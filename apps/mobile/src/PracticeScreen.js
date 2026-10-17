@@ -293,6 +293,8 @@ function Done({ end, progress, round, settings, earned, onAgain, onExit }) {
   // a Practice Journey round: on to the next table, or what it still takes
   const journey = end.journey ? Journey.practiceResultMessage(end.journey) : null;
   const up = Boolean(end.journey && end.journey.advanced);
+  // moved up: on to the next table (×4 ›) or the next, longer round (10 questions ›)
+  const next = up && !Journey.practiceDone(progress) ? Journey.PRACTICE_LEVELS[end.journey.to - 1] : null;
   return (
     <View style={styles.fill}>
       <ScrollView contentContainerStyle={styles.done}>
@@ -340,7 +342,7 @@ function Done({ end, progress, round, settings, earned, onAgain, onExit }) {
         </View>
       </ScrollView>
       <View style={styles.actions}>
-        <Button testID="pd-again" title={up && !Journey.practiceDone(progress) ? `×${end.journey.to} ›` : 'Again'} onPress={onAgain} style={styles.flex} />
+        <Button testID="pd-again" title={!next ? 'Again' : next.stage === 1 ? `×${next.table} ›` : `${next.count} questions ›`} onPress={onAgain} style={styles.flex} />
         <Button kind="secondary" title="Menu" onPress={onExit} style={styles.flex} />
       </View>
     </View>

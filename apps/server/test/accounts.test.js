@@ -102,10 +102,10 @@ test('progress sync: saves round-trip, cheats stay on the device, stats come fro
   const back = (await accounts.getProgress(kid)).progress;
   assert.equal(back.wallet, 50);
   assert.deepEqual(back.cheats, {});
-  // IDDQD's free unlocks never reach the account
+  // IDDQD's free unlocks never reach the account (only what every save has: Practice and ×1)
   P.cheatOn(s, 'iddqd');
   await accounts.putProgress(kid, s);
-  assert.deepEqual((await accounts.getProgress(kid)).progress.unlocks, []);
+  assert.deepEqual((await accounts.getProgress(kid)).progress.unlocks, ['practice', 'table1']);
   assert.deepEqual(P.factSummary(back).needsPractice, ['6 × 7']);
 });
 
@@ -123,7 +123,7 @@ test('merging a device into an account keeps the most of everything', () => {
   P.noteActivity(account, { kind: 'practice', finished: true, difficulty: 'easy' }, 2000);
   const m = P.mergeProgress(device, account);
   assert.equal(m.wallet, 80);
-  assert.deepEqual(m.unlocks.sort(), ['board8', 'practice']);
+  assert.deepEqual(m.unlocks.sort(), ['board8', 'practice', 'table1']); // (×1 comes with Practice)
   assert.equal(m.achievements.first_game, 500);
   assert.equal(m.facts.you.facts['3 × 4'].asked, 5);
   assert.ok(m.facts.you.facts['5 × 5']);

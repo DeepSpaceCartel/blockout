@@ -44,6 +44,7 @@ function journeyView() {
   if (setup.mode === 'practice') {
     const level = Journey.practiceLevel(progress);
     const done = Journey.practiceDone(progress);
+    const round = Journey.practiceSetup(level);
     return {
       key: 'practicePlay', done, open: Journey.freePracticeOpen(progress), on: practiceJourneyOn(),
       name: Journey.practiceName(level),
@@ -51,7 +52,7 @@ function journeyView() {
       goal: Journey.practiceGoalLine(),
       steps: Journey.practiceSteps(progress),
       free: ['Free practice', 'pick tables'],
-      start: `Practice ×${level}`,
+      start: `Practice ×${round.table}`,
     };
   }
   const level = Journey.journeyLevel(progress);
@@ -60,7 +61,7 @@ function journeyView() {
     key: 'play', done, open: Journey.freePlayOpen(progress), on: journeyOn(),
     name: Journey.levelName(level),
     line: done ? 'You finished every level. Pick any board and dice in Free play!' : Journey.levelLine(level),
-    goal: Journey.goalLine(),
+    goal: Journey.goalLine(level),
     steps: Journey.steps(progress),
     free: ['Free play', 'pick a board'],
     start: `Play ${Journey.levelName(level)}`,
@@ -97,6 +98,7 @@ function renderJourney() {
   if (setup.mode === 'single') el.boardSizeField.hidden = on;
   else {
     el.practiceTablesField.hidden = on;
+    el.practiceCountField.hidden = on; // (the level sets the round's length)
     el.practicePreview.hidden = on;
   }
   if (on) {

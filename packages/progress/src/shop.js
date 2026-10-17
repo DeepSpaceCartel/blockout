@@ -4,6 +4,7 @@
 // Pure functions of the save; the clients only draw them.
 import * as Progress from './progress.js';
 import * as Cosmetics from './cosmetics.js';
+import { LEVELS, DONE, PRACTICE_LEVELS } from './levels.js';
 
 // 1,250 rather than 1250
 export const formatPoints = (n) => Number(n).toLocaleString();
@@ -24,17 +25,29 @@ export function buyReason(r) {
     case 'requires':
       return `Unlock ${Progress.shopItem(r.requires).name.split(':')[0]} first`;
     case 'journey':
-      return r.path === 'practice' ? `Reach Practice Level ${r.level}` : `Reach Level ${r.level} on your Journey`;
+      return `Reach ${journeyPlace(r)}`;
     default:
       return '';
   }
 }
 
-// What unlocks a board or difficulty: a level of the Journey
+// Where on a Journey something unlocks (canBuy's { level, path }), in a
+// child's words: "the 8×8 board on your Journey", "the ×3 table in Practice"
+export function journeyPlace(r) {
+  if (r.path === 'practice') {
+    const p = PRACTICE_LEVELS[r.level - 1];
+    return p.stage === 1 ? `the ×${p.table} table in Practice` : `${p.count}-question rounds of ×${p.table} in Practice`;
+  }
+  if (r.level >= DONE) return 'the end of your Journey';
+  const l = LEVELS[r.level - 1];
+  return l.sides ? `the ${l.size}×${l.size} board on your Journey` : `${l.difficulty[0].toUpperCase()}${l.difficulty.slice(1)} on your Journey`;
+}
+
+// What unlocks a board, difficulty, table or round length: a place on a Journey
 export const revealHint = (r) =>
   r.path === 'practice'
-    ? `Reach Practice Level ${r.level} to unlock it. A good practice round moves you up to the next times table.`
-    : `Reach Level ${r.level} on your Journey to unlock it. Play › moves you up a level when you beat the CPU.`;
+    ? `Reach ${journeyPlace(r)} to unlock it. A good practice round moves you along.`
+    : `Reach ${journeyPlace(r)} to unlock it. Play › moves you up a level when you beat the CPU.`;
 
 // Shop items that are bought (not Wardrobe looks, not Journey unlocks)
 const shopItems = () => Progress.SHOP.filter((item) => !item.cosmetic && !item.journey && !item.practiceJourney);

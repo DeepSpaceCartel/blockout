@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Smaller steps on both Journeys ([ADR-0012](https://github.com/DeepSpaceCartel/blockout/blob/main/docs/decisions/0012-journey-stages.md)). Each board now has three stages: beat the CPU with 4 out of 5 answers right first try, then without “Help me count”, then also claiming more than half the board (42 levels in all). Each times table in Practice has three rounds, 5, 10 and 20 questions (36 levels). 10- and 20-question rounds are no longer bought: reaching them on Practice's Journey unlocks them. Players keep their place: they start on the first stage of the board or table they were on.
+
+### Fixed
+- Practice's Journey asked every table up to × 12 (like 3 × 12 on the ×6 level). Its facts now go up to the table's dice, as Practice always did: 6 for ×1–×6, 8 for ×7 and ×8, 12 from ×9.
+
 ## [0.7.0] - 2026-10-17
 
 ### Added
