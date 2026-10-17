@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Progress from '@blockout/progress';
 import * as Shop from '@blockout/progress/shop';
 import * as Setup from '@blockout/progress/setup';
+import * as Practice from '@blockout/progress/practice';
 import { BOARDS, DIFFICULTIES, PLAYER_COUNTS, boardOpen, difficultyOpen, itemFor, modeOpen, playersOpen } from './rewards';
 import { useTheme } from './theme';
 import { Button } from './ui';
@@ -11,6 +12,7 @@ import { Button } from './ui';
 const MODES = [
   { id: 'single', label: 'You vs CPU' },
   { id: 'multi', label: 'Friends' },
+  { id: 'practice', label: 'Practice' },
 ];
 const LEVELS = [
   { id: 'learn', label: 'Learn' },
@@ -25,7 +27,12 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onSignI
   const anyLocked = DIFFICULTIES.some((d) => !difficultyOpen(progress, d.id)) || BOARDS.some((n) => !boardOpen(progress, n));
   const d = choice.difficulty;
   const level = Setup.gameLevel(progress, d, choice); // (what's unlocked on this difficulty)
-  const warning = Setup.boardWarning(d, choice.size);
+  const practicing = choice.mode === 'practice';
+  const pr = Practice.practiceChoice(progress, d, choice.practice || {});
+  const picked = (choice.practice && choice.practice.tables) || [];
+  const prPreview = practicing ? Practice.preview(progress, d, picked) : null;
+  const warning = practicing ? null : Setup.boardWarning(d, choice.size);
+  const setPractice = (part) => onChoose({ practice: { ...pr, tables: picked, ...part } });
   return (
     <View style={[styles.fill, { backgroundColor: t.bg }]}>
       <ScrollView contentContainerStyle={styles.page} bounces={false}>
@@ -71,8 +78,36 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onSignI
         </View>
 
         <Section title="Play">
-          <Segments items={MODES.map((x) => ({ id: x.id, label: x.label, open: modeOpen(progress, x.id) }))} value={choice.mode} onPick={(mode) => onChoose({ mode })} onLocked={() => onLocked(itemFor.mode())} />
-          {choice.mode === 'single' ? (
+          <Segments items={MODES.map((x) => ({ id: x.id, label: x.label, open: modeOpen(progress, x.id) }))} value={choice.mode} onPick={(mode) => onChoose({ mode })} onLocked={(mode) => onLocked(itemFor.mode(mode))} />
+          {practicing ? (
+            <>
+              <Segments
+                compact
+                items={LEVELS.map((l) => ({ id: l.id, label: l.label, open: isOpen(progress, Practice.levelItem(d, l.id)) }))}
+                value={pr.level}
+                onPick={(level) => setPractice({ level })}
+                onLocked={(lv) => onLocked(Practice.levelItem(d, lv))}
+              />
+              {pr.level === 'expert' ? (
+                <Segments
+                  compact
+                  items={Practice.PRACTICE_TIMERS.map((secs) => ({ id: secs, label: secs ? `⏱️ ${secs} s` : 'No timer', open: isOpen(progress, Practice.timerItem(d, secs)) }))}
+                  prefix="t"
+                  value={pr.timer}
+                  onPick={(timer) => setPractice({ timer })}
+                  onLocked={(secs) => onLocked(Practice.timerItem(d, secs))}
+                />
+              ) : null}
+              <Segments
+                compact
+                items={Practice.PRACTICE_COUNTS.map((n) => ({ id: n, label: `${n}`, sub: 'questions', open: isOpen(progress, Practice.countItem(d, n)) }))}
+                prefix="q"
+                value={pr.count}
+                onPick={(count) => setPractice({ count })}
+                onLocked={(n) => onLocked(Practice.countItem(d, n))}
+              />
+            </>
+          ) : choice.mode === 'single' ? (
             <Segments
               compact
               items={LEVELS.map((l) => ({ id: l.id, label: l.label, open: isOpen(progress, Setup.levelItem(d, l.id)) }))}
@@ -103,22 +138,50 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onSignI
         <Section title="Difficulty">
           <Segments
             columns={3}
-            items={DIFFICULTIES.map((x) => ({ id: x.id, label: x.name, sub: x.dice.replace(' dice', ''), open: difficultyOpen(progress, x.id) }))}
+            compact={practicing}
+            items={DIFFICULTIES.map((x) => ({ id: x.id, label: x.name, sub: practicing ? null : x.dice.replace(' dice', ''), open: difficultyOpen(progress, x.id) }))}
             value={choice.difficulty}
             onPick={(difficulty) => onChoose({ difficulty })}
             onLocked={(id) => onLocked(itemFor.difficulty(id))}
           />
         </Section>
 
-        <Section title="Board">
-          <Segments compact items={BOARDS.map((n) => ({ id: n, label: `${n}`, open: boardOpen(progress, n) }))} value={choice.size} onPick={(size) => onChoose({ size })} onLocked={(n) => onLocked(itemFor.size(n))} />
-          {warning ? <Text testID="board-warning" style={[styles.warning, { color: t.bad }]}>{warning}</Text> : null}
-        </Section>
+        {practicing ? (
+          <Section title="Times tables">
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+              {Practice.tableChoices(d).map((n) => {
+                const on = picked.includes(n);
+                const open = Practice.tableOpen(progress, n);
+                return (
+                  <Pressable
+                    key={n}
+                    testID={`table-${n}`}
+                    accessibilityRole="checkbox"
+                    accessibilityLabel={`${n} times table${open ? '' : ', locked'}`}
+                    accessibilityState={{ checked: on }}
+                    onPress={() => (open ? setPractice({ tables: on ? picked.filter((x) => x !== n) : [...picked, n] }) : onLocked(Practice.tableItem(n)))}
+                    style={[styles.chip, { backgroundColor: on ? t.accentSoft : t.surface, borderColor: on ? t.accent : t.line, opacity: open ? 1 : 0.5 }]}
+                  >
+                    <Text style={[styles.chipText, { color: t.ink }]}>{open ? `×${n}` : '🔒'}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+            <Text testID="practice-preview" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={[styles.preview, { color: prPreview ? t.muted : t.bad }]}>
+              {prPreview || 'Unlock a times table to practice: tap ×1 to start.'}
+            </Text>
+          </Section>
+        ) : (
+          <Section title="Board">
+            <Segments compact items={BOARDS.map((n) => ({ id: n, label: `${n}`, open: boardOpen(progress, n) }))} value={choice.size} onPick={(size) => onChoose({ size })} onLocked={(n) => onLocked(itemFor.size(n))} />
+            {warning ? <Text testID="board-warning" style={[styles.warning, { color: t.bad }]}>{warning}</Text> : null}
+          </Section>
+        )}
 
         {anyLocked ? <Text style={[styles.note, { color: t.muted }]}>🔒 Tap a locked one to see how to unlock it.</Text> : null}
       </ScrollView>
       <View style={styles.bottom}>
-        <Button testID="play" title="Play" onPress={onPlay} disabled={Boolean(warning)} />
+        <Button testID="play" title={practicing ? 'Practice' : 'Play'} onPress={onPlay} disabled={Boolean(warning) || (practicing && !prPreview)} />
       </View>
     </View>
   );
@@ -138,7 +201,8 @@ const isOpen = (progress, itemId) => !itemId || Progress.isUnlocked(progress, it
 
 // One row of equal choices (or rows of `columns`); a locked one shows 🔒, and
 // tapping it offers it (onLocked). compact: shorter, for the second rows.
-function Segments({ items, value, onPick, onLocked, columns = 0, compact = false }) {
+// (testIDs are choice-<prefix><id>, so two rows can share an id like 10)
+function Segments({ items, value, onPick, onLocked, columns = 0, compact = false, prefix = '' }) {
   const t = useTheme();
   return (
     <View style={[styles.segments, columns ? styles.wrap : null]} accessibilityRole="radiogroup">
@@ -147,7 +211,7 @@ function Segments({ items, value, onPick, onLocked, columns = 0, compact = false
         return (
           <Pressable
             key={it.id}
-            testID={`choice-${it.id}`}
+            testID={`choice-${prefix}${it.id}`}
             accessibilityRole="radio"
             accessibilityLabel={`${it.label}${it.sub ? ` ${it.sub}` : ''}${it.open ? '' : ', locked'}`}
             accessibilityState={{ selected: on }}
@@ -159,7 +223,7 @@ function Segments({ items, value, onPick, onLocked, columns = 0, compact = false
               { backgroundColor: on ? t.accentSoft : t.surface, borderColor: on ? t.accent : t.line, opacity: it.open ? 1 : 0.5, transform: [{ scale: pressed ? 0.97 : 1 }] },
             ]}
           >
-            <Text style={[styles.segmentText, { color: t.ink }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+            <Text style={[styles.segmentText, { color: t.ink }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
               {it.open ? '' : '🔒 '}
               {it.label}
             </Text>
@@ -237,6 +301,10 @@ const styles = StyleSheet.create({
   wrap: { flexWrap: 'wrap' },
   compact: { minHeight: 36, paddingVertical: 2 },
   warning: { fontSize: 14, lineHeight: 19, fontWeight: '600' },
+  chips: { flexDirection: 'row', gap: 6 },
+  chip: { minWidth: 46, height: 36, paddingHorizontal: 8, borderRadius: 10, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  chipText: { fontSize: 15, fontWeight: '800' },
+  preview: { fontSize: 13, lineHeight: 18 },
   segment: { flex: 1, minHeight: 48, paddingVertical: 6, paddingHorizontal: 4, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   segmentText: { fontSize: 16, fontWeight: '700' },
   segmentSub: { fontSize: 12, marginTop: 2 },

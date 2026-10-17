@@ -16,6 +16,8 @@ import { BOARDS, DIFFICULTIES, boardOpen, difficultyOpen, modeOpen, playersOpen 
 import { ShopScreen, UnlockSheet } from './Shop';
 import { AchievementsScreen, StickersScreen } from './Collection';
 import StatsScreen from './StatsScreen';
+import PracticeScreen from './PracticeScreen';
+import * as Practice from '@blockout/progress/practice';
 import SettingsScreen from './SettingsScreen';
 import { ThemeSetting, useTheme } from './theme';
 
@@ -180,12 +182,24 @@ function Main({ onTheme }) {
     );
   }
 
-  const play = () => setGame({ key: Date.now(), setup: setupFor(choice, progress, settings) });
+  // Play a game, or a practice round (the round's options from the menu)
+  const play = () => {
+    if (choice.mode === 'practice' && modeOpen(progress, 'practice')) {
+      const d = difficultyOpen(progress, choice.difficulty) ? choice.difficulty : 'easy';
+      const pr = Practice.practiceChoice(progress, d, choice.practice || {});
+      // (the tables picked, or else every unlocked one: locked tables never come up)
+      const tables = Practice.roundTables(progress, d, (choice.practice && choice.practice.tables) || []);
+      return setGame({ key: Date.now(), practice: { difficulty: d, count: pr.count, tables, level: pr.level, timer: pr.timer } });
+    }
+    setGame({ key: Date.now(), setup: setupFor(choice, progress, settings) });
+  };
 
   return (
     <SafeAreaView style={[styles.fill, { backgroundColor: t.bg }]}>
       <StatusBar style="auto" />
-      {game ? (
+      {game && game.practice ? (
+        <PracticeScreen key={game.key} options={game.practice} progress={progress} settings={settings} onSave={save} toast={toasts.show} onEarned={celebrate} onExit={() => setGame(null)} onAgain={play} />
+      ) : game ? (
         <Game key={game.key} setup={game.setup} settings={settings} progress={progress} onSave={save} toast={toasts.show} onEarned={celebrate} onExit={() => setGame(null)} onAgain={play} />
       ) : screen === 'shop' ? (
         <ShopScreen progress={progress} onAsk={ask} onClose={() => setScreen('menu')} />

@@ -29,7 +29,7 @@ The owner chose: phases 1–6 and 8 (not the other games), and **extract shared 
 
 1. **Progress: done (2026-10-17).** Shop, achievements and stickers (with sticker drops), stats (the phone's own history), the daily check-in and settings, each shared through `@blockout/progress/{shop,views,stats,settings}` and used by both clients. The app's Settings list only what its game honours; real dice, tap-to-place and the answer timer come in phase 2.
 2. **The rest of the game: done (2026-10-17).** Every difficulty (Master's weighting and Legend's board rule in `@blockout/progress/setup`), Expert levels and timers, 3–4 players, boards to 24, real dice, tap to place and auto placing, every setting. The web game now calls the shared rules on its own state, which is shaped like a match (judging a drawing, awarding points, misses, when an answer is decided, the counting plan, Legend's split, the end of the game, tap-to-place); its turn flow (animations, classroom and pairs turns driven by the server) stays in `play.js`.
-3. **Practice** (`practice.js` → a pure session module in `@blockout/progress`).
+3. **Practice: done (2026-10-17).** `@blockout/progress/practice` (setup rules and words, the round question by question); the web game's practice and the app's Practice screen both use it.
 4. **Wardrobe.**
 5. **Student accounts:** homework, codes (`blockout://` links, QR), joining a class, deleting the account.
 6. **Live classes as a student:** `@blockout/classroom` gets platform adapters (storage, no `EventSource`: long polling, absolute server URL).

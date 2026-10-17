@@ -74,7 +74,7 @@ export const difficultyOpen = Setup.difficultyOpen;
 export const playersOpen = (progress, n) => n === 2 || Progress.isUnlocked(progress, `players${n}`);
 export const boardOpen = (progress, size) => size === 6 || Progress.isUnlocked(progress, `board${size}`);
 // Two players on one phone is the Shop's "Multiplayer", as on the web
-export const modeOpen = (progress, mode) => mode === 'single' || Progress.isUnlocked(progress, 'multiplayer');
+export const modeOpen = (progress, mode) => mode === 'single' || Progress.isUnlocked(progress, mode === 'practice' ? 'practice' : 'multiplayer');
 
 // The Shop item a locked menu choice stands for (to offer it when tapped)
-export const itemFor = { mode: () => 'multiplayer', difficulty: (id) => `difficulty.${id}`, size: (n) => `board${n}`, players: (n) => `players${n}` };
+export const itemFor = { mode: (mode) => (mode === 'practice' ? 'practice' : 'multiplayer'), difficulty: (id) => `difficulty.${id}`, size: (n) => `board${n}`, players: (n) => `players${n}` };

@@ -15,8 +15,10 @@ export async function loadHistory() {
   }
 }
 
-// A finished game: the match and its results (winners: the ranked players with their index)
-export async function recordGame(match, results) {
-  const entry = Stats.gameRecord(match, new Set(results.winners.map((p) => p.index)));
+// One more entry (a practice round's record, say)
+export async function addToHistory(entry) {
   await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(Stats.addToHistory(await loadHistory(), entry)));
 }
+
+// A finished game: the match and its results (winners: the ranked players with their index)
+export const recordGame = (match, results) => addToHistory(Stats.gameRecord(match, new Set(results.winners.map((p) => p.index))));
