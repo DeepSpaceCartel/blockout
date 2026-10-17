@@ -11,6 +11,22 @@ import { PLAYER_COLORS, useTheme } from './theme';
 const FONT = Platform.OS === 'web' ? 'system-ui, sans-serif' : undefined;
 const NO_SELECT = Platform.OS === 'web' ? { userSelect: 'none' } : null;
 
+// A colour made darker (amount < 0) or lighter, like the web board's outlines
+function shade(hex, amount) {
+  const n = parseInt(hex.slice(1), 16);
+  const ch = (v) => Math.round(Math.max(0, Math.min(255, amount < 0 ? v * (1 + amount) : v + (255 - v) * amount)));
+  return `rgb(${ch(n >> 16)}, ${ch((n >> 8) & 255)}, ${ch(n & 255)})`;
+}
+
+// The lines between the squares inside a rectangle, drawn over its colour so
+// every square can be counted
+function SquareLines({ x, y, w, h, cell, width = 1.5 }) {
+  const lines = [];
+  for (let i = 1; i < w; i++) lines.push(<Line key={`c${i}`} x1={(x + i) * cell} y1={y * cell} x2={(x + i) * cell} y2={(y + h) * cell} stroke="#fff" strokeOpacity={0.6} strokeWidth={width} />);
+  for (let i = 1; i < h; i++) lines.push(<Line key={`r${i}`} x1={x * cell} y1={(y + i) * cell} x2={(x + w) * cell} y2={(y + i) * cell} stroke="#fff" strokeOpacity={0.6} strokeWidth={width} />);
+  return lines;
+}
+
 // drag: { c0, r0, c1, r1, verdict } while drawing (verdict: match.judge's); preview: the CPU's rectangle so
 // far (hide: the placed one it grows into); counting: { rect, byRows, shown };
 // onDraw(rect) when a drag ends.
@@ -76,7 +92,9 @@ export default function Board({ match, width, drag, preview, hide, counting, can
           const label = r.w * cell >= 34 && r.h * cell >= 22;
           return (
             <G key={`r${i}`}>
-              {box(r, 'fill', { fill: color, fillOpacity: r.solved ? 0.85 : 0.45, stroke: t.boardEdge, strokeWidth: 2 })}
+              {box(r, 'fill', { fill: color, fillOpacity: r.solved ? 0.85 : 0.5 })}
+              <SquareLines {...r} cell={cell} />
+              {box(r, 'edge', { fill: 'none', stroke: shade(color, -0.35), strokeWidth: 2.5 })}
               {label && r.solved ? (
                 <SvgText x={(r.x + r.w / 2) * cell} y={(r.y + r.h / 2) * cell + 6} fill="#fff" fontFamily={FONT} fontSize={Math.min(18, cell * 0.6)} fontWeight="bold" textAnchor="middle">
                   {r.area}
@@ -130,7 +148,8 @@ function CountingOverlay({ counting, cell, t }) {
     const strip = byRows ? { x: rect.x, y: rect.y + i, w: rect.w, h: 1 } : { x: rect.x + i, y: rect.y, w: 1, h: rect.h };
     strips.push(
       <G key={i}>
-        <Rect x={strip.x * cell} y={strip.y * cell} width={strip.w * cell} height={strip.h * cell} fill={t.gold} fillOpacity={0.55} />
+        <Rect x={strip.x * cell} y={strip.y * cell} width={strip.w * cell} height={strip.h * cell} fill={t.gold} fillOpacity={0.9} />
+        <SquareLines {...strip} cell={cell} width={2} />
         <SvgText
           x={(strip.x + strip.w - 0.5) * cell}
           y={(strip.y + strip.h - 0.5) * cell + 5}
@@ -160,15 +179,10 @@ export function RectPicture({ rect, color, counting, maxWidth, maxHeight }) {
   return (
     <View style={[{ width, height, alignSelf: 'center' }, NO_SELECT]} accessibilityLabel={`Your rectangle: ${rect.w} squares across and ${rect.h} down`}>
       <Svg width={width} height={height} pointerEvents="none">
-        <Rect x={0} y={0} width={width} height={height} fill={color} fillOpacity={0.55} />
-        {Array.from({ length: rect.w + 1 }, (_, i) => (
-          <Line key={`c${i}`} x1={i * cell} y1={0} x2={i * cell} y2={height} stroke={t.boardEdge} strokeOpacity={0.35} strokeWidth={1} />
-        ))}
-        {Array.from({ length: rect.h + 1 }, (_, i) => (
-          <Line key={`r${i}`} x1={0} y1={i * cell} x2={width} y2={i * cell} stroke={t.boardEdge} strokeOpacity={0.35} strokeWidth={1} />
-        ))}
+        <Rect x={0} y={0} width={width} height={height} fill={color} fillOpacity={0.85} />
         {counting ? <CountingOverlay counting={{ ...counting, rect: at }} cell={cell} t={t} /> : null}
-        <Rect x={1.5} y={1.5} width={width - 3} height={height - 3} fill="none" stroke={t.boardEdge} strokeWidth={3} />
+        <SquareLines x={0} y={0} w={rect.w} h={rect.h} cell={cell} width={2} />
+        <Rect x={1.5} y={1.5} width={width - 3} height={height - 3} fill="none" stroke={shade(color, -0.35)} strokeWidth={3} />
       </Svg>
     </View>
   );
