@@ -6,6 +6,7 @@ import * as Classroom from '@blockout/classroom';
 import * as Core from '@blockout/engine';
 import * as Progress from '@blockout/progress';
 import * as Stats from '@blockout/progress/stats';
+import * as Live from '@blockout/progress/classroom';
 import { AUTO_ROLL_MS, el } from './base.js';
 import { celebrate, celebrateWin, grantStickers, progress, saveProgress, toast } from './wallet.js';
 import { settings } from './settings.js';
@@ -172,24 +173,13 @@ function onClassGone(reason) {
     return;
   }
   if (game && (game.mode === 'class' || game.mode === 'pair') && game.phase !== 'over') toMenu();
-  if (!wasIn) return; // an old class from last time: just forget it
-  if (reason === 'closed') toast('👋 Your teacher closed the class', 'Thanks for playing!');
-  else if (reason === 'removed') toast('You’ve left the class', 'Join again with the code if that was a mistake.');
-  else toast('⚠️ Lost the class', 'Join again with the code on the board.');
+  const said = Live.goneToast(reason, wasIn); // (null: an old class from last time, just forgotten)
+  if (said) toast(...said);
 }
 
 function showClassWaiting(view) {
   el.classWaitName.textContent = classSession.name;
-  const t = view && view.tournament;
-  el.classWaitText.textContent = t
-    ? tournamentLine(t)
-    : classSession.teacher
-    ? 'You’re the teacher’s player. When there’s an odd number of students, you’ll play the odd one out here.'
-    : view && view.state === 'playing'
-      ? 'That game started without you. You’ll play in the next one!'
-      : view && view.state === 'ended'
-        ? 'That game just finished. Wait here for the next one!'
-        : 'Waiting for your teacher to start the game…';
+  el.classWaitText.textContent = Live.waitingText(view, classSession);
   el.classJoinForm.hidden = true;
   el.classWait.hidden = false;
   el.classJoin.hidden = false;
@@ -215,16 +205,9 @@ function onClassView(view) {
   showClassWaiting(view);
 }
 
-// The teacher's settings for everyone in the class (no shop locks); placing is
+// The teacher's settings for everyone in the class (Live.classCfg); placing is
 // the student's own choice unless the teacher picked one.
-function classCfg(s) {
-  return {
-    answerTime: s.answerTime || 0,
-    placeMode: s.placeMode && s.placeMode !== 'choice' ? s.placeMode : settings.placeMode,
-    firstInCorner: false,
-    diceMode: 'virtual',
-  };
-}
+const classCfg = (s) => Live.classCfg(s, settings.placeMode);
 
 function startClassGame(view) {
   el.classJoin.hidden = true;
@@ -236,13 +219,7 @@ function startClassGame(view) {
     classroom: { session: classSession, game: view.game, round: 0, reported: true, view },
   });
   // Rejoining mid-game: put your rectangles back and pick up your score.
-  const p = game.players[0];
-  for (const r of you.rects) {
-    const rect = Core.place(game.board, r.x, r.y, r.w, r.h, 0);
-    Object.assign(rect, { a: r.a, b: r.b, solved: true });
-  }
-  Object.assign(p, { squares: you.squares, bonus: you.bonus, score: you.score, streak: you.streak, answered: you.answered, firstTry: you.firstTry });
-  if (you.rects.length) toast(`🏫 Back in class ${view.code}`, `You have ${you.score} points.`);
+  if (Live.rejoinClass(game, you)) toast(`🏫 Back in class ${view.code}`, `You have ${you.score} points.`);
   syncClassGame(view);
 }
 
@@ -255,10 +232,7 @@ function syncClassGame(view) {
     if (!['wait', 'over'].includes(game.phase)) {
       setGameId(gameId + 1); // stop whatever the last roll was still doing
       if (!c.reported) {
-        if (game.pending) Core.removeRect(game.board, game.pending.rect);
-        const [a, b] = game.dice || [];
-        if (a) currentPlayer().log.push({ timeout: true, a, b });
-        currentPlayer().streak = 0;
+        Live.skipUnfinished(game);
         toast('⏭️ Next roll!', 'Your teacher moved on before you finished that one.');
       }
     }
@@ -356,32 +330,7 @@ function syncPairGame(view) {
   const c = game.classroom;
   const m = view.match;
   c.view = view;
-  m.players.forEach((sp, i) => Object.assign(game.players[i], { score: sp.score, squares: sp.squares, bonus: sp.bonus }));
-  let note = '';
-  // New rectangles (yours are already on the board)
-  for (const r of m.rects.slice(c.synced)) {
-    if (game.board.rects.some((x) => x.x === r.x && x.y === r.y && x.w === r.w && x.h === r.h)) continue;
-    if (game.pending) {
-      // Can't happen in turn order, but never draw over your own rectangle
-      Core.removeRect(game.board, game.pending.rect);
-      game.pending = null;
-    }
-    const rect = Core.place(game.board, r.x, r.y, r.w, r.h, r.owner);
-    Object.assign(rect, { a: r.a, b: r.b, solved: true });
-    game.lastRect = rect;
-    game.players[r.owner].log.push({ a: r.a, b: r.b, area: rect.area });
-    if (r.owner !== c.me) note = `${game.players[r.owner].name} drew ${r.a} × ${r.b} = ${rect.area}.`;
-  }
-  c.synced = m.rects.length;
-  // Passes
-  if (m.lastPass && m.lastPass.turn > c.passSeen) {
-    c.passSeen = m.lastPass.turn;
-    const who = m.players.findIndex((p) => p.id === m.lastPass.by);
-    const [a, b] = m.lastPass.roll;
-    game.players[who].log.push({ pass: true, a, b });
-    note = who === c.me ? `No room for a ${a} × ${b} anywhere. You pass.` : `${game.players[who].name} had no room for a ${a} × ${b}, so they pass.`;
-  }
-  game.current = m.current;
+  const note = Live.syncPair(game, m, c.me, c);
   if (m.over) return finishPairGame(view);
   const myTurn = m.current === c.me;
   const newTurn = m.turn !== c.round;
@@ -395,15 +344,7 @@ function syncPairGame(view) {
         c.rollShown = m.turn;
         animatePartnerRoll(m.roll);
       }
-      const [a, b] = m.roll;
-      const live = game.partnerLive;
-      setMsg(
-        live && live.phase === 'answer'
-          ? `${opponent().name} is working out ${a} × ${b}…`
-          : live && live.rect
-            ? `${opponent().name} is placing a ${a} × ${b} rectangle…`
-            : `${opponent().name} rolled ${a} and ${b}…`
-      );
+      setMsg(Live.partnerLine(opponent().name, m.roll, game.partnerLive));
     } else if (newTurn || note) {
       renderDie(el.dieA, null);
       renderDie(el.dieB, null);
@@ -515,23 +456,14 @@ function finishPairGame(view) {
   updateMyGameButton();
   const me = m.players[c.me];
   const opp = m.players[1 - c.me];
-  const oppName = opp.isTeacher ? 'your teacher' : opp.name;
-  const Opp = oppName[0].toUpperCase() + oppName.slice(1);
-  el.resultTitle.textContent =
-    m.left === opp.id
-      ? `${Opp} left, so you win!`
-      : m.winner === me.id
-        ? `You beat ${oppName}! 🎉`
-        : m.winner === null
-          ? 'It’s a tie!'
-          : `${Opp} wins this time`;
-  const empty = Core.emptyCount(game.board);
-  el.resultSub.textContent = `${me.score} – ${opp.score} · ${empty === 0 ? 'the board is full' : `${empty} squares left empty`}`;
+  const result = Live.pairResult(view, c.me, Core.emptyCount(game.board));
+  el.resultTitle.textContent = result.title;
+  el.resultSub.textContent = result.sub;
   el.resultList.innerHTML = '';
   const top = Math.max(1, me.score, opp.score);
-  for (const [i, p] of [...m.players.entries()].sort((x, y) => y[1].score - x[1].score)) {
-    const li = make('li', i === c.me ? 'result-you' : '');
-    li.style.setProperty('--c', game.players[i].color);
+  for (const p of result.rows) {
+    const li = make('li', p.you ? 'result-you' : '');
+    li.style.setProperty('--c', game.players[p.index].color);
     const bar = make('span', 'result-bar');
     const fill = make('span');
     fill.style.width = `${(p.score / top) * 100}%`;
@@ -543,13 +475,12 @@ function finishPairGame(view) {
   if (c.session.teacher) el.rewards.append(make('p', 'setting-help', 'Thanks for playing! Teacher games don’t count towards stats.'));
   else if (view.type === 'tournament') {
     // each tournament game earns its points; the tournament's own rewards come at the end
-    Progress.addPoints(progress, me.score);
+    Live.tournamentGamePoints(progress, view, c.me);
     saveProgress();
     showRewards([]);
   } else renderPairRewards(view);
-  if (m.tiebreak) el.resultSub.textContent += m.tiebreak === 'coin' ? ' · a tie, settled by a coin flip' : ' · a tie, won on answers right first time';
   tournamentUpdate(view, true);
-  if (m.winner === me.id) celebrateWin();
+  if (result.won) celebrateWin();
   renderStats();
   setDetailsOpen(false);
   if (c.session.host && !hostOnGame) {
@@ -562,75 +493,20 @@ function finishPairGame(view) {
 
 function renderPairRewards(view) {
   const c = game.classroom;
-  const m = view.match;
-  const me = m.players[c.me];
-  const opp = m.players[1 - c.me];
-  const won = m.winner === me.id;
-  Progress.addPoints(progress, me.score);
-  progress.counters.pairGames = (progress.counters.pairGames || 0) + 1;
-  if (won) progress.counters.pairWins = (progress.counters.pairWins || 0) + 1;
-  Progress.noteActivity(progress, { kind: 'class', type: view.tournament ? 'tournament' : 'pairs', won });
   const p = game.players[c.me];
-  const asked = p.answered + p.stats.timeouts;
-  const earned = Progress.awardAchievements(progress, {
-    event: 'pair',
-    won,
-    tie: m.winner === null,
-    vsTeacher: opp.isTeacher,
-    vsCpu: opp.isCpu,
-    pairGames: progress.counters.pairGames,
-    pairWins: progress.counters.pairWins || 0,
-    perfect: asked >= 5 && p.firstTry === asked,
-  });
+  const { earned, entry } = Live.pairRewards(progress, view, c.me, p, { startedAt: game.startedAt, statsName: statsName(p) });
   grantStickers(earned); // they show up behind the Stickers button
   saveProgress();
-  const history = loadHistory();
-  history.push({
-    kind: 'class',
-    type: 'pairs',
-    at: Date.now(),
-    duration: Date.now() - game.startedAt,
-    code: view.code,
-    size: view.settings.size,
-    difficulty: view.settings.difficulty,
-    name: me.name,
-    statsName: statsName(p),
-    opponent: opp.isTeacher ? 'Teacher' : opp.name,
-    result: m.winner === null ? 'tie' : won ? 'win' : 'loss',
-    score: me.score,
-    opponentScore: opp.score,
-    answered: p.answered,
-    firstTry: p.firstTry,
-    timeouts: p.stats.timeouts,
-    times: p.stats.times.map(Math.round),
-    missed: p.stats.missed,
-  });
-  saveHistory(history);
+  saveHistory([...loadHistory(), entry]);
   showRewards(earned);
   el.rewards.append(make('p', 'setting-help', 'Stay on this screen: your teacher can start another game.'));
 }
 
 // ---- tournaments (students): where you stand between games, and the rewards at the end
 
-function tournamentLine(t) {
-  const record = `${t.wins}–${t.losses}`;
-  switch (t.status) {
-    case 'champion':
-      return `🏆 You won the tournament! (${record})`;
-    case 'finished':
-      return `${t.champion} won the tournament. You finished ${ordinal(t.place)} of ${t.of} (${record}).`;
-    case 'out':
-      return `You’re out of the tournament (${record}). Cheer on the others! 📣`;
-    case 'bye':
-      return 'You have a bye this round: you go straight through! 🎟️';
-    case 'playing':
-      return 'Your game is on!';
-    default:
-      return t.line ? `You’re number ${t.line} in line for the hill 👑 (${record})` : `Next round starting soon… (${record})`;
-  }
-}
+const tournamentLine = Live.tournamentLine;
 
-let tournamentRewarded = null; // `${code}:${game}` once its rewards are given
+const tournamentRewarded = new Set(); // `${code}:${game}` once its rewards are given
 
 // Every update: keep the line under your last result up to date, and give the
 // tournament's rewards once it's over.
@@ -642,44 +518,13 @@ function tournamentUpdate(view, sameGame) {
     el.resultTournament.hidden = false;
   }
   if (!el.classWait.hidden && !el.classJoin.hidden) el.classWaitText.textContent = tournamentLine(t);
-  const key = `${view.code}:${view.game}`;
-  if (view.state !== 'ended' || classSession.teacher || tournamentRewarded === key) return;
-  tournamentRewarded = key;
-  progress.counters.tournaments = (progress.counters.tournaments || 0) + 1;
-  if (t.status === 'champion') progress.counters.tournamentWins = (progress.counters.tournamentWins || 0) + 1;
-  celebrate(
-    Progress.awardAchievements(progress, {
-      event: 'tournament',
-      place: t.place,
-      of: t.of,
-      champion: t.status === 'champion',
-      undefeated: t.losses === 0 && t.wins > 0,
-      upsets: t.upsets,
-      bestStreak: t.bestStreak,
-      tournaments: progress.counters.tournaments,
-      titles: progress.counters.tournamentWins || 0,
-    })
-  );
+  if (classSession.teacher) return;
+  const done = Live.tournamentRewards(progress, view, classSession.name, tournamentRewarded);
+  if (!done) return;
+  celebrate(done.earned);
   saveProgress();
-  const history = loadHistory();
-  history.push({
-    kind: 'class',
-    type: 'tournament',
-    at: Date.now(),
-    duration: 0,
-    code: view.code,
-    size: view.settings.size,
-    difficulty: view.settings.difficulty,
-    format: view.settings.format,
-    name: classSession.name,
-    place: t.place,
-    of: t.of,
-    wins: t.wins,
-    losses: t.losses,
-    champion: t.champion,
-  });
-  saveHistory(history);
-  if (t.status === 'champion') celebrateWin();
+  saveHistory([...loadHistory(), done.entry]);
+  if (done.champion) celebrateWin();
 }
 
 function finishClassGame(view) {
@@ -695,26 +540,19 @@ function finishClassGame(view) {
   setMsg('');
   Object.assign(p, { score: you.score, squares: you.squares, bonus: you.bonus });
   render();
-  const alone = view.of < 2;
-  el.resultTitle.textContent = alone
-    ? 'Game over!'
-    : you.rank === 1
-      ? `${you.tied ? 'Tied for top' : 'Top'} of the class! 🏆`
-      : `You ${you.tied ? 'tied for' : 'came'} ${ordinal(you.rank)} of ${view.of}!`;
-  const asked = you.answered + you.timeouts;
-  el.resultSub.textContent = `${you.score} points · ${you.firstTry} of ${asked} right first time`;
+  const result = Live.classResult(view);
+  el.resultTitle.textContent = result.title;
+  el.resultSub.textContent = result.sub;
   el.resultList.innerHTML = '';
-  const rows = [...view.top];
-  if (!rows.some((r) => r.name === you.name)) rows.push({ gap: true }, { name: you.name, rank: you.rank, score: you.score });
-  const top = Math.max(1, ...rows.filter((r) => !r.gap).map((r) => r.score));
-  for (const r of rows) {
-    const li = make('li', r.gap ? 'result-gap' : r.name === you.name ? 'result-you' : '');
+  const top = Math.max(1, ...result.rows.filter((r) => !r.gap).map((r) => r.score));
+  for (const r of result.rows) {
+    const li = make('li', r.gap ? 'result-gap' : r.you ? 'result-you' : '');
     if (r.gap) {
       li.textContent = '⋯';
       el.resultList.append(li);
       continue;
     }
-    li.style.setProperty('--c', r.name === you.name ? p.color : 'var(--muted)');
+    li.style.setProperty('--c', r.you ? p.color : 'var(--muted)');
     const bar = make('span', 'result-bar');
     const fill = make('span');
     fill.style.width = `${(r.score / top) * 100}%`;
@@ -724,7 +562,7 @@ function finishClassGame(view) {
   }
   renderClassRewards(view);
   refreshNudges('results');
-  if (you.rank === 1 && !alone) celebrateWin();
+  if (result.celebrate) celebrateWin();
   renderStats();
   setDetailsOpen(false);
   el.gameOver.hidden = false;
@@ -732,51 +570,14 @@ function finishClassGame(view) {
 }
 
 function renderClassRewards(view) {
-  const you = view.you;
   const p = game.players[0];
   el.rewards.innerHTML = '';
-  Progress.addPoints(progress, you.score);
-  progress.counters.classGames = (progress.counters.classGames || 0) + 1;
-  Progress.noteActivity(progress, { kind: 'class', type: 'class', rank: you.rank });
-  const asked = you.answered + you.timeouts;
-  const earned = Progress.awardAchievements(progress, {
-    event: 'class',
-    classGames: progress.counters.classGames,
-    rank: you.rank,
-    of: view.of,
-    perfect: asked >= 5 && you.firstTry === asked,
-    missed: you.missed,
-    rolls: view.round,
-  });
+  const { earned, entry } = Live.classRewards(progress, view, p, { startedAt: game.startedAt, statsName: statsName(p) });
   grantStickers(earned); // they show up behind the Stickers button
   saveProgress();
-  recordClassGame(view, p);
+  saveHistory([...loadHistory(), entry]);
   showRewards(earned);
   el.rewards.append(make('p', 'setting-help', 'Stay on this screen: your teacher can start another game.'));
-}
-
-function recordClassGame(view, p) {
-  const you = view.you;
-  const history = loadHistory();
-  history.push({
-    kind: 'class',
-    at: Date.now(),
-    duration: Date.now() - game.startedAt,
-    code: view.code,
-    size: view.settings.size,
-    difficulty: view.settings.difficulty,
-    name: you.name,
-    statsName: statsName(p),
-    rank: you.rank,
-    of: view.of,
-    score: you.score,
-    answered: you.answered,
-    firstTry: you.firstTry,
-    timeouts: you.timeouts,
-    times: p.stats.times.map(Math.round),
-    missed: p.stats.missed,
-  });
-  saveHistory(history);
 }
 
 // ---- teacher

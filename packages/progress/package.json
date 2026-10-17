@@ -14,7 +14,8 @@
     "./setup": "./src/setup.js",
     "./practice": "./src/practice.js",
     "./wardrobe": "./src/wardrobe.js",
-    "./homework": "./src/homework.js"
+    "./homework": "./src/homework.js",
+    "./classroom": "./src/classroom.js"
   },
   "dependencies": {
     "@blockout/engine": "*"
