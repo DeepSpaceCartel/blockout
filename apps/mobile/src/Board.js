@@ -147,3 +147,29 @@ function CountingOverlay({ counting, cell, t }) {
   }
   return strips;
 }
+
+// The rectangle just drawn, on its own, for answering: a × b squares in the
+// player's colour, as big as fits (up to 56 px a square), with "Help me
+// count" lighting up its rows. counting: { byRows, group, shown }.
+export function RectPicture({ rect, color, counting, maxWidth, maxHeight }) {
+  const t = useTheme();
+  const cell = Math.max(8, Math.floor(Math.min(maxWidth / rect.w, maxHeight / rect.h, 56)));
+  const width = cell * rect.w;
+  const height = cell * rect.h;
+  const at = { ...rect, x: 0, y: 0 };
+  return (
+    <View style={[{ width, height, alignSelf: 'center' }, NO_SELECT]} accessibilityLabel={`Your rectangle: ${rect.w} squares across and ${rect.h} down`}>
+      <Svg width={width} height={height} pointerEvents="none">
+        <Rect x={0} y={0} width={width} height={height} fill={color} fillOpacity={0.55} />
+        {Array.from({ length: rect.w + 1 }, (_, i) => (
+          <Line key={`c${i}`} x1={i * cell} y1={0} x2={i * cell} y2={height} stroke={t.boardEdge} strokeOpacity={0.35} strokeWidth={1} />
+        ))}
+        {Array.from({ length: rect.h + 1 }, (_, i) => (
+          <Line key={`r${i}`} x1={0} y1={i * cell} x2={width} y2={i * cell} stroke={t.boardEdge} strokeOpacity={0.35} strokeWidth={1} />
+        ))}
+        {counting ? <CountingOverlay counting={{ ...counting, rect: at }} cell={cell} t={t} /> : null}
+        <Rect x={1.5} y={1.5} width={width - 3} height={height - 3} fill="none" stroke={t.boardEdge} strokeWidth={3} />
+      </Svg>
+    </View>
+  );
+}

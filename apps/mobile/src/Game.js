@@ -1,12 +1,19 @@
-// A game on the phone: the board, the dice, the keypad and the CPU's
-// explanations, played turn by turn with @blockout/engine/match. The screen
-// animates between the match's steps; a game left half-way just stops (every
-// wait checks it's still the same game).
+// A game on the phone, played turn by turn with @blockout/engine/match. Each
+// turn moves through three screens, sized to the phone so nothing scrolls:
+//
+//   roll    big dice and a Roll button; then "Draw it ›" (or on by itself)
+//   board   the board, as big as it fits: drawing the rectangle, the CPU's
+//           turn and its explanation, and the results
+//   answer  the rectangle just drawn on its own, the question and the keypad;
+//           "Help me count" lights up its rows
+//
+// The screen animates between the match's steps; a game left half-way just
+// stops (every wait checks it's still the same game).
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Match from '@blockout/engine/match';
 import * as Progress from '@blockout/progress';
-import Board from './Board';
+import Board, { RectPicture } from './Board';
 import { dragRect, drawnMessage } from './boardMath';
 import * as Rewards from './rewards';
 import { PLAYER_COLORS, useTheme } from './theme';
@@ -20,6 +27,7 @@ const CPU_STEP_MS = 1000 * pace; // the web game's "normal" CPU speed
 const COUNT_STEP_MS = 850 * pace; // between skip-counting steps when helping
 const PASS_MS = 1600 * pace;
 const SCORED_MS = 1400 * pace;
+const DRAW_IT_MS = 2500 * pace; // after a roll, on to the board by itself
 const TRY_AGAIN = ['Not quite — try again!', 'Almost! Have another go.', 'Hmm, not that one. Try again!'];
 const BONUS_ICONS = { first: '✨', speedy: '⚡', streak: '🔥', timer: '⏱️' };
 const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -28,23 +36,23 @@ const article = (n) => (/^(8|11|18)$/.test(String(n)) || /^8\d$/.test(String(n))
 
 // setup: { mode, difficulty, size, players }; progress: the save (changed in
 // place); onSave() after every change to it; toast(title, text) for bonuses
-// and achievements; onExit() back to the menu.
+// and achievements; onExit() back to the menu; onAgain() a new game.
 export default function Game({ setup, progress, onSave, toast, onExit, onAgain }) {
   const t = useTheme();
-  const { width } = useWindowDimensions();
   const [, setTick] = useState(0);
   const redraw = () => setTick((n) => n + 1);
   const alive = useRef(true);
   const m = useRef(null);
-  if (!m.current) {
-    m.current = Match.createMatch({ ...setup, answerBonus: Progress.answerBonus });
-  }
+  if (!m.current) m.current = Match.createMatch({ ...setup, answerBonus: Progress.answerBonus });
   const match = m.current;
   if (testing) window.BlockoutMobile = { match, Match };
 
+  const [area, setArea] = useState(null); // { width, height } below the header
+  const [view, setView] = useState('roll'); // 'roll' | 'board' | 'answer'
   const [msg, setMsg] = useState('');
   const [oops, setOops] = useState(false);
   const [dice, setDice] = useState([null, null]);
+  const [rolled, setRolled] = useState(false); // the roll is in: "Draw it ›"
   const [drag, setDrag] = useState(null);
   const [preview, setPreview] = useState(null);
   const [hide, setHide] = useState(null);
@@ -53,9 +61,10 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
   const [entry, setEntry] = useState('');
   const [feedback, setFeedback] = useState(null); // { text, kind: 'good' | 'try' | 'help' }
   const [busy, setBusy] = useState(false);
-  const [over, setOver] = useState(null); // { results, rewards }
+  const [over, setOver] = useState(null); // { results }
   const answerStart = useRef(0);
   const pausedMs = useRef(0);
+  const turnId = useRef(0); // (so a late "on by itself" doesn't skip a turn)
 
   useEffect(() => () => (alive.current = false), []);
   // Resolves after ms, or never once the game is left
@@ -63,7 +72,6 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
 
   const who = (p) => (match.mode === 'single' && !p.cpu ? 'You' : p.name);
   const mine = () => !Match.currentPlayer(match).cpu;
-
   const award = (earned) => {
     for (const a of earned) toast(`${a.icon} ${a.name}`, `Achievement! +${a.reward} points`);
   };
@@ -72,14 +80,17 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
 
   async function rollAnimation() {
     const face = (list) => list[Math.floor(Math.random() * list.length)];
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 10; i++) {
       setDice([face(match.faces.a), face(match.faces.b)]);
-      await wait(55);
+      await wait(60 * Math.max(pace, 0.5));
     }
   }
 
   function startTurn() {
+    turnId.current++;
+    setView('roll');
     setDice([null, null]);
+    setRolled(false);
     setSteps([]);
     setFeedback(null);
     setEntry('');
@@ -91,7 +102,7 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
     redraw();
   }
 
-  async function nextTurn() {
+  function nextTurn() {
     const results = Match.endTurn(match);
     if (results) return finish(results);
     startTurn();
@@ -100,6 +111,7 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
   async function humanRoll() {
     if (match.phase !== 'roll' || busy) return;
     setBusy(true);
+    setMsg('');
     await rollAnimation();
     const [a, b] = Match.roll(match);
     setDice([a, b]);
@@ -111,9 +123,20 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
       Match.pass(match);
       return nextTurn();
     }
+    setMsg(`You rolled ${a} and ${b}!`);
+    setRolled(true);
+    const turn = turnId.current;
+    wait(DRAW_IT_MS).then(() => turn === turnId.current && match.phase === 'place' && toBoard());
+  }
+
+  // From the roll to drawing it
+  function toBoard() {
+    if (match.phase !== 'place') return;
+    const [a, b] = match.dice;
     const corner = Match.mustUseCorner(match);
-    setMsg(`You rolled ${a} and ${b}. Draw a ${a} by ${b} rectangle: ${corner ? 'start on the top-left square and drag.' : 'press on a square and drag.'}`);
-    redraw();
+    setRolled(false);
+    setMsg(`Draw a ${a} by ${b} rectangle: ${corner ? 'start on the top-left square and drag.' : 'press on a square and drag.'}`);
+    setView('board');
   }
 
   function onDrag(d) {
@@ -131,12 +154,11 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
       return;
     }
     setOops(false);
-    setMsg('How many squares did you just draw?');
     setEntry('');
     setFeedback(null);
     answerStart.current = Date.now();
     pausedMs.current = 0;
-    redraw();
+    setView('answer');
   }
 
   // ---- answering
@@ -165,6 +187,7 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
       redraw();
       await wait(SCORED_MS);
       setBusy(false);
+      setCounting(null);
       return nextTurn();
     }
     setEntry('');
@@ -190,16 +213,15 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
     setBusy(true);
     for (let i = 1; i <= plan.steps; i++) {
       setFeedback({ kind: 'help', text: `${intro ? `${intro} ` : ''}${plan.steps} ${units} of ${plan.group}: ${plan.totals.slice(0, i).join(', ')}` });
-      setCounting({ rect, byRows: plan.byRows, group: plan.group, shown: i });
+      setCounting({ byRows: plan.byRows, group: plan.group, shown: i });
       await wait(COUNT_STEP_MS);
     }
-    setCounting(null);
     pausedMs.current += Date.now() - started; // counting doesn't count against them
     setFeedback({ kind: 'help', text: `${plan.totals.join(', ')}. So what is ${rect.a} × ${rect.b}?` });
     setBusy(false);
   }
 
-  // ---- the CPU's turn: roll, draw it growing, explain the counting
+  // ---- the CPU's turn: roll, then on the board: draw it growing, explain the counting
 
   async function runCpu() {
     const p = Match.currentPlayer(match);
@@ -216,12 +238,12 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
       await wait(PASS_MS);
       return nextTurn();
     }
-    setMsg('');
+    setMsg(`${p.name} rolled ${a} and ${b}.`);
     setHide(rect);
-    const lines = [`I rolled ${article(a)} ${a} and ${article(b)} ${b}.`];
-    setSteps([...lines]);
-    await wait(CPU_STEP_MS);
-    lines.push(`I'll draw it ${firstOnBoard ? 'in a corner' : 'snug against the others'}: ${rect.w} across and ${rect.h} down.`);
+    await wait(CPU_STEP_MS * 1.2);
+    setMsg('');
+    setView('board');
+    const lines = [`I rolled ${article(a)} ${a} and ${article(b)} ${b}. I'll draw it ${firstOnBoard ? 'in a corner' : 'snug against the others'}: ${rect.w} across and ${rect.h} down.`];
     setSteps([...lines]);
     for (let w = 1; w <= rect.w; w++) {
       setPreview({ ...rect, w, h: 1 });
@@ -233,9 +255,6 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
     }
     setPreview(null);
     setHide(null);
-    lines.push(`${a} × ${b}: how many squares is that?`);
-    setSteps([...lines]);
-    await wait(CPU_STEP_MS);
     const split = Match.legendSplit(rect, match.difficulty);
     if (split) {
       const s = split.split;
@@ -248,13 +267,13 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
       await wait(CPU_STEP_MS);
     } else {
       const plan = Match.countPlan(rect);
-      lines.push(`That's ${plan.steps} ${plan.unit}s of ${plan.group}. Let's count by ${plan.group}s:`);
+      const intro = `That's ${plan.steps} ${plan.unit}s of ${plan.group}. Let's count by ${plan.group}s:`;
       for (let i = 1; i <= plan.steps; i++) {
-        setSteps([...lines, plan.totals.slice(0, i).join(', ')]);
+        setSteps([...lines, `${intro} ${plan.totals.slice(0, i).join(', ')}`]);
         setCounting({ rect, byRows: plan.byRows, group: plan.group, shown: i });
         await wait(CPU_STEP_MS);
       }
-      lines.push(plan.totals.join(', '));
+      lines.push(`${intro} ${plan.totals.join(', ')}`);
       setCounting(null);
     }
     lines.push(`${a} × ${b} = ${rect.area}`);
@@ -271,7 +290,8 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
     if (rewards.boardBonus) toast(`🏁 Finished ${article(match.size)} ${match.size}×${match.size} game!`, `+${rewards.boardBonus} bonus points`);
     award(rewards.earned);
     onSave();
-    setOver({ results, rewards });
+    setOver({ results });
+    setView('board');
     redraw();
   }
 
@@ -279,84 +299,127 @@ export default function Game({ setup, progress, onSave, toast, onExit, onAgain }
     startTurn(); // (once, for the match this screen was made with)
   }, []);
 
-  // ---- the screen
+  // ---- the screens
 
-  const boardWidth = Math.min(width - 32, 560);
-  const phase = match.phase;
-  const pending = match.pending;
+  const side = (reserve) => (area ? Math.max(120, Math.min(area.width - 32, area.height - reserve, 620)) : 0);
+  const current = match.current;
 
   return (
-    <ScrollView style={{ backgroundColor: t.bg }} contentContainerStyle={styles.page} scrollEnabled={phase !== 'place'}>
-      <View style={styles.scores}>
-        {match.players.map((p, i) => (
-          <View key={i} style={[styles.score, { borderColor: i === match.current && !over ? PLAYER_COLORS[i] : t.line, backgroundColor: t.surface }]}>
-            <View style={[styles.swatch, { backgroundColor: PLAYER_COLORS[i] }]} />
-            <Text style={[styles.scoreName, { color: t.ink }]} numberOfLines={1}>
-              {who(p)}
-            </Text>
-            <Text style={[styles.scorePts, { color: t.ink }]}>{p.score}</Text>
-          </View>
-        ))}
-      </View>
-
-      <Board
-        match={match}
-        width={boardWidth}
-        drag={drag}
-        preview={preview}
-        hide={hide}
-        counting={counting}
-        canDraw={phase === 'place' && mine()}
-        onDrag={onDrag}
-        onDraw={onDraw}
-      />
-
-      {over ? (
-        <Results over={over} match={match} who={who} onAgain={onAgain} onExit={onExit} />
-      ) : (
-        <View style={styles.panel}>
-          <View style={styles.diceRow}>
-            <Die value={dice[0]} />
-            <Text style={[styles.times, { color: t.muted }]}>×</Text>
-            <Die value={dice[1]} />
-          </View>
-          {msg ? (
-            <Text testID="turn-msg" style={[styles.msg, { color: oops ? t.bad : t.ink }]}>
-              {msg}
-            </Text>
-          ) : null}
-          {steps.length ? (
-            <View style={[styles.steps, { backgroundColor: t.surface, borderColor: t.line }]}>
-              {steps.map((s, i) => (
-                <Text key={i} style={[styles.step, { color: t.ink }, i === steps.length - 1 && /=/.test(s) ? styles.stepBig : null]}>
-                  {s}
-                </Text>
-              ))}
+    <View style={[styles.fill, { backgroundColor: t.bg }]}>
+      <Header match={match} who={who} over={over} dice={view === 'roll' ? null : match.dice || dice} onExit={onExit} />
+      <View style={styles.fill} onLayout={(e) => setArea(e.nativeEvent.layout)}>
+        {!area ? null : view === 'roll' ? (
+          <View style={styles.rollScreen}>
+            <View style={styles.bigDice}>
+              <Die value={dice[0]} size={Math.min(130, area.width * 0.32)} />
+              <Text style={[styles.bigTimes, { color: t.muted }]}>×</Text>
+              <Die value={dice[1]} size={Math.min(130, area.width * 0.32)} />
             </View>
-          ) : null}
-          {phase === 'roll' && mine() ? <Button testID="roll" title="Roll the dice" onPress={humanRoll} disabled={busy} /> : null}
-          {phase === 'answer' && pending ? (
-            <View style={styles.answer}>
-              <Text style={[styles.question, { color: t.ink }]}>
-                {pending.rect.a} × {pending.rect.b} =
-              </Text>
-              <View testID="answer-box" style={[styles.answerBox, { borderColor: feedback && feedback.kind === 'good' ? t.good : t.edge, backgroundColor: t.surface }]}>
-                <Text style={[styles.answerText, { color: t.ink }]}>{entry || ' '}</Text>
+            <Text testID="turn-msg" style={[styles.rollMsg, { color: t.ink }]}>
+              {msg || ' '}
+            </Text>
+            {match.phase === 'roll' && mine() ? <Button testID="roll" title="Roll the dice" onPress={humanRoll} disabled={busy} style={styles.wide} /> : null}
+            {rolled ? <Button testID="draw-it" title="Draw it ›" onPress={toBoard} style={styles.wide} /> : null}
+          </View>
+        ) : view === 'board' ? (
+          <View style={styles.boardScreen}>
+            <Board
+              match={match}
+              width={side(over ? 300 : steps.length ? 150 : 90)}
+              drag={drag}
+              preview={preview}
+              hide={hide}
+              counting={counting}
+              canDraw={match.phase === 'place' && mine()}
+              onDrag={onDrag}
+              onDraw={onDraw}
+            />
+            {over ? (
+              <Results over={over} match={match} who={who} onAgain={onAgain} onExit={onExit} />
+            ) : steps.length ? (
+              <View style={[styles.steps, { backgroundColor: t.surface, borderColor: t.line }]}>
+                {steps.slice(-3).map((s, i, shown) => (
+                  <Text key={i} style={[styles.step, { color: t.ink }, i === shown.length - 1 && /^\d+ × \d+ = \d+$/.test(s) ? styles.stepBig : null]}>
+                    {s}
+                  </Text>
+                ))}
               </View>
-              {feedback ? (
-                <Text testID="feedback" style={[styles.feedback, { color: feedback.kind === 'good' ? t.goodInk : feedback.kind === 'try' ? t.bad : t.ink }]}>
-                  {feedback.text}
-                </Text>
-              ) : null}
-              <Keypad onKey={onKey} disabled={busy} />
-              {!match.expert && !pending.helped ? <Button kind="secondary" title="Help me count" onPress={() => helpCount()} disabled={busy} style={styles.help} /> : null}
-            </View>
-          ) : null}
-          {phase === 'scored' && feedback ? <Text style={[styles.feedback, { color: t.goodInk }]}>{feedback.text}</Text> : null}
-          <Button kind="secondary" title="Main menu" onPress={onExit} style={styles.menu} />
+            ) : (
+              <Text testID="turn-msg" style={[styles.msg, { color: oops ? t.bad : t.ink }]}>
+                {msg}
+              </Text>
+            )}
+          </View>
+        ) : (
+          <AnswerScreen
+            area={area}
+            rect={match.pending ? match.pending.rect : match.lastRect}
+            color={PLAYER_COLORS[current % PLAYER_COLORS.length]}
+            counting={counting}
+            entry={entry}
+            feedback={feedback}
+            busy={busy}
+            canHelp={Boolean(match.pending && !match.pending.helped && !match.expert)}
+            onKey={onKey}
+            onHelp={() => helpCount()}
+          />
+        )}
+      </View>
+    </View>
+  );
+}
+
+// Scores, the roll once it's in, and ✕ back to the menu
+function Header({ match, who, over, dice, onExit }) {
+  const t = useTheme();
+  return (
+    <View style={styles.header}>
+      <Pressable onPress={onExit} accessibilityRole="button" accessibilityLabel="Main menu" hitSlop={10} style={[styles.close, { borderColor: t.line, backgroundColor: t.surface }]}>
+        <Text style={[styles.closeText, { color: t.ink }]}>✕</Text>
+      </Pressable>
+      {match.players.map((p, i) => (
+        <View key={i} style={[styles.score, { borderColor: i === match.current && !over ? PLAYER_COLORS[i] : t.line, backgroundColor: t.surface }]}>
+          <View style={[styles.swatch, { backgroundColor: PLAYER_COLORS[i] }]} />
+          <Text style={[styles.scoreName, { color: t.ink }]} numberOfLines={1}>
+            {who(p)}
+          </Text>
+          <Text style={[styles.scorePts, { color: t.ink }]}>{p.score}</Text>
         </View>
-      )}
-    </ScrollView>
+      ))}
+      {dice && dice[0] && !over ? (
+        <View style={[styles.rollChip, { backgroundColor: t.ink }]}>
+          <Text style={[styles.rollChipText, { color: t.bg }]}>
+            {dice[0]} × {dice[1]}
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+// The rectangle just drawn, the question and the keypad
+function AnswerScreen({ area, rect, color, counting, entry, feedback, busy, canHelp, onKey, onHelp }) {
+  const t = useTheme();
+  if (!rect) return null;
+  const KEYPAD = 4 * 64 + 3 * 8; // (four rows of keys)
+  const below = 72 + 56 + KEYPAD + (canHelp ? 64 : 0) + 24; // question, feedback, keypad, help
+  return (
+    <View style={styles.answerScreen}>
+      <RectPicture rect={rect} color={color} counting={counting} maxWidth={area.width - 32} maxHeight={Math.max(60, area.height - below)} />
+      <View style={styles.questionRow}>
+        <Text style={[styles.question, { color: t.ink }]}>
+          {rect.a} × {rect.b} =
+        </Text>
+        <View testID="answer-box" style={[styles.answerBox, { borderColor: feedback && feedback.kind === 'good' ? t.good : t.edge, backgroundColor: t.surface }]}>
+          <Text style={[styles.answerText, { color: t.ink }]}>{entry || ' '}</Text>
+        </View>
+      </View>
+      <Text testID="feedback" numberOfLines={2} style={[styles.feedback, { color: !feedback ? t.muted : feedback.kind === 'good' ? t.goodInk : feedback.kind === 'try' ? t.bad : t.ink }]}>
+        {feedback ? feedback.text : 'How many squares did you just draw?'}
+      </Text>
+      <Keypad onKey={onKey} disabled={busy} />
+      {canHelp ? <Button kind="secondary" title="Help me count" onPress={onHelp} disabled={busy} /> : null}
+    </View>
   );
 }
 
@@ -372,8 +435,10 @@ function Results({ over, match, who, onAgain, onExit }) {
       <Text style={[styles.resultSub, { color: t.muted }]}>{results.empty === 0 ? 'The board is completely full!' : `Nobody could fit a rectangle. ${results.empty} squares left empty.`}</Text>
       {results.ranked.map((p) => (
         <View key={p.index} style={styles.resultRow}>
-          <Text style={[styles.resultName, { color: t.ink }]}>{who(p)}</Text>
-          <Text style={[styles.resultPts, { color: t.ink }]}>{p.score} pts</Text>
+          <View style={styles.resultLine}>
+            <Text style={[styles.resultName, { color: t.ink }]}>{who(p)}</Text>
+            <Text style={[styles.resultName, { color: t.ink }]}>{p.score} pts</Text>
+          </View>
           <View style={[styles.bar, { backgroundColor: t.soft }]}>
             <View style={{ width: `${top ? (p.score / top) * 100 : 0}%`, height: '100%', backgroundColor: PLAYER_COLORS[p.index], borderRadius: 6 }} />
           </View>
@@ -389,33 +454,39 @@ function Results({ over, match, who, onAgain, onExit }) {
 }
 
 const styles = StyleSheet.create({
-  page: { padding: 16, gap: 14, paddingBottom: 40 },
-  scores: { flexDirection: 'row', gap: 8 },
-  score: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderRadius: 12, borderWidth: 3 },
-  swatch: { width: 14, height: 14, borderRadius: 7 },
-  scoreName: { flex: 1, fontSize: 16, fontWeight: '600' },
-  scorePts: { fontSize: 20, fontWeight: '800' },
-  panel: { gap: 12 },
-  diceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
-  times: { fontSize: 28, fontWeight: '700' },
-  msg: { fontSize: 18, textAlign: 'center', lineHeight: 24 },
-  steps: { padding: 12, borderRadius: 12, borderWidth: 2, gap: 6 },
-  step: { fontSize: 17, lineHeight: 23 },
-  stepBig: { fontSize: 22, fontWeight: '800' },
-  answer: { gap: 10, alignItems: 'stretch' },
-  question: { fontSize: 32, fontWeight: '800', textAlign: 'center' },
-  answerBox: { alignSelf: 'center', minWidth: 120, borderWidth: 3, borderRadius: 12, paddingVertical: 6, alignItems: 'center' },
-  answerText: { fontSize: 32, fontWeight: '800' },
-  feedback: { fontSize: 18, textAlign: 'center', fontWeight: '600', lineHeight: 24 },
-  help: { marginTop: 4 },
-  menu: { marginTop: 8 },
-  results: { padding: 16, borderRadius: 16, borderWidth: 2, gap: 10 },
-  resultTitle: { fontSize: 28, fontWeight: '800', textAlign: 'center' },
-  resultSub: { fontSize: 16, textAlign: 'center' },
-  resultRow: { gap: 4 },
-  resultName: { fontSize: 18, fontWeight: '700' },
-  resultPts: { position: 'absolute', right: 0, top: 0, fontSize: 18, fontWeight: '700' },
-  bar: { height: 12, borderRadius: 6, overflow: 'hidden' },
-  resultActions: { flexDirection: 'row', gap: 10, marginTop: 6 },
+  fill: { flex: 1 },
   flex: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
+  close: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  closeText: { fontSize: 18, fontWeight: '800' },
+  score: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 12, borderWidth: 3 },
+  swatch: { width: 12, height: 12, borderRadius: 6 },
+  scoreName: { flex: 1, fontSize: 15, fontWeight: '600' },
+  scorePts: { fontSize: 18, fontWeight: '800' },
+  rollChip: { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 10 },
+  rollChipText: { fontSize: 16, fontWeight: '800' },
+  rollScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 28, padding: 24 },
+  bigDice: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  bigTimes: { fontSize: 40, fontWeight: '800' },
+  rollMsg: { fontSize: 24, fontWeight: '700', textAlign: 'center', lineHeight: 32 },
+  wide: { alignSelf: 'stretch' },
+  boardScreen: { flex: 1, alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 4 },
+  msg: { fontSize: 18, textAlign: 'center', lineHeight: 24 },
+  steps: { alignSelf: 'stretch', padding: 12, borderRadius: 12, borderWidth: 2, gap: 4 },
+  step: { fontSize: 16, lineHeight: 22 },
+  stepBig: { fontSize: 22, fontWeight: '800' },
+  answerScreen: { flex: 1, justifyContent: 'flex-end', gap: 10, paddingHorizontal: 16, paddingBottom: 16 },
+  questionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
+  question: { fontSize: 34, fontWeight: '800' },
+  answerBox: { minWidth: 110, borderWidth: 3, borderRadius: 12, paddingVertical: 4, alignItems: 'center' },
+  answerText: { fontSize: 34, fontWeight: '800' },
+  feedback: { fontSize: 17, textAlign: 'center', fontWeight: '600', lineHeight: 23, minHeight: 46 },
+  results: { alignSelf: 'stretch', padding: 14, borderRadius: 16, borderWidth: 2, gap: 8 },
+  resultTitle: { fontSize: 26, fontWeight: '800', textAlign: 'center' },
+  resultSub: { fontSize: 15, textAlign: 'center' },
+  resultRow: { gap: 4 },
+  resultLine: { flexDirection: 'row', justifyContent: 'space-between' },
+  resultName: { fontSize: 17, fontWeight: '700' },
+  bar: { height: 10, borderRadius: 5, overflow: 'hidden' },
+  resultActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
 });

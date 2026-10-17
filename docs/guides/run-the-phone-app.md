@@ -56,6 +56,8 @@ The same code runs in a browser through `react-native-web`, so Playwright can pl
 cd apps/mobile && npx expo export --platform web --output-dir /tmp/mobile-web
 ```
 
+Check both a big and a small phone: 390 × 844 and 375 × 667 (iPhone SE). Nothing on the answer screen may fall below the bottom edge.
+
 In the web build only, `window.BLOCKOUT_FAST = true` (set before the page loads) makes every wait 20 times shorter. `window.BlockoutMobile` holds the running `match` and the `Match` functions, so a test can find where a rectangle fits and then draw it with the mouse.
 
 ## How it's built
@@ -63,7 +65,7 @@ In the web build only, `window.BLOCKOUT_FAST = true` (set before the page loads)
 | File | What |
 |---|---|
 | `src/App.js` | The menu or the game, the save, signing in, and the bonus and achievement banners |
-| `src/Game.js` | A game: turns from `@blockout/engine/match`, animated (the CPU's rectangle grows, skip-counting lights up the rows) |
+| `src/Game.js` | A game: turns from `@blockout/engine/match`, on three screens sized to the phone (nothing scrolls). **Roll:** big dice, then "Draw it ›", which also moves on by itself after a moment. **Board:** drawing, the CPU's turn (its rectangle grows, it explains the counting) and the results. **Answer:** the rectangle just drawn on its own, the question and the keypad; "Help me count" lights up its rows |
 | `src/Board.js` | The board in SVG (`react-native-svg`); a drag (`PanResponder`) draws a rectangle |
 | `src/account.js` | Signing in (`expo-auth-session`), tokens in `expo-secure-store`, the API, saving and syncing |
 | `src/sync.js`, `src/rewards.js`, `src/boardMath.js` | The parts with no React Native in them, tested with `node --test` |
