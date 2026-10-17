@@ -11,6 +11,7 @@ import { icon, openSettings, selectIn, setLockBadge } from './wardrobe.js';
 import { FACT_STATUS, answerDecided, cancelContinue, gameId, make, renderFactGrid, renderFactLegend, setGame, setGameId, showStreak, stopTimer, waitInGame } from './play.js';
 import { recordPracticeRound } from './stats.js';
 import { confirmUnlock, refreshNudges } from './shop.js';
+import { completeDaily } from './daily.js';
 
 let practiceTables;
 
@@ -122,13 +123,14 @@ function renderPracticeCount() {
 // Times tables are unlocked one by one (×1, then ×2, …)
 const tableUnlocked = (n) => Practice.tableOpen(progress, n);
 
-function startPractice(name, count, tables = [], expert = false, timer = 0) {
+// difficulty: whose dice the questions come from (today's practice may pick one)
+function startPractice(name, count, tables = [], expert = false, timer = 0, difficulty = settings.difficulty) {
   stopPracticeTimer();
   cancelContinue();
   stopTimer();
   setGameId(gameId + 1); // cancels anything still waiting from a game
   setGame(null);
-  practice = Practice.createRound(progress, { name, difficulty: settings.difficulty, count, tables, level: expert ? 'expert' : 'learn', timer });
+  practice = Practice.createRound(progress, { name, difficulty, count, tables, level: expert ? 'expert' : 'learn', timer });
   practice.earned = [];
   el.startScreen.hidden = true;
   el.gameScreen.hidden = true;
@@ -324,6 +326,7 @@ function finishPractice() {
   if (end.finishToast) toast(...end.finishToast);
   recordPracticeRound(end.record);
   pr.earned.push(...celebrate(end.earned));
+  pr.earned.push(...completeDaily({ kind: 'practice', tables: pr.tables, count: pr.count })); // (today's practice?)
   saveProgress();
   el.pdSub.textContent = end.sub;
 
@@ -419,7 +422,7 @@ export function run() {
 
   el.prHelp.addEventListener('click', practiceHelp);
 
-  el.pdAgain.addEventListener('click', () => startPractice(practice.name, practice.count, practice.tables, practice.expert, practice.timer));
+  el.pdAgain.addEventListener('click', () => startPractice(practice.name, practice.count, practice.tables, practice.expert, practice.timer, practice.difficulty));
 
   el.pdMenu.addEventListener('click', leavePractice);
 

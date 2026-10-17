@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Today's practice: one small task a day on the menu, picked from the player's own Times Table (facts that need practice, the next table to master, a taste of the next table, or a game that stretches a little), worth 30 points and 10 more for each day in a row. In the web game and the phone app, for guests too.
 - Blockout for phones and tablets (`apps/mobile`): a React Native app, built with Expo, that runs in Expo Go. You against the CPU or two players on one phone, Easy to Hard, drawing by dragging, a keypad, "Help me count", points and achievements, and signing in with Google, with the save synced with the web game.
 - The Wardrobe in the phone app (menu › Looks): every look from the web game, worn in its games and practice, from dice, keypads and boards to the CPU's character and the win celebration.
 - Accounts in the phone app: homework (with Play ›), joining a class with its code, a code for a grown-up with its QR code, using a teacher's or a grown-up's code, and deleting a teacher's or grown-up's account.

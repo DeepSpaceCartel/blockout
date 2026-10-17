@@ -12,6 +12,7 @@ import { run as invites } from './invites.js';
 import { run as classroom } from './classroom.js';
 import { run as cheats } from './cheats.js';
 import { run as checkin } from './checkin.js';
+import { run as daily } from './daily.js';
 import { run as input } from './input.js';
 import { run as render } from './render.js';
 
@@ -27,5 +28,6 @@ invites();
 classroom();
 cheats();
 checkin();
+daily();
 input();
 render();

@@ -10,6 +10,7 @@ import * as Views from '@blockout/progress/views';
 import * as Settings from '@blockout/progress/settings';
 import * as Wardrobe from '@blockout/progress/wardrobe';
 import * as Homework from '@blockout/progress/homework';
+import * as Daily from '@blockout/progress/daily';
 import * as Account from './account';
 import Game from './Game';
 import Home from './Home';
@@ -115,6 +116,7 @@ function Main({ onTheme }) {
         for (const drop of Views.grantStickers(save, visit.earned)) toasts.show(...drop.toast);
         Account.saveProgress(save);
       }
+      Daily.today(save); // (a new day: today's practice)
       setProgress(save);
       try {
         setChoice({ ...DEFAULT_CHOICE, ...JSON.parse(await AsyncStorage.getItem(CHOICE_KEY)) });
@@ -296,6 +298,16 @@ function Main({ onTheme }) {
     toasts.show('👋 Account deleted', 'Everything in it is gone.');
   }
 
+  // Today's practice: its round straight away (a taste of the next table
+  // too, though it's still locked), or the menu set up for its game
+  function playDaily() {
+    const p = Daily.playFor(Daily.today(progress).task);
+    if (p.practice) return setGame({ key: Date.now(), practice: p.practice });
+    const next = { ...choice, ...p.game };
+    choose(next);
+    play(next);
+  }
+
   // Homework's Play ›: set the menu up for it, then start
   function playHomework(goal) {
     const c = Homework.homeworkChoice(progress, goal);
@@ -392,6 +404,7 @@ function Main({ onTheme }) {
           choice={choice}
           onChoose={choose}
           onPlay={() => play()}
+          onDaily={playDaily}
           onClass={(code) => setInClass({ code })}
           liveClasses={liveClasses}
           onSignIn={signIn}

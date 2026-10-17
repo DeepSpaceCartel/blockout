@@ -5,6 +5,7 @@ import * as Progress from '@blockout/progress';
 import * as Shop from '@blockout/progress/shop';
 import * as Setup from '@blockout/progress/setup';
 import * as Practice from '@blockout/progress/practice';
+import * as Daily from '@blockout/progress/daily';
 import { BOARDS, DIFFICULTIES, PLAYER_COUNTS, boardOpen, difficultyOpen, itemFor, modeOpen, playersOpen } from './rewards';
 import { useTheme } from './theme';
 import { ROLE } from './AccountScreen';
@@ -21,7 +22,7 @@ const LEVELS = [
 ];
 
 // onLocked(itemId): a locked choice was tapped (offer it); onShop(): open the Shop
-export default function Home({ progress, user, choice, onChoose, onPlay, onClass, liveClasses = [], onSignIn, onAccount, onHomework, onClasses, onKids, onAdmin, homeworkCount = 0, signingIn, accountError, onLocked, onShop, onWardrobe, onAchievements, onStats, onStickers, onSettings }) {
+export default function Home({ progress, user, choice, onChoose, onPlay, onDaily, onClass, liveClasses = [], onSignIn, onAccount, onHomework, onClasses, onKids, onAdmin, homeworkCount = 0, signingIn, accountError, onLocked, onShop, onWardrobe, onAchievements, onStats, onStickers, onSettings }) {
   const t = useTheme();
   const newUnlocks = Shop.affordableCount(progress);
   const stickerNews = Shop.newStickers(progress) + Shop.spareStickers(progress);
@@ -87,6 +88,8 @@ export default function Home({ progress, user, choice, onChoose, onPlay, onClass
           <MenuButton testID="achievements" label="🏆 Awards" onPress={onAchievements} />
           <MenuButton testID="stickers" label="🎁 Stickers" badge={stickerNews} onPress={onStickers} />
         </View>
+
+        <DailyCard daily={Daily.card(progress)} onPlay={onDaily} />
 
         <Section title="Play">
           <Segments items={MODES.map((x) => ({ id: x.id, label: x.label, open: modeOpen(progress, x.id) }))} value={choice.mode} onPick={(mode) => onChoose({ mode })} onLocked={(mode) => onLocked(itemFor.mode(mode))} />
@@ -287,7 +290,26 @@ function MenuButton({ label, badge = 0, onPress, testID }) {
   );
 }
 
-function SmallButton({ title, onPress, disabled, testID, badge = 0 }) {
+// Today's practice, in one line (the menu has to fit a small phone): what
+// it is, its reward or streak, and Play ›
+function DailyCard({ daily, onPlay }) {
+  const t = useTheme();
+  return (
+    <View
+      testID="daily"
+      accessibilityLabel={`${daily.title} ${daily.text}. ${daily.done ? daily.streak : `${daily.why} ${daily.reward} points`}`}
+      style={[styles.daily, { backgroundColor: daily.done ? t.surface : t.goldBg, borderColor: daily.done ? t.line : t.gold }]}
+    >
+      <Text testID="daily-text" style={[styles.dailyTask, { color: t.ink }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+        {daily.done ? `${daily.title}${daily.streak ? ` ${daily.streak}` : ''}` : `⭐ ${daily.short}`}
+        {daily.reward ? <Text style={{ color: t.goldInk }}> · {daily.reward}</Text> : null}
+      </Text>
+      {daily.done ? null : <SmallButton testID="daily-play" title="Play ›" onPress={onPlay} slim />}
+    </View>
+  );
+}
+
+function SmallButton({ title, onPress, disabled, testID, badge = 0, slim = false }) {
   const t = useTheme();
   return (
     <Pressable
@@ -295,7 +317,7 @@ function SmallButton({ title, onPress, disabled, testID, badge = 0 }) {
       accessibilityRole="button"
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [styles.small, { backgroundColor: t.soft, borderColor: t.line, opacity: disabled ? 0.5 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] }]}
+      style={({ pressed }) => [styles.small, slim ? styles.slim : null, { backgroundColor: t.soft, borderColor: t.line, opacity: disabled ? 0.5 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] }]}
     >
       <Text style={[styles.smallText, { color: t.ink }]}>{title}</Text>
       {badge ? (
@@ -309,6 +331,8 @@ function SmallButton({ title, onPress, disabled, testID, badge = 0 }) {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
+  daily: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 12, paddingRight: 3, paddingVertical: 2, borderRadius: 14, borderWidth: 2 },
+  dailyTask: { flex: 1, fontSize: 16, fontWeight: '800' },
   flex: { flex: 1 },
   playRow: { flexDirection: 'row', gap: 10 },
   classBtn: { minWidth: 110 },
@@ -350,5 +374,6 @@ const styles = StyleSheet.create({
   menuIcon: { fontSize: 18, lineHeight: 22 },
   menuText: { fontSize: 13, fontWeight: '700' },
   small: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth * 2 },
+  slim: { paddingVertical: 5 },
   smallText: { fontSize: 15, fontWeight: '700' },
 });

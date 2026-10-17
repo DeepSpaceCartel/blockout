@@ -12,6 +12,7 @@ import { cpuStep, settings } from './settings.js';
 import { GAME_EXPERT_BONUS, applySettingsForTurn, icon, look, syncBoardLocks } from './wardrobe.js';
 import { recordGame } from './stats.js';
 import { refreshNudges } from './shop.js';
+import { completeDaily } from './daily.js';
 import { playerFacts, setPractice, stopPracticeTimer, timerText, weakFactWeight } from './practice.js';
 import { pairRoll, pairTurnOrWait, reportClass } from './classroom.js';
 import { buildDicePicks, setDetailsOpen } from './input.js';
@@ -835,6 +836,7 @@ function renderRewards(winners, empty) {
     Progress.recordBoardWin(progress, game.size); // reveals the next board
     syncBoardLocks();
   }
+  if (game.mode === 'single') completeDaily({ kind: 'game', size: game.size, difficulty: game.difficulty, won: humanWon }); // (today's practice?)
   const asked = (p) => p.answered + p.stats.timeouts;
   const perfect = humans.some((p) => asked(p) >= 5 && p.firstTry === asked(p));
   const noHelp = humans.some((p) => asked(p) >= 5 && p.stats.helped === 0);

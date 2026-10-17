@@ -9,6 +9,7 @@ import { PROGRESS_KEY, el } from './base.js';
 import { settings } from './settings.js';
 import { look } from './wardrobe.js';
 import { make } from './play.js';
+import { renderDaily } from './daily.js';
 import { affordableCount, affordableLooks, newStickers, newWardrobe, spareStickers } from './shop.js';
 import { refreshUnlocks } from './cheats.js';
 
@@ -48,6 +49,7 @@ function replaceProgress(next) {
 function renderWallet() {
   el.walletAmount.textContent = formatPoints(progress.wallet);
   updateMenuBadges();
+  renderDaily(); // (done, or a new day)
 }
 
 // iPhone-style red count badges on the main-menu Shop, Wardrobe and Stickers buttons.

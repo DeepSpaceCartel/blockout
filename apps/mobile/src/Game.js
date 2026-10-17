@@ -27,6 +27,7 @@ import Board, { RectPicture } from './Board';
 import { dragRect, drawnMessage } from './boardMath';
 import * as Rewards from './rewards';
 import * as Live from '@blockout/progress/classroom';
+import * as Daily from '@blockout/progress/daily';
 import { addToHistory, recordGame } from './history';
 import { useTheme } from './theme';
 import { usePlayerColors } from './looks';
@@ -749,6 +750,11 @@ export default function Game({ setup, settings = Settings.DEFAULT_SETTINGS, prog
     if (Rewards.countsForStats(match)) recordGame(match, results); // (two players on one phone: just for fun)
     if (rewards.boardBonus) toast(`🏁 Finished ${article(match.size)} ${match.size}×${match.size} game!`, `+${rewards.boardBonus} bonus points`);
     award(rewards.earned);
+    const daily = match.mode === 'single' && Daily.complete(progress, { kind: 'game', size: match.size, difficulty: match.difficulty, won: results.humanWon }); // (today's practice?)
+    if (daily) {
+      toast(...daily.toast);
+      award(daily.earned);
+    }
     onSave();
     setOver({ results });
     setView('board');

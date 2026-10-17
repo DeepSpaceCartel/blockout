@@ -17,7 +17,8 @@
     "./homework": "./src/homework.js",
     "./classroom": "./src/classroom.js",
     "./grownups": "./src/grownups.js",
-    "./hosting": "./src/hosting.js"
+    "./hosting": "./src/hosting.js",
+    "./daily": "./src/daily.js"
   },
   "dependencies": {
     "@blockout/engine": "*"

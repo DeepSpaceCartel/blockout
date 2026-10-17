@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Practice from '@blockout/progress/practice';
+import * as Daily from '@blockout/progress/daily';
 import * as Settings from '@blockout/progress/settings';
 import * as Setup from '@blockout/progress/setup';
 import * as Stats from '@blockout/progress/stats';
@@ -193,6 +194,11 @@ export default function PracticeScreen({ options, progress, settings = Settings.
     const out = Practice.finish(progress, round);
     if (out.finishToast) toast(...out.finishToast);
     onEarned(out.earned);
+    const daily = Daily.complete(progress, { kind: 'practice', tables: round.tables, count: round.count }); // (today's practice?)
+    if (daily) {
+      toast(...daily.toast);
+      onEarned(daily.earned);
+    }
     onSave();
     addToHistory(out.record);
     setEnd(out);

@@ -13,6 +13,7 @@ function createProgress() {
     unlocks: [], // shop item ids
     achievements: {}, // id -> time earned
     checkIn: { last: null, streak: 0 },
+    daily: { day: null, task: null, done: false, streak: 0, lastDone: null }, // today's practice (daily.js)
     facts: {}, // player key -> { name, facts: { '3 × 4': FactStats } }; 3 × 4 and 4 × 3 are separate
     factsOrdered: true,
     counters: { games: 0, classGames: 0, pairGames: 0, pairWins: 0, tournaments: 0, tournamentWins: 0 },
@@ -75,6 +76,7 @@ function normalize(saved) {
     ...fresh,
     ...saved,
     checkIn: { ...fresh.checkIn, ...saved.checkIn },
+    daily: { ...fresh.daily, ...saved.daily },
     counters: { ...fresh.counters, ...saved.counters },
     unlocks: Array.isArray(saved.unlocks) ? saved.unlocks : [],
     achievements: saved.achievements || {},
@@ -559,6 +561,8 @@ const GENERAL_ACHIEVEMENTS = [
   { id: 'twelve', icon: '🧠', name: 'Twelve times', desc: 'Answer a 12 times fact correctly.', reward: 20, check: (c) => c.event === 'answer' && c.correct && (c.a === 12 || c.b === 12) },
   { id: 'checkin3', icon: '☀️', name: 'Three days in a row', desc: 'Play three days in a row.', reward: 20, check: (c) => c.event === 'checkin' && c.streak >= 3 },
   { id: 'checkin7', icon: '🗓️', name: 'Week streak', desc: 'Play seven days in a row.', reward: 50, check: (c) => c.event === 'checkin' && c.streak >= 7 },
+  { id: 'daily_first', icon: '⭐', name: 'Daily star', desc: 'Finish today’s practice.', reward: 15, check: (c) => c.event === 'daily' },
+  { id: 'daily_week', icon: '🌟', name: 'Star week', desc: 'Finish today’s practice seven days in a row.', reward: 60, check: (c) => c.event === 'daily' && c.streak >= 7 },
   { id: 'practice', icon: '🎯', name: 'Practice makes perfect', desc: 'Finish a practice round.', reward: 10, check: (c) => c.event === 'practice' },
   // "Help me count": finding it, learning from it, and managing without it
   { id: 'help_first', icon: '🤝', name: 'Counting buddy', desc: 'Use “Help me count” for the first time.', reward: 5, check: (c) => c.event === 'help' },
@@ -748,6 +752,10 @@ function mergeProgress(a, b) {
   out.stickers = maxOf(x.stickers, y.stickers);
   out.boardWins = maxOf(x.boardWins, y.boardWins);
   out.checkIn = (x.checkIn.last || '') >= (y.checkIn.last || '') ? x.checkIn : y.checkIn;
+  // today's practice: the later day's, and on the same day the one that's done
+  const dx = x.daily || {};
+  const dy = y.daily || {};
+  out.daily = (dx.day || '') > (dy.day || '') || ((dx.day || '') === (dy.day || '') && (dx.done || !dy.done)) ? dx : dy;
   out.facts = {};
   for (const key of new Set([...Object.keys(x.facts), ...Object.keys(y.facts)])) {
     const fx = (x.facts[key] || { facts: {} }).facts;
@@ -900,6 +908,7 @@ export {
   mergeProgress,
   withoutCheats,
   factSummary,
+  ownFacts,
   cleanGoal,
   describeGoal,
   goalProgress,
