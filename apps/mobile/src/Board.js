@@ -141,26 +141,41 @@ function Drawing({ rect, verdict, color, cell, side, t }) {
 }
 
 // Skip-counting: the rows (or columns) counted so far light up, each with its running total
-function CountingOverlay({ counting, cell, t }) {
+// everySquare: every counted square shows its number (1, 2, 3, then 4, 5, 6 …),
+// the last of each row in bold: that's the running total. Without it only
+// the running totals show (the board's squares are too small for more).
+function CountingOverlay({ counting, cell, t, everySquare = false }) {
   const { rect, byRows, shown, group } = counting;
+  const size = everySquare ? Math.min(22, cell * 0.42) : Math.min(16, cell * 0.5);
   const strips = [];
   for (let i = 0; i < shown; i++) {
     const strip = byRows ? { x: rect.x, y: rect.y + i, w: rect.w, h: 1 } : { x: rect.x + i, y: rect.y, w: 1, h: rect.h };
+    // the squares along the strip, in counting order (left to right, or top to bottom)
+    const squares = Array.from({ length: group }, (_, j) => (byRows ? { x: strip.x + j, y: strip.y } : { x: strip.x, y: strip.y + j }));
+    const numbered = everySquare ? squares : squares.slice(-1);
     strips.push(
       <G key={i}>
         <Rect x={strip.x * cell} y={strip.y * cell} width={strip.w * cell} height={strip.h * cell} fill={t.gold} fillOpacity={0.9} />
         <SquareLines {...strip} cell={cell} width={2} />
-        <SvgText
-          x={(strip.x + strip.w - 0.5) * cell}
-          y={(strip.y + strip.h - 0.5) * cell + 5}
-          fill={t.ink}
-          fontFamily={FONT}
-          fontSize={Math.min(16, cell * 0.5)}
-          fontWeight="bold"
-          textAnchor="middle"
-        >
-          {(i + 1) * group}
-        </SvgText>
+        {numbered.map((sq) => {
+          const n = i * group + (byRows ? sq.x - strip.x : sq.y - strip.y) + 1;
+          const total = n === (i + 1) * group;
+          return (
+            <SvgText
+              key={n}
+              x={(sq.x + 0.5) * cell}
+              y={(sq.y + 0.5) * cell + size * 0.35}
+              fill={t.ink}
+              fillOpacity={total ? 1 : 0.7}
+              fontFamily={FONT}
+              fontSize={total && everySquare ? size * 1.15 : size}
+              fontWeight={total ? '900' : '600'}
+              textAnchor="middle"
+            >
+              {n}
+            </SvgText>
+          );
+        })}
       </G>
     );
   }
@@ -180,7 +195,7 @@ export function RectPicture({ rect, color, counting, maxWidth, maxHeight }) {
     <View style={[{ width, height, alignSelf: 'center' }, NO_SELECT]} accessibilityLabel={`Your rectangle: ${rect.w} squares across and ${rect.h} down`}>
       <Svg width={width} height={height} pointerEvents="none">
         <Rect x={0} y={0} width={width} height={height} fill={color} fillOpacity={0.85} />
-        {counting ? <CountingOverlay counting={{ ...counting, rect: at }} cell={cell} t={t} /> : null}
+        {counting ? <CountingOverlay counting={{ ...counting, rect: at }} cell={cell} t={t} everySquare /> : null}
         <SquareLines x={0} y={0} w={rect.w} h={rect.h} cell={cell} width={2} />
         <Rect x={1.5} y={1.5} width={width - 3} height={height - 3} fill="none" stroke={shade(color, -0.35)} strokeWidth={3} />
       </Svg>
